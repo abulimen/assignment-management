@@ -5,7 +5,7 @@ import TextAlign from '@tiptap/extension-text-align';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useTracker } from '../hooks/useTracker';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   List, ListOrdered, Quote, Code, Undo, Redo,
@@ -63,6 +63,7 @@ function Toolbar({ editor }) {
 
 export default function Editor({ submissionId, initialContent, onContentChange }) {
   const { plugin, flush } = useTracker(submissionId);
+  const registered = useRef(false);
 
   const editor = useEditor({
     extensions: [
@@ -86,8 +87,9 @@ export default function Editor({ submissionId, initialContent, onContentChange }
   });
 
   useEffect(() => {
-    if (editor && plugin) {
+    if (editor && plugin && !registered.current) {
       editor.registerPlugin(plugin);
+      registered.current = true;
     }
   }, [editor, plugin]);
 

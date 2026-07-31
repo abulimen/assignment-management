@@ -49,8 +49,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true) ?? [];
     require_fields($data, ['assignment_id']);
 
-    $stmt = $pdo->prepare('INSERT INTO submissions (assignment_id, student_id, content, status) VALUES (?, ?, ?, ?)');
-    $stmt->execute([$data['assignment_id'], $user['sub'], $data['content'] ?? null, 'draft']);
+    // Verify assignment exists
+    $stmt = $pdo->prepare('SELECT id FROM assignments WHERE id = ?');
+    $stmt->execute([$data['assignment_id']]);
+    if (!$stmt->fetch()) {
+        error_response('Assignment not found', 404);
+    }
+
+    try {
+        $stmt = $pdo->prepare('INSERT INTO submissions (assignment_id, student_id, content, status) VALUES (?, ?, ?, ?)');
+        $stmt->execute([$data['assignment_id'], $user['sub'], $data['content'] ?? null, 'draft']);
+    } catch (PDOException $e) {
+        if ($e->getCode() == 23000) {
+            error_response('You already have a submission for this assignment', 409);
+        }
+        error_response('Failed to create submission', 500);
+    }
     $id = (int) $pdo->lastInsertId();
 
     // Initialize stats row

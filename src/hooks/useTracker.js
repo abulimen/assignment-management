@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useMemo } from 'react';
 import { Plugin } from '@tiptap/pm/state';
 import { api } from '../api';
 
@@ -8,6 +8,7 @@ export function useTracker(submissionId) {
   const buffer = useRef([]);
   const seq = useRef(0);
   const timer = useRef(null);
+  const enqueueRef = useRef(null);
 
   const flush = useCallback(() => {
     if (buffer.current.length === 0) return;
@@ -32,8 +33,14 @@ export function useTracker(submissionId) {
     }
   }, [flush]);
 
-  const plugin = new Plugin({
+  // Keep enqueueRef synced so the plugin (created once) always calls latest enqueue
+  enqueueRef.current = enqueue;
+
+  // Memoize plugin: created once per hook instance, enqueue accessed via ref
+  const plugin = useMemo(() => new Plugin({
     appendTransaction: (transactions, oldState, newState) => {
+      const enq = enqueueRef.current;
+      if (!enq) return null;
       for (const tr of transactions) {
         if (tr.docChanged) {
           for (const step of tr.steps) {
@@ -47,18 +54,18 @@ export function useTracker(submissionId) {
 
               if (inserted && deleted === 0) {
                 if (inserted.length === 1) {
-                  enqueue('keystroke', { char: inserted, position: from });
+                  enq('keystroke', { char: inserted, position: from });
                 } else {
-                  enqueue('paste', { text: inserted, position: from, source: 'clipboard' });
+                  enq('paste', { text: inserted, position: from, source: 'clipboard' });
                 }
               } else if (deleted > 0 && !inserted) {
-                enqueue('delete', { position: from, length: deleted });
+                enq('delete', { position: from, length: deleted });
               } else if (deleted > 0 && inserted) {
-                enqueue('delete', { position: from, length: deleted });
+                enq('delete', { position: from, length: deleted });
                 if (inserted.length === 1) {
-                  enqueue('keystroke', { char: inserted, position: from });
+                  enq('keystroke', { char: inserted, position: from });
                 } else {
-                  enqueue('paste', { text: inserted, position: from, source: 'clipboard' });
+                  enq('paste', { text: inserted, position: from, source: 'clipboard' });
                 }
               }
             }
@@ -68,13 +75,13 @@ export function useTracker(submissionId) {
           const oldFrom = oldState.selection.from;
           const newFrom = newState.selection.from;
           if (Math.abs(newFrom - oldFrom) > 50) {
-            enqueue('cursor_jump', { from: oldFrom, to: newFrom });
+            enq('cursor_jump', { from: oldFrom, to: newFrom });
           }
         }
       }
       return null;
     },
-  });
+  }), []);
 
   return { plugin, flush, enqueue };
 }
