@@ -30,7 +30,7 @@ export default function Review() {
       <EditDensity events={data.events} totalTimeMs={data.stats?.total_time_ms} />
 
       <h2 className="text-lg font-semibold mb-3">Document Playback</h2>
-      <Playback events={data.events} />
+      <Playback events={data.events} finalContent={data.content} />
     </div>
   );
 }

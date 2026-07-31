@@ -13,6 +13,7 @@ export default function Submission() {
   const [assignment, setAssignment] = useState(null);
   const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,11 +33,26 @@ export default function Submission() {
     }).finally(() => setLoading(false));
   }, [id, user?.id]);
 
+  async function handleSave() {
+    if (!submission) return;
+    setSaving(true);
+    setSavedMsg('');
+    try {
+      await api.put(`submission.php/${submission.id}`, { content });
+      setSavedMsg('Draft saved');
+      setTimeout(() => setSavedMsg(''), 2000);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleSubmit() {
     if (!submission) return;
     setSaving(true);
     try {
-      await api.post(`submission.php/${submission.id}/submit`);
+      await api.post(`submission.php/${submission.id}/submit`, { content });
       navigate(`/assignments/${id}`);
     } catch (err) {
       alert(err.message);
@@ -55,15 +71,22 @@ export default function Submission() {
           {submission && (
             <p className="text-sm text-gray-400 mt-1">
               Status: <span className="font-medium text-gray-600">{submission.status}</span>
+              {savedMsg && <span className="text-green-500 ml-2">{savedMsg}</span>}
             </p>
           )}
         </div>
         <div className="flex items-center gap-3">
           {submission && submission.status !== 'submitted' && (
-            <button onClick={handleSubmit} disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
-              <Send className="w-4 h-4" /> Submit
-            </button>
+            <>
+              <button onClick={handleSave} disabled={saving}
+                className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
+                <Save className="w-4 h-4" /> Save Draft
+              </button>
+              <button onClick={handleSubmit} disabled={saving}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50">
+                <Send className="w-4 h-4" /> Submit
+              </button>
+            </>
           )}
         </div>
       </div>

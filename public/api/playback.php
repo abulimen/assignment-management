@@ -13,7 +13,7 @@ $pdo = db();
 $id = isset($_SERVER['PATH_INFO']) ? (int) trim($_SERVER['PATH_INFO'], '/') : 0;
 if (!$id) error_response('Submission ID required', 400);
 
-$stmt = $pdo->prepare('SELECT id, assignment_id, student_id, status FROM submissions WHERE id = ?');
+$stmt = $pdo->prepare('SELECT id, assignment_id, student_id, status, content FROM submissions WHERE id = ?');
 $stmt->execute([$id]);
 $sub = $stmt->fetch();
 if (!$sub) error_response('Submission not found', 404);
@@ -40,6 +40,7 @@ $stats = $stmt->fetch() ?: [];
 
 json_response([
     'submission_id' => (int) $sub['id'],
+    'content' => $sub['content'],
     'events' => $events,
     'stats' => $stats,
 ]);

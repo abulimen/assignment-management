@@ -62,7 +62,7 @@ function Toolbar({ editor }) {
 }
 
 export default function Editor({ submissionId, initialContent, onContentChange }) {
-  const { plugin, flush } = useTracker(submissionId);
+  const { plugin, flush, setEditorRef } = useTracker(submissionId);
   const registered = useRef(false);
 
   const editor = useEditor({
@@ -85,6 +85,11 @@ export default function Editor({ submissionId, initialContent, onContentChange }
     },
     onBlur: () => flush(),
   });
+
+  // Give the tracker access to the editor for snapshots
+  useEffect(() => {
+    setEditorRef(() => editor);
+  }, [editor, setEditorRef]);
 
   useEffect(() => {
     if (editor && plugin && !registered.current) {

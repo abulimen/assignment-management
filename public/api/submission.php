@@ -50,10 +50,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ((int) $sub['student_id'] !== $user['sub']) error_response('Forbidden', 403);
     if ($sub['status'] === 'submitted') error_response('Already submitted', 409);
 
-    $stmt = $pdo->prepare("UPDATE submissions SET status = 'submitted', submitted_at = NOW() WHERE id = ?");
-    $stmt->execute([$id]);
+    // Save final content on submit
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    $content = $body['content'] ?? null;
+
+    $stmt = $pdo->prepare("UPDATE submissions SET status = 'submitted', submitted_at = NOW(), content = ? WHERE id = ?");
+    $stmt->execute([$content, $id]);
 
     $stmt = $pdo->prepare('SELECT id, assignment_id, student_id, status, submitted_at, created_at FROM submissions WHERE id = ?');
+    $stmt->execute([$id]);
+    json_response(['submission' => $stmt->fetch()]);
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
+    // Save draft content
+    $stmt = $pdo->prepare('SELECT student_id, status FROM submissions WHERE id = ?');
+    $stmt->execute([$id]);
+    $sub = $stmt->fetch();
+    if (!$sub) error_response('Submission not found', 404);
+    if ((int) $sub['student_id'] !== $user['sub']) error_response('Forbidden', 403);
+    if ($sub['status'] === 'submitted') error_response('Cannot edit submitted submission', 409);
+
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    $content = $body['content'] ?? null;
+
+    $stmt = $pdo->prepare('UPDATE submissions SET content = ? WHERE id = ?');
+    $stmt->execute([$content, $id]);
+
+    $stmt = $pdo->prepare('SELECT id, assignment_id, student_id, content, status, submitted_at, created_at FROM submissions WHERE id = ?');
     $stmt->execute([$id]);
     json_response(['submission' => $stmt->fetch()]);
 }
