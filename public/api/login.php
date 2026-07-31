@@ -10,6 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $data = json_decode(file_get_contents('php://input'), true) ?? [];
 require_fields($data, ['email', 'password']);
+validate_email($data['email']);
 
 $pdo = db();
 $stmt = $pdo->prepare('SELECT id, email, password, name, role FROM users WHERE email = ?');
