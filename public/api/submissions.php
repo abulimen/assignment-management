@@ -16,18 +16,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $stmt->execute([$assignmentId]);
         $a = $stmt->fetch();
         if (!$a || (int) $a['lecturer_id'] !== $user['sub']) error_response('Forbidden', 403);
+
+        $stmt = $pdo->prepare('
+            SELECT s.id, s.student_id, u.name AS student_name, s.status, s.submitted_at, s.created_at,
+                   st.keystroke_count, st.paste_count, st.delete_count, st.avg_wpm, st.total_time_ms
+            FROM submissions s
+            JOIN users u ON u.id = s.student_id
+            LEFT JOIN submission_stats st ON st.submission_id = s.id
+            WHERE s.assignment_id = ?
+            ORDER BY s.created_at DESC
+        ');
+        $stmt->execute([$assignmentId]);
+    } else {
+        // Student: only see their own submission
+        $stmt = $pdo->prepare('
+            SELECT s.id, s.student_id, u.name AS student_name, s.status, s.submitted_at, s.created_at,
+                   st.keystroke_count, st.paste_count, st.delete_count, st.avg_wpm, st.total_time_ms
+            FROM submissions s
+            JOIN users u ON u.id = s.student_id
+            LEFT JOIN submission_stats st ON st.submission_id = s.id
+            WHERE s.assignment_id = ? AND s.student_id = ?
+            ORDER BY s.created_at DESC
+        ');
+        $stmt->execute([$assignmentId, $user['sub']]);
     }
 
-    $stmt = $pdo->prepare('
-        SELECT s.id, s.student_id, u.name AS student_name, s.status, s.submitted_at, s.created_at,
-               st.keystroke_count, st.paste_count, st.delete_count, st.avg_wpm, st.total_time_ms
-        FROM submissions s
-        JOIN users u ON u.id = s.student_id
-        LEFT JOIN submission_stats st ON st.submission_id = s.id
-        WHERE s.assignment_id = ?
-        ORDER BY s.created_at DESC
-    ');
-    $stmt->execute([$assignmentId]);
     json_response(['submissions' => $stmt->fetchAll()]);
 }
 
