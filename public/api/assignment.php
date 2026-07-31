@@ -16,18 +16,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $assignment = $stmt->fetch();
     if (!$assignment) error_response('Assignment not found', 404);
 
-    $stmt = $pdo->prepare('
-        SELECT s.id, s.student_id, u.name AS student_name, u.email AS student_email,
-               s.status, s.submitted_at, s.created_at,
-               st.keystroke_count, st.paste_count, st.delete_count, st.avg_wpm, st.total_time_ms
-        FROM submissions s
-        JOIN users u ON u.id = s.student_id
-        LEFT JOIN submission_stats st ON st.submission_id = s.id
-        WHERE s.assignment_id = ?
-        ORDER BY s.created_at DESC
-    ');
-    $stmt->execute([$id]);
-    $assignment['submissions'] = $stmt->fetchAll();
+    if ($user['role'] === 'lecturer') {
+        // Lecturer: only see submissions if they own the assignment
+        if ((int) $assignment['lecturer_id'] !== $user['sub']) {
+            $assignment['submissions'] = [];
+        } else {
+            $stmt = $pdo->prepare('
+                SELECT s.id, s.student_id, u.name AS student_name, u.email AS student_email,
+                       s.status, s.submitted_at, s.created_at,
+                       st.keystroke_count, st.paste_count, st.delete_count, st.avg_wpm, st.total_time_ms
+                FROM submissions s
+                JOIN users u ON u.id = s.student_id
+                LEFT JOIN submission_stats st ON st.submission_id = s.id
+                WHERE s.assignment_id = ?
+                ORDER BY s.created_at DESC
+            ');
+            $stmt->execute([$id]);
+            $assignment['submissions'] = $stmt->fetchAll();
+        }
+    } else {
+        // Student: only see their own submission
+        $stmt = $pdo->prepare('
+            SELECT s.id, s.student_id, u.name AS student_name, u.email AS student_email,
+                   s.status, s.submitted_at, s.created_at,
+                   st.keystroke_count, st.paste_count, st.delete_count, st.avg_wpm, st.total_time_ms
+            FROM submissions s
+            JOIN users u ON u.id = s.student_id
+            LEFT JOIN submission_stats st ON st.submission_id = s.id
+            WHERE s.assignment_id = ? AND s.student_id = ?
+            ORDER BY s.created_at DESC
+        ');
+        $stmt->execute([$id, $user['sub']]);
+        $assignment['submissions'] = $stmt->fetchAll();
+    }
 
     json_response(['assignment' => $assignment]);
 }
