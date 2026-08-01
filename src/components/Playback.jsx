@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -8,23 +8,26 @@ import { TextSelection } from '@tiptap/pm/state';
 import { Play, Pause, SkipBack, SkipForward, FileText, Film } from 'lucide-react';
 
 // ProseMirror Step Replay.
-// Instead of reconstructing a document from keystroke events, we replay the
-// actual ProseMirror transaction steps into a hidden TipTap editor instance.
-// The editor handles ALL formatting, paragraphs, marks natively.
-// The cursor position comes from the stored selection.
+// Replays raw ProseMirror transaction steps into a hidden TipTap editor.
+// Uses a guard ref to prevent the dispatch → emit → re-render → dispatch
+// infinite loop that TipTap's React integration causes.
 
 export default function Playback({ events, finalContent }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [mode, setMode] = useState('playback');
-  const [appliedIndex, setAppliedIndex] = useState(-1);
   const intervalRef = useRef(null);
   const contentRef = useRef(null);
-  const caretRef = useRef(null);
+  const isDispatching = useRef(false); // Guards against re-entrant dispatches
+  const lastIndexRef = useRef(-1);     // Tracks what we've already replayed
 
-  // The hidden editor used for replay — same schema as the writing editor,
-  // minus the tracker plugin (which would cause double-recording).
+  // Memoize step events so identity is stable across renders
+  const stepEvents = useMemo(
+    () => (events || []).filter(e => e.steps && e.steps.length > 0),
+    [events]
+  );
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -41,16 +44,11 @@ export default function Playback({ events, finalContent }) {
     },
   });
 
-  // Filter to only events with steps (skip snapshots, cursor_jumps without steps)
-  const stepEvents = (events || []).filter(e => e.steps && e.steps.length > 0);
-
-  // Apply a single step event to the hidden editor
+  // Apply a single step event — guarded against re-entrancy
   const applyStepEvent = useCallback((event) => {
     if (!editor || !event?.steps) return;
 
     const { state } = editor.view;
-
-    // Build a transaction from the stored steps
     let tr = state.tr;
     for (const stepJson of event.steps) {
       try {
@@ -61,55 +59,65 @@ export default function Playback({ events, finalContent }) {
       }
     }
 
-    // Set selection if available
     if (event.selection?.from != null) {
       const from = Math.min(event.selection.from, tr.doc.content.size);
       try {
         tr = tr.setSelection(TextSelection.create(tr.doc, from));
       } catch (e) {
-        // If position is invalid, skip selection
+        // Invalid position — skip
       }
     }
 
+    isDispatching.current = true;
     editor.view.dispatch(tr);
+    isDispatching.current = false;
   }, [editor]);
 
-  // Reset editor to empty and apply all steps up to a given index
-  const replayToIndex = useCallback((index) => {
+  // Full rebuild from 0 to index — only called when scrubbing/jumping
+  const rebuildToIndex = useCallback((index) => {
     if (!editor) return;
-
-    // Clear the editor
+    isDispatching.current = true;
     editor.commands.clearContent();
-
-    // Apply all step events up to index
+    isDispatching.current = false;
     for (let i = 0; i <= index && i < stepEvents.length; i++) {
       applyStepEvent(stepEvents[i]);
     }
-
-    setAppliedIndex(index);
+    lastIndexRef.current = index;
   }, [editor, stepEvents, applyStepEvent]);
 
-  // When currentIndex changes, replay to that index
+  // Replay logic: if advancing by 1, just apply the next step.
+  // If jumping (scrub), do a full rebuild.
   useEffect(() => {
-    if (mode === 'playback' && editor && stepEvents.length > 0) {
-      replayToIndex(currentIndex);
+    if (mode !== 'playback' || !editor || stepEvents.length === 0) return;
+    if (isDispatching.current) return; // Guard against re-entrant calls
+
+    if (currentIndex === lastIndexRef.current + 1) {
+      // Sequential advance — just apply the next step
+      applyStepEvent(stepEvents[currentIndex]);
+      lastIndexRef.current = currentIndex;
+    } else if (currentIndex !== lastIndexRef.current) {
+      // Jump (scrub) — full rebuild
+      rebuildToIndex(currentIndex);
     }
-  }, [currentIndex, mode, editor, stepEvents.length, replayToIndex]);
+  }, [currentIndex, mode, editor, stepEvents, applyStepEvent, rebuildToIndex]);
 
   // Switch to final document
   useEffect(() => {
     if (mode === 'final' && editor && finalContent) {
+      isDispatching.current = true;
       try {
         editor.commands.setContent(JSON.parse(finalContent));
       } catch (e) {
         editor.commands.setContent(finalContent);
       }
-    } else if (mode === 'playback' && editor) {
-      replayToIndex(currentIndex);
+      isDispatching.current = false;
+      lastIndexRef.current = -1; // Invalidate replay cache
+    } else if (mode === 'playback' && editor && lastIndexRef.current === -1) {
+      rebuildToIndex(currentIndex);
     }
-  }, [mode, editor, finalContent, currentIndex, replayToIndex]);
+  }, [mode, editor, finalContent, currentIndex, rebuildToIndex]);
 
-  // Playback loop — advance one step per tick
+  // Playback loop
   useEffect(() => {
     if (playing && stepEvents.length > 0) {
       const delay = 200 / speed;
@@ -126,16 +134,13 @@ export default function Playback({ events, finalContent }) {
     return () => clearInterval(intervalRef.current);
   }, [playing, speed, stepEvents.length]);
 
-  // Auto-scroll to caret position
+  // Auto-scroll to bottom (cursor follows typing)
   useEffect(() => {
     if (mode === 'playback' && contentRef.current) {
       const el = contentRef.current.querySelector('.ProseMirror');
-      if (el) {
-        // Scroll to the end of the content (where cursor is)
-        el.scrollTop = el.scrollHeight;
-      }
+      if (el) el.scrollTop = el.scrollHeight;
     }
-  }, [appliedIndex, mode]);
+  }, [currentIndex, mode]);
 
   const hasFinal = !!finalContent;
   const hasEvents = stepEvents.length > 0;
@@ -147,7 +152,6 @@ export default function Playback({ events, finalContent }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div className="border-b border-gray-200 bg-gray-50 p-3">
-        {/* Tab toggle */}
         <div className="flex items-center gap-2 mb-3">
           <button
             onClick={() => setMode('playback')}
@@ -169,7 +173,6 @@ export default function Playback({ events, finalContent }) {
           </button>
         </div>
 
-        {/* Playback controls */}
         {mode === 'playback' && hasEvents && (
           <>
             <div className="flex items-center gap-2 mb-2">
@@ -200,15 +203,7 @@ export default function Playback({ events, finalContent }) {
         {mode === 'final' && <div className="text-xs text-gray-500">The student's final submitted document</div>}
       </div>
 
-      {/* Editor content area with caret overlay */}
-      <div ref={contentRef} className="relative min-h-[300px] max-h-[600px] overflow-y-auto">
-        {mode === 'playback' && playing && (
-          <div ref={caretRef} className="absolute w-0.5 h-5 bg-primary-600 animate-pulse z-10 pointer-events-none"
-            style={{
-              left: '50%',
-              top: '50%',
-            }} />
-        )}
+      <div ref={contentRef} className="min-h-[300px] max-h-[600px] overflow-y-auto">
         <div className="p-6">
           <EditorContent editor={editor} />
         </div>
