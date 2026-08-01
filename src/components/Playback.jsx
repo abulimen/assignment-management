@@ -6,6 +6,8 @@ import TextAlign from '@tiptap/extension-text-align';
 import Link from '@tiptap/extension-link';
 import { TextSelection } from '@tiptap/pm/state';
 import { Step } from '@tiptap/pm/transform';
+import { Plugin } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { Play, Pause, SkipBack, SkipForward, FileText, Film } from 'lucide-react';
 
 // ProseMirror Step Replay.
@@ -44,6 +46,38 @@ export default function Playback({ events, finalContent }) {
       },
     },
   });
+
+  // Cursor decoration plugin — draws a blinking caret block at the
+  // current selection position. Needed because editable:false editors
+  // don't show a native cursor.
+  useEffect(() => {
+    if (!editor) return;
+
+    const cursorPlugin = new Plugin({
+      props: {
+        decorations: (state) => {
+          const { from, to } = state.selection;
+          if (from === to) {
+            // Collapsed selection — show a cursor block
+            return DecorationSet.create(state.doc, [
+              Decoration.widget(from, () => {
+                const el = document.createElement('span');
+                el.className = 'playback-caret';
+                return el;
+              })
+            ]);
+          }
+          // Range selection — highlight it
+          return DecorationSet.create(state.doc, [
+            Decoration.inline(from, to, { class: 'playback-selection' })
+          ]);
+        },
+      },
+    });
+
+    editor.registerPlugin(cursorPlugin);
+    return () => { editor.unregisterPlugin(cursorPlugin.key); };
+  }, [editor]);
 
   // Apply a single step event — guarded against re-entrancy
   const applyStepEvent = useCallback((event) => {

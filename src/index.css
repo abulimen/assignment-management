@@ -31,3 +31,24 @@
   @apply text-gray-400 float-left pointer-events-none h-0;
   content: attr(data-placeholder);
 }
+
+/* Playback blinking cursor block */
+.playback-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.2em;
+  background: #2563eb;
+  vertical-align: text-bottom;
+  margin-left: -1px;
+  animation: playback-blink 0.8s step-end infinite;
+}
+
+@keyframes playback-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Playback selection highlight */
+.playback-selection {
+  background: rgba(59, 130, 246, 0.2);
+}
