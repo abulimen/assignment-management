@@ -208,14 +208,26 @@ def compute_verdict(events, stats):
     }
 
     # --- Compute weighted overall score ---
-    total_weight = sum(f["weight"] for f in factors.values())
-    weighted_sum = sum(f["score"] * f["weight"] for f in factors.values())
+    # Scale non-paste factors by (1 - paste_ratio): if 91% of the document
+    # was pasted, then the typing cadence, edit density, sustained speed,
+    # cursor jumps, and growth pattern factors are only measuring 9% of
+    # the document. Their scores should be proportionally discounted.
+    processed_factors = {}
+    for name, f in factors.items():
+        scaled = dict(f)  # copy
+        if name != "paste_ratio":
+            # Scale: at 100% paste → 0% relevance, at 0% paste → 100% relevance
+            relevance = max(0.05, 1.0 - paste_ratio)
+            scaled["score"] = round(f["score"] * relevance)
+            scaled["detail"] = f["detail"] + f" (relevance: {relevance*100:.0f}%)"
+        processed_factors[name] = scaled
+
+    total_weight = sum(f["weight"] for f in processed_factors.values())
+    weighted_sum = sum(f["score"] * f["weight"] for f in processed_factors.values())
     overall = round(weighted_sum / total_weight) if total_weight > 0 else 0
 
     # Critical factor override: if ANY factor scores 0, cap the overall at 40.
-    # A submission where 91% of text was pasted cannot be "Likely Original"
-    # even if the other factors look fine.
-    if any(f["score"] == 0 for f in factors.values()):
+    if any(f["score"] == 0 for f in processed_factors.values()):
         overall = min(overall, 40)
 
     if overall >= 80:
@@ -241,7 +253,7 @@ def compute_verdict(events, stats):
         "overall_score": overall,
         "verdict": verdict,
         "confidence": confidence,
-        "factors": factors,
+        "factors": processed_factors,
         "risk_flags": risk_flags
     }
 
