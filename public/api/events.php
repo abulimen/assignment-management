@@ -55,6 +55,23 @@ $stats = $pdo->prepare('
 $stats->execute(['keystroke', 'paste', 'delete', 'cursor_jump', $sid]);
 $s = $stats->fetch();
 
+// Compute paste_ratio by CHARACTER count, not event count.
+// paste_ratio = pasted_chars / (pasted_chars + typed_chars)
+// Each keystroke = 1 char. Paste text length from data.text.
+$charStats = $pdo->prepare('
+    SELECT
+        SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) AS typed_chars,
+        SUM(CASE WHEN type = ? THEN CHAR_LENGTH(JSON_UNQUOTE(JSON_EXTRACT(data, "$.text"))) ELSE 0 END) AS pasted_chars
+    FROM events WHERE submission_id = ?
+');
+$charStats->execute(['keystroke', 'paste', $sid]);
+$cs = $charStats->fetch();
+
+$typedChars = (int) ($cs['typed_chars'] ?? 0);
+$pastedChars = (int) ($cs['pasted_chars'] ?? 0);
+$totalChars = $typedChars + $pastedChars;
+$pasteRatio = $totalChars > 0 ? round($pastedChars / $totalChars, 4) : 0;
+
 // Approximate total time: last event time - first event time
 $time = $pdo->prepare('SELECT MIN(occurred_at) AS first_ts, MAX(occurred_at) AS last_ts FROM events WHERE submission_id = ?');
 $time->execute([$sid]);
@@ -64,9 +81,6 @@ $totalMs = $ts['first_ts'] && $ts['last_ts'] ? round(($ts['last_ts'] - $ts['firs
 // Approximate WPM: (keystrokes / 5) / minutes
 $minutes = $totalMs / 60000;
 $wpm = $minutes > 0 ? round(($s['keystroke_count'] / 5) / $minutes, 1) : 0;
-
-$total = max((int) $s['total_events'], 1);
-$pasteRatio = $total > 0 ? round($s['paste_count'] / $total, 4) : 0;
 
 $pdo->prepare('
     INSERT INTO submission_stats (submission_id, total_time_ms, keystroke_count, paste_count, delete_count, cursor_jumps, avg_wpm, paste_ratio)
