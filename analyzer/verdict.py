@@ -3,6 +3,14 @@ from statistics import stdev, mean
 
 # Weighted originality scoring engine.
 # Each factor returns a 0-100 score (100 = most original, 0 = suspicious).
+#
+# Classification: events now have type='step' with a 'steps' array containing
+# raw ProseMirror steps. We classify from the step types:
+#   - ReplaceStep with inserted text length 1  → keystroke
+#   - ReplaceStep with inserted text length >1 → paste
+#   - ReplaceStep with deleted > 0             → delete
+#   - AddMarkStep/RemoveMarkStep               → format
+# Legacy events (type='keystroke'/'paste'/'delete') still work as fallback.
 
 def compute_verdict(events, stats):
     factors = {}
@@ -29,6 +37,53 @@ def compute_verdict(events, stats):
 
     total_minutes = max(total_time_ms / 60000, 0.016)
 
+    # --- Classify events from steps_json (or legacy type field) ---
+    keystroke_events = []  # events with timestamps for cadence analysis
+    typed_chars = 0
+    pasted_chars = 0
+    deleted_chars = 0
+
+    for e in events:
+        etype = e.get("type", "")
+        steps = e.get("steps")
+
+        if steps:
+            # New step-based event — classify from ProseMirror step types
+            for step in steps:
+                step_type = step.get("stepType", "")
+                if step_type == "replace":
+                    frm = step.get("from", 0)
+                    to = step.get("to", 0)
+                    deleted = to - frm
+                    inserted_len = _count_slice_text(step.get("slice", {}).get("content", []))
+
+                    if inserted_len > 0 and deleted == 0:
+                        if inserted_len == 1:
+                            keystroke_events.append(e)
+                            typed_chars += 1
+                        else:
+                            pasted_chars += inserted_len
+                    elif deleted > 0 and inserted_len == 0:
+                        deleted_chars += deleted
+                    elif deleted > 0 and inserted_len > 0:
+                        deleted_chars += deleted
+                        if inserted_len == 1:
+                            keystroke_events.append(e)
+                            typed_chars += 1
+                        else:
+                            pasted_chars += inserted_len
+                # addMark / removeMark = format, not counted in text stats
+        else:
+            # Legacy event — classify from type field
+            if etype == "keystroke":
+                keystroke_events.append(e)
+                typed_chars += 1
+            elif etype == "paste":
+                text = e.get("data", {}).get("text", "")
+                pasted_chars += len(text)
+            elif etype == "delete":
+                deleted_chars += e.get("data", {}).get("length", 0)
+
     # --- Factor 1: Paste Ratio (20%) ---
     paste_score = max(0, 100 - paste_ratio * 500)
     factors["paste_ratio"] = {
@@ -41,20 +96,16 @@ def compute_verdict(events, stats):
         risk_flags.append({"level": "critical", "message": "High Risk: Excessive Copy-Paste"})
 
     # --- Factor 2: Typing Cadence Consistency (25%) ---
-    # Extract keystroke timestamps, compute inter-keystroke intervals
-    keystrokes = [e for e in events if e.get("type") == "keystroke"]
     intervals = []
-    if len(keystrokes) >= 10:
-        for i in range(1, len(keystrokes)):
-            gap = keystrokes[i]["occurred_at"] - keystrokes[i-1]["occurred_at"]
+    if len(keystroke_events) >= 10:
+        for i in range(1, len(keystroke_events)):
+            gap = keystroke_events[i]["occurred_at"] - keystroke_events[i-1]["occurred_at"]
             if 0 < gap < 10:  # ignore gaps > 10s (pauses)
                 intervals.append(gap)
     if len(intervals) >= 10:
         avg_interval = mean(intervals)
         interval_std = stdev(intervals) if len(intervals) > 1 else 0
-        # Coefficient of variation: how much variation exists. Human > 0.3, bot < 0.1
         cv = interval_std / avg_interval if avg_interval > 0 else 0
-        # Map CV to score: CV=0 (bot) → 0, CV=0.5+ (human) → 100
         cadence_score = min(100, max(0, cv * 200))
         if cv < 0.15:
             risk_flags.append({"level": "critical", "message": "High Risk: Unnaturally Consistent Typing (possible transcription bot)"})
@@ -62,8 +113,8 @@ def compute_verdict(events, stats):
             risk_flags.append({"level": "warning", "message": "Risk: Typing cadence is unusually consistent"})
         detail = f"CV: {cv:.2f} ({'natural' if cv > 0.3 else 'unusually consistent'} variation)"
     else:
-        cadence_score = 50  # Not enough data
-        detail = "Insufficient keystroke data for cadence analysis"
+        cadence_score = 50
+        detail = f"Insufficient keystroke data ({len(keystroke_events)} keystrokes found)"
     factors["typing_cadence"] = {
         "score": round(cadence_score),
         "weight": 25,
@@ -72,28 +123,17 @@ def compute_verdict(events, stats):
     }
 
     # --- Factor 3: Edit Density (20%) ---
-    # Measure by character ratio, not event ratio (same fix as paste_ratio).
-    # delete_ratio = deleted_chars / (deleted_chars + typed_chars)
-    # This avoids dilution from large paste events.
-    typed_chars = 0
-    deleted_chars = 0
-    for e in events:
-        if e.get("type") == "keystroke":
-            typed_chars += 1
-        elif e.get("type") == "delete":
-            deleted_chars += e.get("data", {}).get("length", 0)
     total_text_ops = max(typed_chars + deleted_chars, 1)
     delete_ratio = deleted_chars / total_text_ops
-    # Expected: 5-25% of typed text gets deleted during normal writing.
     if delete_ratio < 0.02:
-        edit_score = 10  # Almost no editing — suspicious
+        edit_score = 10
         risk_flags.append({"level": "warning", "message": "Very low edit density — possible transcription of external screen"})
     elif delete_ratio < 0.05:
         edit_score = 70
     elif delete_ratio < 0.30:
         edit_score = 100
     else:
-        edit_score = 60  # Heavy editing — possibly struggling
+        edit_score = 60
     factors["edit_density"] = {
         "score": round(edit_score),
         "weight": 20,
@@ -102,8 +142,6 @@ def compute_verdict(events, stats):
     }
 
     # --- Factor 4: Sustained Speed (15%) ---
-    # Check for long stretches of high WPM without corrections
-    # Proxied by: avg_wpm > 55 AND delete_ratio < 2% AND duration > 15 min
     speed_score = 100
     if avg_wpm > 55 and total_minutes > 15 and delete_ratio < 0.02:
         speed_score = 20
@@ -146,18 +184,16 @@ def compute_verdict(events, stats):
     growth_score = 100
     detail = "Document grew steadily over time"
     if len(snapshots) >= 3:
-        # Measure doc size at each snapshot
         sizes = []
         for s in snapshots:
             doc = s.get("data", {}).get("doc", {})
             size = _estimate_doc_size(doc)
             sizes.append({"time": s["occurred_at"], "size": size})
         if len(sizes) >= 2:
-            # Check for bursty growth (large jumps in size)
             bursts = 0
             for i in range(1, len(sizes)):
                 growth = sizes[i]["size"] - sizes[i-1]["size"]
-                if growth > 500:  # > 500 chars in one snapshot interval = paste burst
+                if growth > 500:
                     bursts += 1
             burst_ratio = bursts / (len(sizes) - 1)
             growth_score = round(100 * (1 - burst_ratio))
@@ -176,7 +212,6 @@ def compute_verdict(events, stats):
     weighted_sum = sum(f["score"] * f["weight"] for f in factors.values())
     overall = round(weighted_sum / total_weight) if total_weight > 0 else 0
 
-    # --- Verdict label ---
     if overall >= 80:
         verdict = "Likely Original"
         confidence = "high"
@@ -190,7 +225,6 @@ def compute_verdict(events, stats):
         verdict = "High Risk of Academic Dishonesty"
         confidence = "high"
 
-    # PRD algorithm: Linear Transcription Anomaly
     if avg_wpm > 55 and delete_ratio < 0.02 and cursor_jumps == 0 and total_minutes > 15:
         risk_flags.append({
             "level": "critical",
@@ -204,6 +238,20 @@ def compute_verdict(events, stats):
         "factors": factors,
         "risk_flags": risk_flags
     }
+
+
+def _count_slice_text(content):
+    """Count total text length in a ProseMirror slice content array."""
+    if not content:
+        return 0
+    total = 0
+    for node in content:
+        if isinstance(node, dict):
+            if "text" in node:
+                total += len(node["text"])
+            elif "content" in node:
+                total += _count_slice_text(node["content"])
+    return total
 
 
 def _estimate_doc_size(doc):

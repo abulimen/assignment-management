@@ -6,14 +6,21 @@ function get_verdict(int $submissionId): array {
     require_once __DIR__ . '/db.php';
     $pdo = db();
 
-    // Fetch events
-    $stmt = $pdo->prepare('SELECT type, data, occurred_at, sequence FROM events WHERE submission_id = ? ORDER BY sequence ASC');
+    // Fetch events (include steps_json for classification)
+    $stmt = $pdo->prepare('SELECT type, data, steps_json, occurred_at, sequence FROM events WHERE submission_id = ? ORDER BY sequence ASC');
     $stmt->execute([$submissionId]);
     $events = $stmt->fetchAll();
 
     foreach ($events as &$e) {
         $e['data'] = json_decode($e['data'], true);
         $e['occurred_at'] = (float) $e['occurred_at'];
+        // Parse steps_json for the analyzer to classify
+        if ($e['steps_json']) {
+            $e['steps'] = json_decode($e['steps_json'], true);
+        } else {
+            $e['steps'] = null;
+        }
+        unset($e['steps_json']);
     }
 
     // Fetch stats
