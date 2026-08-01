@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Play, Pause, SkipBack, SkipForward, FileText, Film } from 'lucide-react';
 
-// Typewriter-style replay. Builds the document as a plain string,
-// tracking cursor position ourselves. No ProseMirror position math.
-// Blinking cursor block follows the virtual cursor position.
+// Typewriter-style replay. Builds the document as a plain string array,
+// tracking cursor position ourselves. Uses event positions (converted from
+// ProseMirror offsets) to insert at the correct location, fixing the
+// "characters skip/reappear" bug that occurred when loading snapshots.
+// Tracks formatting marks (bold, italic) and renders them inline.
 
 export default function Playback({ events, finalContent }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -13,42 +15,37 @@ export default function Playback({ events, finalContent }) {
   const intervalRef = useRef(null);
   const contentRef = useRef(null);
 
-  // Build document state up to a given event index.
-  // Returns { text, cursor, paragraphs } where paragraphs is an array of strings.
-  const buildState = useCallback((index) => {
-    if (!events?.length) return { paragraphs: [''], cursor: 0 };
+  // Build document state: paragraphs as strings, plus active formatting ranges.
+  // Returns { paragraphs, cursor, formats } where formats is [{from, to, type}]
+  const state = useMemo(() => {
+    if (!events?.length) return { paragraphs: [''], cursor: 0, formats: [] };
 
-    // Use snapshot as starting point if available (performance for large docs)
-    let snapshotIdx = -1;
-    for (let i = index; i >= 0; i--) {
-      if (events[i]?.type === 'snapshot') { snapshotIdx = i; break; }
-    }
+    let paragraphs = [''];
+    let cursor = 0;
+    let formats = []; // {from, to, type: 'bold'|'italic'|'underline'|'code'}
 
-    // Start from snapshot or empty
-    let paragraphs;
-    let cursor;
-
-    if (snapshotIdx >= 0 && events[snapshotIdx].data.doc) {
-      // Reconstruct paragraphs from ProseMirror JSON
-      paragraphs = docToParagraphs(events[snapshotIdx].data.doc);
-      // Can't know exact cursor from snapshot — set to end of doc
-      cursor = paragraphs.reduce((sum, p) => sum + p.length + 1, -1);
-    } else {
-      paragraphs = [''];
-      cursor = 0;
-    }
-
-    // Apply events after the snapshot up to index
-    const startIdx = snapshotIdx >= 0 ? snapshotIdx + 1 : 0;
-    for (let i = startIdx; i <= index && i < events.length; i++) {
+    for (let i = 0; i <= currentIndex && i < events.length; i++) {
       const e = events[i];
-      const { paraIdx, charIdx } = cursorToPos(cursor, paragraphs);
+      if (e.type === 'snapshot') continue;
+
+      // Determine where to apply this event. Use the event's stored position
+      // (converted from ProseMirror offsets) to avoid cursor drift.
+      let insertPos = cursor;
+      if (e.data.position !== undefined) {
+        insertPos = pmToOurPos(e.data.position, paragraphs);
+      } else if (e.type === 'cursor_jump' && e.data.to !== undefined) {
+        insertPos = pmToOurPos(e.data.to, paragraphs);
+      } else if (e.type === 'delete' && e.data.position !== undefined) {
+        insertPos = pmToOurPos(e.data.position, paragraphs);
+      }
+      cursor = insertPos;
+
+      const { paraIdx, charIdx } = cursorToParagraph(cursor, paragraphs);
 
       switch (e.type) {
         case 'keystroke': {
           const char = e.data.char;
           if (char === '\n') {
-            // New paragraph
             const after = paragraphs[paraIdx].slice(charIdx);
             paragraphs[paraIdx] = paragraphs[paraIdx].slice(0, charIdx);
             paragraphs.splice(paraIdx + 1, 0, after);
@@ -61,13 +58,11 @@ export default function Playback({ events, finalContent }) {
         }
         case 'paste': {
           const text = e.data.text || '';
-          // Handle multi-line paste
           const lines = text.split('\n');
           if (lines.length === 1) {
             paragraphs[paraIdx] = paragraphs[paraIdx].slice(0, charIdx) + text + paragraphs[paraIdx].slice(charIdx);
             cursor += text.length;
           } else {
-            // Split current paragraph at cursor
             const before = paragraphs[paraIdx].slice(0, charIdx);
             const after = paragraphs[paraIdx].slice(charIdx);
             const newParas = [before + lines[0]];
@@ -81,49 +76,57 @@ export default function Playback({ events, finalContent }) {
           break;
         }
         case 'delete': {
-          const len = e.data.length || 1;
-          for (let d = 0; d < len; d++) {
-            if (charIdx > 0) {
-              // Delete char before cursor in same paragraph
-              paragraphs[paraIdx] = paragraphs[paraIdx].slice(0, charIdx - 1) + paragraphs[paraIdx].slice(charIdx);
-              cursor -= 1;
-            } else if (paraIdx > 0) {
-              // Merge with previous paragraph
-              const prev = paragraphs[paraIdx - 1];
-              paragraphs[paraIdx - 1] = prev + paragraphs[paraIdx];
-              paragraphs.splice(paraIdx, 1);
-              cursor -= 1;
+          let remaining = e.data.length || 1;
+          let delCursor = cursor;
+          while (remaining > 0) {
+            const dp = cursorToParagraph(delCursor, paragraphs);
+            if (dp.charIdx > 0) {
+              const remove = Math.min(remaining, dp.charIdx);
+              paragraphs[dp.paraIdx] = paragraphs[dp.paraIdx].slice(0, dp.charIdx - remove) + paragraphs[dp.paraIdx].slice(dp.charIdx);
+              delCursor -= remove;
+              remaining -= remove;
+            } else if (dp.paraIdx > 0) {
+              const prev = paragraphs[dp.paraIdx - 1];
+              paragraphs[dp.paraIdx - 1] = prev + paragraphs[dp.paraIdx];
+              paragraphs.splice(dp.paraIdx, 1);
+              delCursor -= 1;
+              remaining -= 1;
+            } else {
+              break;
             }
           }
+          cursor = delCursor;
           break;
         }
         case 'cursor_jump': {
-          cursor = Math.max(0, Math.min(e.data.to, paragraphs.reduce((s, p) => s + p.length + 1, -1)));
+          cursor = pmToOurPos(e.data.to, paragraphs);
           break;
         }
-        case 'snapshot':
-          // Already handled above
+        case 'format': {
+          if (e.data.active) {
+            const from = pmToOurPos(e.data.from, paragraphs);
+            const to = pmToOurPos(e.data.to, paragraphs);
+            formats.push({ from, to, type: e.data.mark });
+          } else {
+            // Remove format
+            const from = pmToOurPos(e.data.from, paragraphs);
+            formats = formats.filter(f => !(f.type === e.data.mark && f.from === from));
+          }
           break;
-        case 'format':
-          // Formatting not shown in typewriter mode
-          break;
+        }
       }
     }
 
-    return { paragraphs, cursor };
-  }, [events]);
+    return { paragraphs, cursor, formats };
+  }, [currentIndex, events]);
 
-  const { paragraphs, cursor } = useMemo(() => buildState(currentIndex), [currentIndex, buildState]);
-
-  // Auto-scroll to cursor
+  // Auto-scroll
   useEffect(() => {
     if (mode === 'playback' && contentRef.current) {
-      const cursorEl = contentRef.current.querySelector('[data-cursor]');
-      if (cursorEl) {
-        cursorEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      }
+      const el = contentRef.current.querySelector('[data-cursor]');
+      if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
-  }, [cursor, mode, paragraphs]);
+  }, [state.cursor, mode]);
 
   // Playback loop
   useEffect(() => {
@@ -131,10 +134,7 @@ export default function Playback({ events, finalContent }) {
       const delay = 150 / speed;
       intervalRef.current = setInterval(() => {
         setCurrentIndex(prev => {
-          if (prev >= events.length - 1) {
-            setPlaying(false);
-            return prev;
-          }
+          if (prev >= events.length - 1) { setPlaying(false); return prev; }
           return prev + 1;
         });
       }, delay);
@@ -149,42 +149,23 @@ export default function Playback({ events, finalContent }) {
     return <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">No data to display.</div>;
   }
 
-  // Compute cursor position for rendering
-  let renderParas = paragraphs || [''];
-  let cursorPara = 0;
-  let cursorChar = 0;
-  if (mode === 'playback') {
-    const pos = cursorToPos(cursor, renderParas);
-    cursorPara = pos.paraIdx;
-    cursorChar = pos.charIdx;
-  }
+  const { paragraphs, cursor, formats } = state;
+  const cursorPos = cursorToParagraph(cursor, paragraphs);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div className="border-b border-gray-200 bg-gray-50 p-3">
-        {/* Tab toggle */}
         <div className="flex items-center gap-2 mb-3">
-          <button
-            onClick={() => setMode('playback')}
-            disabled={!hasEvents}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
-              mode === 'playback' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'
-            } ${!hasEvents ? 'opacity-40 cursor-not-allowed' : ''}`}
-          >
+          <button onClick={() => setMode('playback')} disabled={!hasEvents}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${mode === 'playback' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'} ${!hasEvents ? 'opacity-40 cursor-not-allowed' : ''}`}>
             <Film className="w-4 h-4" /> Playback
           </button>
-          <button
-            onClick={() => setMode('final')}
-            disabled={!hasFinal}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
-              mode === 'final' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'
-            } ${!hasFinal ? 'opacity-40 cursor-not-allowed' : ''}`}
-          >
+          <button onClick={() => setMode('final')} disabled={!hasFinal}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${mode === 'final' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'} ${!hasFinal ? 'opacity-40 cursor-not-allowed' : ''}`}>
             <FileText className="w-4 h-4" /> Final Document
           </button>
         </div>
 
-        {/* Playback controls */}
         {mode === 'playback' && hasEvents && (
           <>
             <div className="flex items-center gap-2 mb-2">
@@ -213,122 +194,190 @@ export default function Playback({ events, finalContent }) {
             </div>
           </>
         )}
-
-        {mode === 'final' && (
-          <div className="text-xs text-gray-500">The student's final submitted document</div>
-        )}
+        {mode === 'final' && <div className="text-xs text-gray-500">The student's final submitted document</div>}
       </div>
 
-      {/* Content area */}
-      <div ref={contentRef} className="p-6 min-h-[300px] max-h-[600px] overflow-y-auto font-mono text-sm leading-relaxed whitespace-pre-wrap break-words">
+      <div ref={contentRef} className="p-6 min-h-[300px] max-h-[600px] overflow-y-auto text-sm leading-relaxed">
         {mode === 'final' ? (
-          <div className="font-sans">
-            {finalContent ? renderFinalDoc(finalContent) : <span className="text-gray-400">No final document saved.</span>}
-          </div>
+          <div className="font-sans">{finalContent ? renderFinalDoc(finalContent) : <span className="text-gray-400">No final document saved.</span>}</div>
         ) : (
-          renderParas.map((para, pi) => (
-            <div key={pi} className="min-h-[1.5em] mb-2">
-              {pi === cursorPara ? (
-                <>
-                  <span>{para.slice(0, cursorChar)}</span>
-                  <span data-cursor className="inline-block w-2 h-4 bg-primary-600 align-middle animate-pulse mr-px" />
-                  <span>{para.slice(cursorChar)}</span>
-                </>
-              ) : (
-                <span>{para}</span>
-              )}
-            </div>
-          ))
+          paragraphs.map((para, pi) => {
+            // Build formatted segments for this paragraph
+            const segments = buildFormattedSegments(para, pi, paragraphs, formats, cursorPos, pi === cursorPos.paraIdx);
+            return <div key={pi} className="min-h-[1.5em] mb-2 font-mono">{segments}</div>;
+          })
         )}
       </div>
     </div>
   );
 }
 
-// Convert ProseMirror cursor offset to {paraIdx, charIdx}
-function cursorToPos(cursor, paragraphs) {
+// --- Helpers ---
+
+// Convert ProseMirror character offset to our flat string offset.
+// PM offsets: each character = 1, each paragraph boundary = 2.
+// Our offsets: each character = 1, each paragraph boundary = 1.
+function pmToOurPos(pmPos, paragraphs) {
+  let pmOffset = 0;
+  let ourOffset = 0;
+  for (let i = 0; i < paragraphs.length; i++) {
+    const len = paragraphs[i].length;
+    if (pmPos >= pmOffset && pmPos <= pmOffset + len) {
+      return ourOffset + (pmPos - pmOffset);
+    }
+    pmOffset += len + 2;
+    ourOffset += len + 1;
+  }
+  return ourOffset; // fallback: end of document
+}
+
+// Convert our flat string position to {paraIdx, charIdx}
+function cursorToParagraph(cursor, paragraphs) {
   let pos = 0;
   for (let i = 0; i < paragraphs.length; i++) {
-    const paraLen = paragraphs[i].length;
-    if (pos + paraLen >= cursor) {
-      return { paraIdx: i, charIdx: cursor - pos };
-    }
-    pos += paraLen + 1; // +1 for paragraph boundary
+    const len = paragraphs[i].length;
+    if (pos + len >= cursor) return { paraIdx: i, charIdx: Math.min(cursor - pos, len) };
+    pos += len + 1;
   }
   return { paraIdx: paragraphs.length - 1, charIdx: paragraphs[paragraphs.length - 1].length };
 }
 
-// Convert ProseMirror doc JSON to array of paragraph strings
-function docToParagraphs(doc) {
-  if (!doc || !doc.content) return [''];
-  const paras = [];
-  for (const node of doc.content) {
-    if (node.type === 'paragraph' || node.type === 'heading') {
-      let text = '';
-      if (node.content) {
-        for (const child of node.content) {
-          if (child.text) text += child.text;
-        }
-      }
-      paras.push(text);
-    } else if (node.type === 'bulletList' || node.type === 'orderedList') {
-      if (node.content) {
-        for (const item of node.content) {
-          if (item.content) {
-            for (const child of item.content) {
-              if (child.content) {
-                for (const text of child.content) {
-                  if (text.text) paras.push(text.text);
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+// Our flat position to {paraIdx, charIdx}
+function ourPosToParagraph(pos, paragraphs) {
+  let offset = 0;
+  for (let i = 0; i < paragraphs.length; i++) {
+    const len = paragraphs[i].length;
+    if (offset + len >= pos) return { paraIdx: i, charIdx: Math.min(pos - offset, len) };
+    offset += len + 1;
   }
-  return paras.length > 0 ? paras : [''];
+  return { paraIdx: paragraphs.length - 1, charIdx: paragraphs[paragraphs.length - 1].length };
 }
 
-// Render final document from TipTap JSON or plain text
+// Build formatted segments for a paragraph, with cursor insertion
+function buildFormattedSegments(para, paraIdx, paragraphs, formats, cursorPos, isCursorPara) {
+  // Collect format ranges that overlap this paragraph
+  const paraStart = paragraphs.slice(0, paraIdx).reduce((s, p) => s + p.length + 1, 0);
+  const paraEnd = paraStart + para.length;
+
+  const ranges = [];
+  for (const f of formats) {
+    if (f.to > paraStart && f.from < paraEnd) {
+      ranges.push({
+        from: Math.max(f.from - paraStart, 0),
+        to: Math.min(f.to - paraStart, para.length),
+        type: f.type,
+      });
+    }
+  }
+  ranges.sort((a, b) => a.from - b.from);
+
+  // Build segments
+  const segments = [];
+  let pos = 0;
+  for (const r of ranges) {
+    if (r.from > pos) {
+      segments.push({ text: para.slice(pos, r.from), format: null });
+    }
+    if (r.to > r.from) {
+      segments.push({ text: para.slice(r.from, r.to), format: r.type });
+    }
+    pos = Math.max(pos, r.to);
+  }
+  if (pos < para.length) {
+    segments.push({ text: para.slice(pos), format: null });
+  }
+  if (segments.length === 0) {
+    segments.push({ text: para, format: null });
+  }
+
+  // Insert cursor if this is the cursor paragraph
+  if (isCursorPara) {
+    const cursorChar = cursorPos.charIdx;
+    const result = [];
+    let charOffset = 0;
+    for (const seg of segments) {
+      const segEnd = charOffset + seg.text.length;
+      if (cursorChar >= charOffset && cursorChar <= segEnd) {
+        const before = seg.text.slice(0, cursorChar - charOffset);
+        const after = seg.text.slice(cursorChar - charOffset);
+        if (before) result.push({ text: before, format: seg.format });
+        result.push({ text: '', format: null, cursor: true });
+        if (after) result.push({ text: after, format: seg.format });
+      } else {
+        result.push(seg);
+      }
+      charOffset = segEnd;
+    }
+    return result.map((s, i) => renderSegment(s, i));
+  }
+
+  return segments.map((s, i) => renderSegment(s, i));
+}
+
+function renderSegment(seg, key) {
+  if (seg.cursor) {
+    return <span key={key} data-cursor className="inline-block w-2 h-4 bg-primary-600 align-middle animate-pulse mx-px">&nbsp;</span>;
+  }
+  let cls = '';
+  if (seg.format === 'bold') cls = 'font-bold';
+  else if (seg.format === 'italic') cls = 'italic';
+  else if (seg.format === 'underline') cls = 'underline';
+  else if (seg.format === 'code') cls = 'bg-gray-100 rounded px-1';
+  return <span key={key} className={cls}>{seg.text}</span>;
+}
+
+// Render final document from TipTap JSON
 function renderFinalDoc(content) {
   try {
     const doc = typeof content === 'string' ? JSON.parse(content) : content;
-    if (doc && doc.content) {
-      return doc.content.map((node, i) => {
-        let text = '';
-        if (node.content) {
-          for (const child of node.content) {
-            if (child.text) text += child.text;
-          }
-        }
-        if (node.type === 'heading') {
-          const level = node.attrs?.level || 1;
-          const sizes = { 1: 'text-2xl font-bold', 2: 'text-xl font-bold', 3: 'text-lg font-semibold' };
-          return <div key={i} className={`${sizes[level] || 'font-bold'} mb-2 mt-3`}>{text}</div>;
-        }
-        if (node.type === 'bulletList') {
-          return <ul key={i} className="list-disc pl-6 mb-2">{node.content?.map((item, j) => <li key={j}>{renderListItem(item)}</li>)}</ul>;
-        }
-        return <p key={i} className="mb-2 leading-relaxed">{text}</p>;
-      });
+    if (doc?.content) {
+      return doc.content.map((node, i) => renderDocNode(node, i));
     }
-  } catch (e) {
-    // Fall through to plain text
-  }
-  return <span>{content}</span>;
+  } catch (e) { /* fall through */ }
+  return <span className="text-gray-400">{String(content)}</span>;
 }
 
-function renderListItem(item) {
-  let text = '';
-  if (item.content) {
-    for (const para of item.content) {
-      if (para.content) {
-        for (const child of para.content) {
-          if (child.text) text += child.text;
+function renderDocNode(node, key) {
+  if (node.type === 'paragraph') {
+    return <p key={key} className="mb-2 leading-relaxed">{renderInline(node.content)}</p>;
+  }
+  if (node.type === 'heading') {
+    const lvl = node.attrs?.level || 1;
+    const sizes = { 1: 'text-2xl font-bold mb-3 mt-4', 2: 'text-xl font-bold mb-2 mt-3', 3: 'text-lg font-semibold mb-2 mt-2' };
+    return <div key={key} className={sizes[lvl] || 'font-bold'}>{renderInline(node.content)}</div>;
+  }
+  if (node.type === 'bulletList') {
+    return <ul key={key} className="list-disc pl-6 mb-2">{node.content?.map((item, j) => <li key={j}>{item.content?.map((p, k) => <span key={k}>{renderInline(p.content)}</span>)}</li>)}</ul>;
+  }
+  if (node.type === 'orderedList') {
+    return <ol key={key} className="list-decimal pl-6 mb-2">{node.content?.map((item, j) => <li key={j}>{item.content?.map((p, k) => <span key={k}>{renderInline(p.content)}</span>)}</li>)}</ol>;
+  }
+  if (node.type === 'blockquote') {
+    return <blockquote key={key} className="border-l-4 border-gray-300 pl-4 italic my-2">{node.content?.map((p, k) => <p key={k} className="mb-1">{renderInline(p.content)}</p>)}</blockquote>;
+  }
+  if (node.type === 'codeBlock') {
+    return <pre key={key} className="bg-gray-900 text-gray-100 rounded-lg p-4 my-2 overflow-x-auto text-sm"><code>{renderInline(node.content)}</code></pre>;
+  }
+  return <span key={key}>{renderInline(node.content)}</span>;
+}
+
+function renderInline(content) {
+  if (!content) return null;
+  return content.map((node, i) => {
+    if (node.type === 'text') {
+      let cls = '';
+      if (node.marks) {
+        for (const m of node.marks) {
+          if (m.type === 'bold') cls += ' font-bold';
+          if (m.type === 'italic') cls += ' italic';
+          if (m.type === 'underline') cls += ' underline';
+          if (m.type === 'code') cls += ' bg-gray-100 rounded px-1 text-sm';
+          if (m.type === 'link') cls += ' text-blue-600 underline';
         }
       }
+      return <span key={i} className={cls}>{node.text}</span>;
     }
-  }
-  return text;
+    if (node.type === 'hardBreak') return <br key={i} />;
+    return null;
+  });
 }
