@@ -1,126 +1,134 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
-import TextAlign from '@tiptap/extension-text-align';
-import Link from '@tiptap/extension-link';
 import { Play, Pause, SkipBack, SkipForward, FileText, Film } from 'lucide-react';
+
+// Typewriter-style replay. Builds the document as a plain string,
+// tracking cursor position ourselves. No ProseMirror position math.
+// Blinking cursor block follows the virtual cursor position.
 
 export default function Playback({ events, finalContent }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
-  const [mode, setMode] = useState('playback'); // 'playback' | 'final'
+  const [mode, setMode] = useState('playback');
   const intervalRef = useRef(null);
+  const contentRef = useRef(null);
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Underline,
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Link.configure({ openOnClick: false }),
-    ],
-    content: '',
-    editable: false,
-    editorProps: {
-      attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none',
-      },
-    },
-  });
+  // Build document state up to a given event index.
+  // Returns { text, cursor, paragraphs } where paragraphs is an array of strings.
+  const buildState = useCallback((index) => {
+    if (!events?.length) return { paragraphs: [''], cursor: 0 };
 
-  // Find the most recent snapshot at or before a given index
-  const findSnapshotBefore = useCallback((index) => {
-    if (!events) return -1;
+    // Use snapshot as starting point if available (performance for large docs)
+    let snapshotIdx = -1;
     for (let i = index; i >= 0; i--) {
-      if (events[i]?.type === 'snapshot') return i;
+      if (events[i]?.type === 'snapshot') { snapshotIdx = i; break; }
     }
-    return -1;
-  }, [events]);
 
-  // Apply a single event to the editor
-  const applyEvent = useCallback((e) => {
-    if (!editor) return;
-    try {
+    // Start from snapshot or empty
+    let paragraphs;
+    let cursor;
+
+    if (snapshotIdx >= 0 && events[snapshotIdx].data.doc) {
+      // Reconstruct paragraphs from ProseMirror JSON
+      paragraphs = docToParagraphs(events[snapshotIdx].data.doc);
+      // Can't know exact cursor from snapshot — set to end of doc
+      cursor = paragraphs.reduce((sum, p) => sum + p.length + 1, -1);
+    } else {
+      paragraphs = [''];
+      cursor = 0;
+    }
+
+    // Apply events after the snapshot up to index
+    const startIdx = snapshotIdx >= 0 ? snapshotIdx + 1 : 0;
+    for (let i = startIdx; i <= index && i < events.length; i++) {
+      const e = events[i];
+      const { paraIdx, charIdx } = cursorToPos(cursor, paragraphs);
+
       switch (e.type) {
-        case 'snapshot':
-          if (e.data.doc) editor.commands.setContent(e.data.doc);
-          break;
-        case 'keystroke':
-          if (e.data.char) editor.commands.insertContentAt(e.data.position, e.data.char);
-          break;
-        case 'paste':
-          if (e.data.text) editor.commands.insertContentAt(e.data.position, e.data.text);
-          break;
-        case 'delete':
-          if (e.data.length) {
-            const from = e.data.position;
-            const to = Math.min(from + e.data.length, editor.state.doc.content.size);
-            if (to > from) editor.commands.deleteRange({ from, to });
-          }
-          break;
-        case 'cursor_jump':
-          editor.commands.setTextSelection({ from: e.data.to, to: e.data.to });
-          break;
-        case 'format': {
-          const { mark, from, to, active } = e.data;
-          const safeTo = Math.min(to, editor.state.doc.content.size);
-          if (safeTo > from) {
-            if (active) editor.commands.addMark(mark, from, safeTo);
-            else editor.commands.removeMark(mark, from, safeTo);
+        case 'keystroke': {
+          const char = e.data.char;
+          if (char === '\n') {
+            // New paragraph
+            const after = paragraphs[paraIdx].slice(charIdx);
+            paragraphs[paraIdx] = paragraphs[paraIdx].slice(0, charIdx);
+            paragraphs.splice(paraIdx + 1, 0, after);
+            cursor += 1;
+          } else {
+            paragraphs[paraIdx] = paragraphs[paraIdx].slice(0, charIdx) + char + paragraphs[paraIdx].slice(charIdx);
+            cursor += 1;
           }
           break;
         }
+        case 'paste': {
+          const text = e.data.text || '';
+          // Handle multi-line paste
+          const lines = text.split('\n');
+          if (lines.length === 1) {
+            paragraphs[paraIdx] = paragraphs[paraIdx].slice(0, charIdx) + text + paragraphs[paraIdx].slice(charIdx);
+            cursor += text.length;
+          } else {
+            // Split current paragraph at cursor
+            const before = paragraphs[paraIdx].slice(0, charIdx);
+            const after = paragraphs[paraIdx].slice(charIdx);
+            const newParas = [before + lines[0]];
+            for (let j = 1; j < lines.length - 1; j++) {
+              newParas.push(lines[j]);
+            }
+            newParas.push(lines[lines.length - 1] + after);
+            paragraphs.splice(paraIdx, 1, ...newParas);
+            cursor += text.length;
+          }
+          break;
+        }
+        case 'delete': {
+          const len = e.data.length || 1;
+          for (let d = 0; d < len; d++) {
+            if (charIdx > 0) {
+              // Delete char before cursor in same paragraph
+              paragraphs[paraIdx] = paragraphs[paraIdx].slice(0, charIdx - 1) + paragraphs[paraIdx].slice(charIdx);
+              cursor -= 1;
+            } else if (paraIdx > 0) {
+              // Merge with previous paragraph
+              const prev = paragraphs[paraIdx - 1];
+              paragraphs[paraIdx - 1] = prev + paragraphs[paraIdx];
+              paragraphs.splice(paraIdx, 1);
+              cursor -= 1;
+            }
+          }
+          break;
+        }
+        case 'cursor_jump': {
+          cursor = Math.max(0, Math.min(e.data.to, paragraphs.reduce((s, p) => s + p.length + 1, -1)));
+          break;
+        }
+        case 'snapshot':
+          // Already handled above
+          break;
+        case 'format':
+          // Formatting not shown in typewriter mode
+          break;
       }
-    } catch (err) {
-      // ponytail: skip out-of-range events. snapshot anchors prevent most drift.
     }
-  }, [editor]);
 
-  // Replay to a given index using snapshot anchoring
-  const replayTo = useCallback((index) => {
-    if (!editor || !events?.length) return;
+    return { paragraphs, cursor };
+  }, [events]);
 
-    const snapshotIdx = findSnapshotBefore(index);
-    if (snapshotIdx >= 0) {
-      // Start from snapshot, replay forward
-      editor.commands.setContent(events[snapshotIdx].data.doc || '');
-      for (let i = snapshotIdx + 1; i <= index; i++) {
-        applyEvent(events[i]);
-      }
-    } else {
-      // No snapshot — replay from scratch
-      editor.commands.clearContent();
-      for (let i = 0; i <= index; i++) {
-        applyEvent(events[i]);
-      }
-    }
-  }, [editor, events, findSnapshotBefore, applyEvent]);
+  const { paragraphs, cursor } = useMemo(() => buildState(currentIndex), [currentIndex, buildState]);
 
-  // Update playback when index changes
+  // Auto-scroll to cursor
   useEffect(() => {
-    if (mode === 'playback') {
-      replayTo(currentIndex);
-    }
-  }, [currentIndex, replayTo, mode]);
-
-  // Show final document when mode switches
-  useEffect(() => {
-    if (mode === 'final' && editor && finalContent) {
-      try {
-        editor.commands.setContent(JSON.parse(finalContent));
-      } catch (e) {
-        editor.commands.setContent(finalContent);
+    if (mode === 'playback' && contentRef.current) {
+      const cursorEl = contentRef.current.querySelector('[data-cursor]');
+      if (cursorEl) {
+        cursorEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }
-    } else if (mode === 'playback') {
-      replayTo(currentIndex);
     }
-  }, [mode, editor, finalContent, replayTo, currentIndex]);
+  }, [cursor, mode, paragraphs]);
 
   // Playback loop
   useEffect(() => {
     if (playing && events?.length) {
-      const delay = 200 / speed;
+      const delay = 150 / speed;
       intervalRef.current = setInterval(() => {
         setCurrentIndex(prev => {
           if (prev >= events.length - 1) {
@@ -139,6 +147,16 @@ export default function Playback({ events, finalContent }) {
 
   if (!hasEvents && !hasFinal) {
     return <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">No data to display.</div>;
+  }
+
+  // Compute cursor position for rendering
+  let renderParas = paragraphs || [''];
+  let cursorPara = 0;
+  let cursorChar = 0;
+  if (mode === 'playback') {
+    const pos = cursorToPos(cursor, renderParas);
+    cursorPara = pos.paraIdx;
+    cursorChar = pos.charIdx;
   }
 
   return (
@@ -166,15 +184,15 @@ export default function Playback({ events, finalContent }) {
           </button>
         </div>
 
-        {/* Playback controls — only in playback mode */}
+        {/* Playback controls */}
         {mode === 'playback' && hasEvents && (
           <>
             <div className="flex items-center gap-2 mb-2">
-              <button onClick={() => setCurrentIndex(0)} className="p-1.5 rounded hover:bg-gray-200 text-gray-600"><SkipBack className="w-4 h-4" /></button>
+              <button onClick={() => { setPlaying(false); setCurrentIndex(0); }} className="p-1.5 rounded hover:bg-gray-200 text-gray-600"><SkipBack className="w-4 h-4" /></button>
               <button onClick={() => setPlaying(!playing)} className="p-1.5 rounded hover:bg-gray-200 text-gray-600">
                 {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               </button>
-              <button onClick={() => setCurrentIndex(events.length - 1)} className="p-1.5 rounded hover:bg-gray-200 text-gray-600"><SkipForward className="w-4 h-4" /></button>
+              <button onClick={() => { setPlaying(false); setCurrentIndex(events.length - 1); }} className="p-1.5 rounded hover:bg-gray-200 text-gray-600"><SkipForward className="w-4 h-4" /></button>
               <div className="flex-1 mx-2">
                 <input type="range" min={0} max={events.length - 1} value={currentIndex}
                   onChange={e => { setPlaying(false); setCurrentIndex(parseInt(e.target.value)); }}
@@ -200,9 +218,117 @@ export default function Playback({ events, finalContent }) {
           <div className="text-xs text-gray-500">The student's final submitted document</div>
         )}
       </div>
-      <div className="p-6 min-h-[300px]">
-        <EditorContent editor={editor} />
+
+      {/* Content area */}
+      <div ref={contentRef} className="p-6 min-h-[300px] max-h-[600px] overflow-y-auto font-mono text-sm leading-relaxed whitespace-pre-wrap break-words">
+        {mode === 'final' ? (
+          <div className="font-sans">
+            {finalContent ? renderFinalDoc(finalContent) : <span className="text-gray-400">No final document saved.</span>}
+          </div>
+        ) : (
+          renderParas.map((para, pi) => (
+            <div key={pi} className="min-h-[1.5em] mb-2">
+              {pi === cursorPara ? (
+                <>
+                  <span>{para.slice(0, cursorChar)}</span>
+                  <span data-cursor className="inline-block w-2 h-4 bg-primary-600 align-middle animate-pulse mr-px" />
+                  <span>{para.slice(cursorChar)}</span>
+                </>
+              ) : (
+                <span>{para}</span>
+              )}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
+}
+
+// Convert ProseMirror cursor offset to {paraIdx, charIdx}
+function cursorToPos(cursor, paragraphs) {
+  let pos = 0;
+  for (let i = 0; i < paragraphs.length; i++) {
+    const paraLen = paragraphs[i].length;
+    if (pos + paraLen >= cursor) {
+      return { paraIdx: i, charIdx: cursor - pos };
+    }
+    pos += paraLen + 1; // +1 for paragraph boundary
+  }
+  return { paraIdx: paragraphs.length - 1, charIdx: paragraphs[paragraphs.length - 1].length };
+}
+
+// Convert ProseMirror doc JSON to array of paragraph strings
+function docToParagraphs(doc) {
+  if (!doc || !doc.content) return [''];
+  const paras = [];
+  for (const node of doc.content) {
+    if (node.type === 'paragraph' || node.type === 'heading') {
+      let text = '';
+      if (node.content) {
+        for (const child of node.content) {
+          if (child.text) text += child.text;
+        }
+      }
+      paras.push(text);
+    } else if (node.type === 'bulletList' || node.type === 'orderedList') {
+      if (node.content) {
+        for (const item of node.content) {
+          if (item.content) {
+            for (const child of item.content) {
+              if (child.content) {
+                for (const text of child.content) {
+                  if (text.text) paras.push(text.text);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return paras.length > 0 ? paras : [''];
+}
+
+// Render final document from TipTap JSON or plain text
+function renderFinalDoc(content) {
+  try {
+    const doc = typeof content === 'string' ? JSON.parse(content) : content;
+    if (doc && doc.content) {
+      return doc.content.map((node, i) => {
+        let text = '';
+        if (node.content) {
+          for (const child of node.content) {
+            if (child.text) text += child.text;
+          }
+        }
+        if (node.type === 'heading') {
+          const level = node.attrs?.level || 1;
+          const sizes = { 1: 'text-2xl font-bold', 2: 'text-xl font-bold', 3: 'text-lg font-semibold' };
+          return <div key={i} className={`${sizes[level] || 'font-bold'} mb-2 mt-3`}>{text}</div>;
+        }
+        if (node.type === 'bulletList') {
+          return <ul key={i} className="list-disc pl-6 mb-2">{node.content?.map((item, j) => <li key={j}>{renderListItem(item)}</li>)}</ul>;
+        }
+        return <p key={i} className="mb-2 leading-relaxed">{text}</p>;
+      });
+    }
+  } catch (e) {
+    // Fall through to plain text
+  }
+  return <span>{content}</span>;
+}
+
+function renderListItem(item) {
+  let text = '';
+  if (item.content) {
+    for (const para of item.content) {
+      if (para.content) {
+        for (const child of para.content) {
+          if (child.text) text += child.text;
+        }
+      }
+    }
+  }
+  return text;
 }
