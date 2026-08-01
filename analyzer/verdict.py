@@ -72,24 +72,33 @@ def compute_verdict(events, stats):
     }
 
     # --- Factor 3: Edit Density (20%) ---
-    # Ratio of deletes to total events
-    total_non_snapshot = max(keystroke_count + paste_count + delete_count + cursor_jumps, 1)
-    delete_ratio = delete_count / total_non_snapshot
-    # Expected: 10-20% edits. Score: best at 15%, penalize deviation
+    # Measure by character ratio, not event ratio (same fix as paste_ratio).
+    # delete_ratio = deleted_chars / (deleted_chars + typed_chars)
+    # This avoids dilution from large paste events.
+    typed_chars = 0
+    deleted_chars = 0
+    for e in events:
+        if e.get("type") == "keystroke":
+            typed_chars += 1
+        elif e.get("type") == "delete":
+            deleted_chars += e.get("data", {}).get("length", 0)
+    total_text_ops = max(typed_chars + deleted_chars, 1)
+    delete_ratio = deleted_chars / total_text_ops
+    # Expected: 5-25% of typed text gets deleted during normal writing.
     if delete_ratio < 0.02:
         edit_score = 10  # Almost no editing — suspicious
         risk_flags.append({"level": "warning", "message": "Very low edit density — possible transcription of external screen"})
     elif delete_ratio < 0.05:
-        edit_score = 50
+        edit_score = 70
     elif delete_ratio < 0.30:
         edit_score = 100
     else:
-        edit_score = 60  # Too much editing — maybe struggling
+        edit_score = 60  # Heavy editing — possibly struggling
     factors["edit_density"] = {
         "score": round(edit_score),
         "weight": 20,
         "label": "Edit Density",
-        "detail": f"{delete_ratio * 100:.1f}% of events were corrections"
+        "detail": f"{deleted_chars} chars deleted vs {typed_chars} typed ({delete_ratio * 100:.1f}% correction rate)"
     }
 
     # --- Factor 4: Sustained Speed (15%) ---
