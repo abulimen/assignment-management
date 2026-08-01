@@ -108,10 +108,17 @@ export default function Playback({ events, finalContent }) {
             const to = pmToOurPos(e.data.to, paragraphs);
             formats.push({ from, to, type: e.data.mark });
           } else {
-            // Remove format
             const from = pmToOurPos(e.data.from, paragraphs);
             formats = formats.filter(f => !(f.type === e.data.mark && f.from === from));
           }
+          break;
+        }
+        case 'newline': {
+          // Split paragraph at the cursor position (Enter key)
+          const after = paragraphs[paraIdx].slice(charIdx);
+          paragraphs[paraIdx] = paragraphs[paraIdx].slice(0, charIdx);
+          paragraphs.splice(paraIdx + 1, 0, after);
+          cursor += 1;
           break;
         }
       }

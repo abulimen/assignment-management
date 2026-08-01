@@ -32,7 +32,6 @@ export function useTracker(submissionId, editorRef) {
     });
     eventCount.current += 1;
 
-    // Snapshot every N events
     if (eventCount.current % SNAPSHOT_INTERVAL === 0 && snapshotRef.current) {
       const editor = snapshotRef.current();
       if (editor) {
@@ -54,40 +53,55 @@ export function useTracker(submissionId, editorRef) {
     }
   }, [flush]);
 
-  // Keep refs synced so the memoized plugin always calls latest closures
   enqueueRef.current = enqueue;
 
-  // ponytail: memoized plugin, enqueue via ref. recreating would double-register.
   const plugin = useMemo(() => new Plugin({
     appendTransaction: (transactions, oldState, newState) => {
       const enq = enqueueRef.current;
       if (!enq) return null;
 
       for (const tr of transactions) {
-        // Track formatting changes (marks added/removed)
-        if (!tr.docChanged && tr.storedMarksSet) {
-          // Mark toggle via toolbar — detect from selection
-          const sel = tr.selection;
-          const oldMarks = oldState.doc.resolve(sel.from).marks();
-          const newMarks = newState.doc.resolve(sel.from).marks();
-          // Compare mark types
-          const oldTypes = oldMarks.map(m => m.type.name).sort().join(',');
-          const newTypes = newMarks.map(m => m.type.name).sort().join(',');
-          if (oldTypes !== newTypes) {
-            // Find added marks
-            for (const nm of newMarks) {
-              if (!oldMarks.some(om => om.type.name === nm.type.name)) {
-                enq('format', { mark: nm.type.name, from: sel.from, to: sel.to, active: true });
-              }
-            }
-            for (const om of oldMarks) {
-              if (!newMarks.some(nm => nm.type.name === om.type.name)) {
-                enq('format', { mark: om.type.name, from: sel.from, to: sel.to, active: false });
-              }
+        // Check steps directly for mark and structural changes
+        for (const step of tr.steps) {
+          const stepJson = step.toJSON();
+
+          // Format: AddMarkStep / RemoveMarkStep
+          if (stepJson.stepType === 'addMark') {
+            enq('format', {
+              mark: stepJson.mark?.type || stepJson.mark,
+              from: stepJson.from,
+              to: stepJson.to,
+              active: true,
+            });
+            continue;
+          }
+          if (stepJson.stepType === 'removeMark') {
+            enq('format', {
+              mark: stepJson.mark?.type || stepJson.mark,
+              from: stepJson.from,
+              to: stepJson.to,
+              active: false,
+            });
+            continue;
+          }
+        }
+
+        // Detect Enter key: paragraph count increased
+        const oldChildCount = oldState.doc.content.childCount;
+        const newChildCount = newState.doc.content.childCount;
+        if (newChildCount > oldChildCount && tr.docChanged) {
+          // New paragraph created — find the split point from the first replace step
+          for (const step of tr.steps) {
+            const stepJson = step.toJSON();
+            if (stepJson.stepType === 'replace') {
+              // The split position is where the new paragraph was inserted
+              enq('newline', { position: stepJson.from });
+              break;
             }
           }
         }
 
+        // Text content changes
         if (tr.docChanged) {
           for (const step of tr.steps) {
             const stepJson = step.toJSON();
@@ -96,21 +110,23 @@ export function useTracker(submissionId, editorRef) {
               const to = stepJson.to;
               const deleted = to - from;
 
-              // Use textBetween to correctly extract multi-paragraph text
-              // (slice.content[0].text only gets the first node's text, missing paragraphs)
               let inserted = '';
               if (stepJson.slice && stepJson.slice.content) {
-                // Reconstruct from the slice content using ProseMirror's Fragment
+                // Check if this is a structural change (new paragraph) — skip text extraction
+                const isStructural = stepJson.slice.content.some(
+                  n => (n.type === 'paragraph' || n.type === 'heading') && (!n.content || n.content.length === 0 || n.content.every(c => !c.text))
+                );
+                if (isStructural && deleted === 0) {
+                  // This is an Enter key or similar structural change — already handled above
+                  continue;
+                }
                 try {
-                  // textBetween on newState gives us the inserted text across all nodes
                   inserted = newState.doc.textBetween(from, from + getSliceSize(stepJson.slice), '\n');
                 } catch (e) {
-                  // Fallback: try first content node
-                  inserted = stepJson.slice.content[0]?.text || '';
+                  inserted = extractText(stepJson.slice.content);
                 }
               }
 
-              // Also check for marks on the inserted content (formatted paste)
               if (inserted && deleted === 0) {
                 if (inserted.length === 1) {
                   enq('keystroke', { char: inserted, position: from });
@@ -131,21 +147,6 @@ export function useTracker(submissionId, editorRef) {
           }
         }
 
-        // Track mark changes that happen WITH doc changes (e.g., formatting selected text)
-        if (tr.docChanged) {
-          const sel = tr.selection;
-          if (sel.from !== sel.to) {
-            // Selection exists — check for mark changes
-            const oldMarks = oldState.doc.resolve(sel.from).marks();
-            const newMarks = newState.doc.resolve(sel.from).marks();
-            for (const nm of newMarks) {
-              if (!oldMarks.some(om => om.type.name === nm.type.name)) {
-                enq('format', { mark: nm.type.name, from: sel.from, to: sel.to, active: true });
-              }
-            }
-          }
-        }
-
         if (tr.selectionSet) {
           const oldFrom = oldState.selection.from;
           const newFrom = newState.selection.from;
@@ -161,7 +162,19 @@ export function useTracker(submissionId, editorRef) {
   return { plugin, flush, enqueue, setEditorRef: (fn) => { snapshotRef.current = fn; } };
 }
 
-// Helper: estimate the size of a ProseMirror slice from its JSON
+// Extract text from ProseMirror slice content (handles nested nodes)
+function extractText(content) {
+  let text = '';
+  for (const node of content) {
+    if (node.text) {
+      text += node.text;
+    } else if (node.content) {
+      text += extractText(node.content);
+    }
+  }
+  return text;
+}
+
 function getSliceSize(slice) {
   if (!slice || !slice.content) return 0;
   let size = 0;
@@ -169,11 +182,10 @@ function getSliceSize(slice) {
     if (node.text) {
       size += node.text.length;
     } else if (node.content) {
-      // It's a block node (paragraph, heading, etc.)
       for (const child of node.content) {
         if (child.text) size += child.text.length;
       }
-      size += 1; // paragraph boundary
+      size += 1;
     }
   }
   return size;
