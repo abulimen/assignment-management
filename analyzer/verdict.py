@@ -212,6 +212,12 @@ def compute_verdict(events, stats):
     weighted_sum = sum(f["score"] * f["weight"] for f in factors.values())
     overall = round(weighted_sum / total_weight) if total_weight > 0 else 0
 
+    # Critical factor override: if ANY factor scores 0, cap the overall at 40.
+    # A submission where 91% of text was pasted cannot be "Likely Original"
+    # even if the other factors look fine.
+    if any(f["score"] == 0 for f in factors.values()):
+        overall = min(overall, 40)
+
     if overall >= 80:
         verdict = "Likely Original"
         confidence = "high"
