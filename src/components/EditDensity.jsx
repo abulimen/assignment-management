@@ -6,7 +6,7 @@ export default function EditDensity({ events, totalTimeMs }) {
     const first = events[0].occurred_at;
     const last = events[events.length - 1].occurred_at;
     const duration = last - first;
-    const bucketSize = Math.max(duration / 20, 30);
+    const bucketSize = Math.max(duration / 20, 5);
 
     const map = {};
     for (const e of events) {
