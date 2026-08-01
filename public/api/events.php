@@ -4,6 +4,19 @@ require_once __DIR__ . '/../../src/guard.php';
 require_once __DIR__ . '/../../src/response.php';
 require_once __DIR__ . '/../../src/validate.php';
 
+// Helper: count text length in a ProseMirror slice content array
+function countSliceTextLength($content) {
+    $len = 0;
+    foreach ($content as $node) {
+        if (isset($node['text'])) {
+            $len += strlen($node['text']);
+        } elseif (isset($node['content'])) {
+            $len += countSliceTextLength($node['content']);
+        }
+    }
+    return $len;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     error_response('Method not allowed', 405);
 }
@@ -169,16 +182,3 @@ $pdo->prepare('
 ')->execute([$sid, $totalMs, $keystrokeCount, $pasteCount, $deleteCount, $cursorJumps, $wpm, $pasteRatio]);
 
 json_response(['received' => $count]);
-
-// Helper: count text length in a ProseMirror slice content array
-function countSliceTextLength($content) {
-    $len = 0;
-    foreach ($content as $node) {
-        if (isset($node['text'])) {
-            $len += strlen($node['text']);
-        } elseif (isset($node['content'])) {
-            $len += countSliceTextLength($node['content']);
-        }
-    }
-    return $len;
-}

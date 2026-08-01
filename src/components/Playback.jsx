@@ -85,13 +85,21 @@ export default function Playback({ events, finalContent }) {
     lastIndexRef.current = index;
   }, [editor, stepEvents, applyStepEvent]);
 
+  // Reset replay state when events change (new data loaded)
+  useEffect(() => {
+    lastIndexRef.current = -1;
+  }, [stepEvents]);
+
   // Replay logic: if advancing by 1, just apply the next step.
   // If jumping (scrub), do a full rebuild.
   useEffect(() => {
     if (mode !== 'playback' || !editor || stepEvents.length === 0) return;
     if (isDispatching.current) return; // Guard against re-entrant calls
 
-    if (currentIndex === lastIndexRef.current + 1) {
+    if (currentIndex === 0 && lastIndexRef.current === -1) {
+      // First load — rebuild from 0
+      rebuildToIndex(0);
+    } else if (currentIndex === lastIndexRef.current + 1) {
       // Sequential advance — just apply the next step
       applyStepEvent(stepEvents[currentIndex]);
       lastIndexRef.current = currentIndex;
