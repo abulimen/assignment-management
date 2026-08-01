@@ -5,6 +5,7 @@ import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import Link from '@tiptap/extension-link';
 import { TextSelection } from '@tiptap/pm/state';
+import { Step } from '@tiptap/pm/transform';
 import { Play, Pause, SkipBack, SkipForward, FileText, Film } from 'lucide-react';
 
 // ProseMirror Step Replay.
@@ -52,7 +53,7 @@ export default function Playback({ events, finalContent }) {
     let tr = state.tr;
     for (const stepJson of event.steps) {
       try {
-        const step = state.schema.stepFromJSON(stepJson);
+        const step = Step.fromJSON(state.schema, stepJson);
         tr = tr.step(step);
       } catch (e) {
         // Skip invalid steps
@@ -62,7 +63,11 @@ export default function Playback({ events, finalContent }) {
     if (event.selection?.from != null) {
       const from = Math.min(event.selection.from, tr.doc.content.size);
       try {
-        tr = tr.setSelection(TextSelection.create(tr.doc, from));
+        const resolved = tr.doc.resolve(from);
+        // Only set text selection if the position has inline content
+        if (resolved.parent.isTextblock) {
+          tr = tr.setSelection(TextSelection.create(tr.doc, from));
+        }
       } catch (e) {
         // Invalid position — skip
       }
