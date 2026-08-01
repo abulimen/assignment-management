@@ -62,7 +62,7 @@ function Toolbar({ editor }) {
 }
 
 export default function Editor({ submissionId, initialContent, onContentChange }) {
-  const { plugin, flush, setEditorRef } = useTracker(submissionId);
+  const { flush, captureTransaction, setEditorRef } = useTracker(submissionId);
   const registered = useRef(false);
 
   const editor = useEditor({
@@ -79,9 +79,11 @@ export default function Editor({ submissionId, initialContent, onContentChange }
         class: 'prose prose-sm max-w-none focus:outline-none',
       },
     },
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor, transaction }) => {
       const json = editor.getJSON();
       onContentChange?.(JSON.stringify(json));
+      // Capture the raw transaction for step replay
+      captureTransaction(transaction);
     },
     onBlur: () => flush(),
   });
@@ -90,13 +92,6 @@ export default function Editor({ submissionId, initialContent, onContentChange }
   useEffect(() => {
     setEditorRef(() => editor);
   }, [editor, setEditorRef]);
-
-  useEffect(() => {
-    if (editor && plugin && !registered.current) {
-      editor.registerPlugin(plugin);
-      registered.current = true;
-    }
-  }, [editor, plugin]);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
