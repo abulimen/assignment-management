@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../api';
 import VerdictPanel from '../components/VerdictPanel';
+import PasteAnalysis from '../components/PasteAnalysis';
 import StatsBar from '../components/StatsBar';
 import EditDensity from '../components/EditDensity';
+import EditTimeline from '../components/EditTimeline';
 import Playback from '../components/Playback';
 
 export default function Review() {
@@ -39,9 +41,10 @@ export default function Review() {
       </div>
 
       <VerdictPanel verdict={verdict} loading={verdictLoading} />
-
+      <PasteAnalysis events={data.events} finalContent={data.content} />
       <StatsBar stats={data.stats} />
       <EditDensity events={data.events} totalTimeMs={data.stats?.total_time_ms} />
+      <EditTimeline events={data.events} />
 
       <h2 className="text-lg font-semibold mb-3">Document Playback</h2>
       <Playback events={data.events} finalContent={data.content} />

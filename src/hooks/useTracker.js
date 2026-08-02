@@ -84,8 +84,8 @@ export function useTracker(submissionId, editorRef) {
 
   // The actual capture happens via the editor's onUpdate callback,
   // which receives the transaction. We expose a function for Editor.jsx
-  // to call with the raw transaction.
-  const captureTransaction = useCallback((tr) => {
+  // to call with the raw transaction and optional pending paste info.
+  const captureTransaction = useCallback((tr, pendingPaste = null) => {
     const enq = enqueueRef.current;
     if (!enq || !tr || !tr.docChanged) return;
 
@@ -94,7 +94,7 @@ export function useTracker(submissionId, editorRef) {
     const selFrom = tr.selection.from;
     const selTo = tr.selection.to;
 
-    // Classify for legacy stats support (events.php still uses type field)
+    // Classify for stats + detect pastes
     let type = 'step';
     let data = {};
 
@@ -102,10 +102,47 @@ export function useTracker(submissionId, editorRef) {
     for (const step of tr.steps) {
       const stepJson = step.toJSON();
       if (stepJson.stepType === 'replace') {
-        const inserted = tr.doc.textBetween(stepJson.from, stepJson.from + (stepJson.to - stepJson.from === 0 ? (stepJson.slice?.content?.[0]?.text?.length || 0) : 0), '\n');
-        if (stepJson.to - stepJson.from > 0) {
+        const from = stepJson.from;
+        const to = stepJson.to;
+        const deleted = to - from;
+
+        // Extract inserted text length
+        let insertedLen = 0;
+        if (stepJson.slice?.content) {
+          insertedLen = countSliceText(stepJson.slice.content);
+        }
+
+        if (deleted > 0 && insertedLen === 0) {
+          // Pure deletion
           type = 'delete';
-          data = { position: stepJson.from, length: stepJson.to - stepJson.from };
+          data = { position: from, length: deleted };
+        } else if (insertedLen > 1) {
+          // Multi-char insert — could be paste
+          if (pendingPaste) {
+            // External clipboard paste detected
+            type = 'paste';
+            data = {
+              external_paste: true,
+              pasted_text: pendingPaste.text,
+              pasted_text_length: pendingPaste.text.length,
+              is_html: pendingPaste.isHtml,
+              position: from,
+              source: 'clipboard',
+            };
+          } else {
+            // Multi-char insert without clipboard event — autocomplete, IME, or internal copy
+            type = 'paste';
+            data = {
+              external_paste: false,
+              source: 'internal_or_autocomplete',
+              position: from,
+              inserted_length: insertedLen,
+            };
+          }
+        } else if (deleted > 0 && insertedLen > 0) {
+          // Replace (delete then insert)
+          type = 'delete';
+          data = { position: from, length: deleted };
         }
       }
     }
@@ -114,4 +151,17 @@ export function useTracker(submissionId, editorRef) {
   }, []);
 
   return { plugin, flush, enqueue, captureTransaction, setEditorRef: (fn) => { snapshotRef.current = fn; } };
+}
+
+// Helper: count text length in a ProseMirror slice content array
+function countSliceText(content) {
+  let len = 0;
+  for (const node of content) {
+    if (node.text) {
+      len += node.text.length;
+    } else if (node.content) {
+      len += countSliceText(node.content);
+    }
+  }
+  return len;
 }

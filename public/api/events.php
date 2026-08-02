@@ -17,6 +17,29 @@ function countSliceTextLength($content) {
     return $len;
 }
 
+// Helper: extract plain text from a ProseMirror JSON document
+function extractPlainText($doc) {
+    $text = '';
+    if (!isset($doc['content'])) return $text;
+    foreach ($doc['content'] as $node) {
+        $text .= extractNodeText($node) . "\n";
+    }
+    return $text;
+}
+
+function extractNodeText($node) {
+    $text = '';
+    if (isset($node['text'])) {
+        return $node['text'];
+    }
+    if (isset($node['content'])) {
+        foreach ($node['content'] as $child) {
+            $text .= extractNodeText($child);
+        }
+    }
+    return $text;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     error_response('Method not allowed', 405);
 }
@@ -168,17 +191,66 @@ $totalMs = $ts['first_ts'] && $ts['last_ts'] ? round(($ts['last_ts'] - $ts['firs
 $minutes = $totalMs / 60000;
 $wpm = $minutes > 0 ? round(($keystrokeCount / 5) / $minutes, 1) : 0;
 
+// Compute active time from focus/blur event pairs
+// Only count gaps < 1 hour (ignore draft-save-and-come-back-later)
+$focusBlurQuery = $pdo->prepare("
+    SELECT type, occurred_at FROM events
+    WHERE submission_id = ? AND type IN ('focus', 'blur')
+    ORDER BY occurred_at ASC
+");
+$focusBlurQuery->execute([$sid]);
+$fbEvents = $focusBlurQuery->fetchAll();
+
+$activeTimeMs = 0;
+$lastFocus = null;
+foreach ($fbEvents as $fb) {
+    if ($fb['type'] === 'focus') {
+        $lastFocus = (float) $fb['occurred_at'];
+    } elseif ($fb['type'] === 'blur' && $lastFocus !== null) {
+        $gap = (float) $fb['occurred_at'] - $lastFocus;
+        if ($gap > 0 && $gap < 3600) { // < 1 hour
+            $activeTimeMs += round($gap * 1000);
+        }
+        $lastFocus = null;
+    }
+}
+// If no focus/blur events, fall back to total_time_ms
+if ($activeTimeMs === 0) {
+    $activeTimeMs = $totalMs;
+}
+
+// Compute word count from final submission content
+$wordCount = 0;
+$contentQuery = $pdo->prepare('SELECT content FROM submissions WHERE id = ?');
+$contentQuery->execute([$sid]);
+$contentRow = $contentQuery->fetch();
+if ($contentRow && $contentRow['content']) {
+    $doc = json_decode($contentRow['content'], true);
+    if ($doc) {
+        $plainText = extractPlainText($doc);
+        $wordCount = str_word_count($plainText);
+    }
+}
+
+// Use active time for WPM if available
+$activeMinutes = $activeTimeMs / 60000;
+if ($activeMinutes > 0 && $activeMinutes < $minutes) {
+    $wpm = round(($keystrokeCount / 5) / $activeMinutes, 1);
+}
+
 $pdo->prepare('
-    INSERT INTO submission_stats (submission_id, total_time_ms, keystroke_count, paste_count, delete_count, cursor_jumps, avg_wpm, paste_ratio)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO submission_stats (submission_id, total_time_ms, active_time_ms, keystroke_count, paste_count, delete_count, cursor_jumps, avg_wpm, paste_ratio, word_count)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
         total_time_ms = VALUES(total_time_ms),
+        active_time_ms = VALUES(active_time_ms),
         keystroke_count = VALUES(keystroke_count),
         paste_count = VALUES(paste_count),
         delete_count = VALUES(delete_count),
         cursor_jumps = VALUES(cursor_jumps),
         avg_wpm = VALUES(avg_wpm),
-        paste_ratio = VALUES(paste_ratio)
-')->execute([$sid, $totalMs, $keystrokeCount, $pasteCount, $deleteCount, $cursorJumps, $wpm, $pasteRatio]);
+        paste_ratio = VALUES(paste_ratio),
+        word_count = VALUES(word_count)
+')->execute([$sid, $totalMs, $activeTimeMs, $keystrokeCount, $pasteCount, $deleteCount, $cursorJumps, $wpm, $pasteRatio, $wordCount]);
 
 json_response(['received' => $count]);

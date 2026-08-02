@@ -62,8 +62,9 @@ function Toolbar({ editor }) {
 }
 
 export default function Editor({ submissionId, initialContent, onContentChange }) {
-  const { flush, captureTransaction, setEditorRef } = useTracker(submissionId);
+  const { flush, captureTransaction, setEditorRef, enqueue } = useTracker(submissionId);
   const registered = useRef(false);
+  const pendingPasteRef = useRef(null);
 
   const editor = useEditor({
     extensions: [
@@ -78,12 +79,28 @@ export default function Editor({ submissionId, initialContent, onContentChange }
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none',
       },
+      handlePaste: (view, event) => {
+        // Capture clipboard text before ProseMirror processes it
+        const clipboardText = event.clipboardData?.getData('text/plain') || '';
+        if (clipboardText.length > 0) {
+          pendingPasteRef.current = {
+            text: clipboardText,
+            timestamp: Date.now(),
+            isHtml: event.clipboardData?.types?.includes('text/html'),
+          };
+        }
+        // Don't return true — let ProseMirror handle the paste normally
+      },
     },
     onUpdate: ({ editor, transaction }) => {
       const json = editor.getJSON();
       onContentChange?.(JSON.stringify(json));
-      // Capture the raw transaction for step replay
-      captureTransaction(transaction);
+      // Pass the pending paste info (if any) to the tracker
+      captureTransaction(transaction, pendingPasteRef.current);
+      // Clear the pending paste after it's been consumed
+      if (pendingPasteRef.current) {
+        pendingPasteRef.current = null;
+      }
     },
     onBlur: () => flush(),
   });
@@ -92,6 +109,35 @@ export default function Editor({ submissionId, initialContent, onContentChange }
   useEffect(() => {
     setEditorRef(() => editor);
   }, [editor, setEditorRef]);
+
+  // Focus/blur tracking for active time calculation
+  useEffect(() => {
+    if (!enqueue) return;
+
+    const handleFocus = () => {
+      enqueue('focus', { timestamp: Date.now() / 1000 });
+    };
+    const handleBlur = () => {
+      enqueue('blur', { timestamp: Date.now() / 1000 });
+    };
+    const handleVisibility = () => {
+      if (document.hidden) handleBlur();
+      else handleFocus();
+    };
+
+    // Emit initial focus when editor mounts
+    handleFocus();
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      handleBlur(); // Emit blur on unmount
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [enqueue]);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">

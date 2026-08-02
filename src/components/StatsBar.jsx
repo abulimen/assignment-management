@@ -1,15 +1,21 @@
-import { Clock, Keyboard, Clipboard, Delete, MousePointer, Gauge } from 'lucide-react';
+import { Clock, Keyboard, Clipboard, Delete, MousePointer, Gauge, FileText } from 'lucide-react';
 
 export default function StatsBar({ stats }) {
   if (!stats) return null;
 
+  const activeMs = stats.active_time_ms || stats.total_time_ms || 0;
+  const activeMinutes = Math.round(activeMs / 60000);
+  const timeDisplay = activeMinutes >= 60
+    ? `${Math.floor(activeMinutes / 60)}h ${activeMinutes % 60}m`
+    : `${activeMinutes}m`;
+
   const items = [
-    { label: 'Active Time', value: `${Math.round((stats.total_time_ms || 0) / 60000)}m`, icon: <Clock className="w-4 h-4" />, color: 'text-blue-600' },
+    { label: 'Active Time', value: timeDisplay, icon: <Clock className="w-4 h-4" />, color: 'text-blue-600' },
+    { label: 'Word Count', value: stats.word_count || 0, icon: <FileText className="w-4 h-4" />, color: 'text-indigo-600' },
     { label: 'Keystrokes', value: stats.keystroke_count || 0, icon: <Keyboard className="w-4 h-4" />, color: 'text-green-600' },
     { label: 'Avg WPM', value: stats.avg_wpm || 0, icon: <Gauge className="w-4 h-4" />, color: 'text-purple-600' },
     { label: 'Pastes', value: stats.paste_count || 0, icon: <Clipboard className="w-4 h-4" />, color: 'text-orange-600' },
     { label: 'Deletes', value: stats.delete_count || 0, icon: <Delete className="w-4 h-4" />, color: 'text-red-600' },
-    { label: 'Cursor Jumps', value: stats.cursor_jumps || 0, icon: <MousePointer className="w-4 h-4" />, color: 'text-yellow-600' },
   ];
 
   return (
