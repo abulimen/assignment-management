@@ -155,24 +155,9 @@ $jumpQuery = $pdo->prepare("SELECT COUNT(*) FROM events WHERE submission_id = ? 
 $jumpQuery->execute([$sid]);
 $cursorJumps = max($cursorJumps, (int) $jumpQuery->fetchColumn());
 
-// Compute paste ratio by character count
-$pasteCharQuery = $pdo->prepare("
-    SELECT COALESCE(SUM(
-        CASE WHEN type = 'paste' THEN
-            CHAR_LENGTH(JSON_UNQUOTE(JSON_EXTRACT(data, '$.text')))
-        WHEN steps_json IS NOT NULL THEN
-            (SELECT SUM(len) FROM JSON_TABLE(steps_json, '$[*]' COLUMNS(
-                len INT PATH '$.slice.content[0].text' DEFAULT 0 ON EMPTY
-            )) AS jt WHERE jt.len > 1)
-        ELSE 0 END
-    ), 0) AS pasted_chars
-    FROM events WHERE submission_id = ? AND type != 'snapshot'
-");
-$pasteCharQuery->execute([$sid]);
-
-// Simpler approach: just sum paste text lengths from data field
+// Compute paste ratio by character count — use pasted_text field from paste events
 $pasteCharsQuery = $pdo->prepare("
-    SELECT COALESCE(SUM(CHAR_LENGTH(JSON_UNQUOTE(JSON_EXTRACT(data, '$.text')))), 0)
+    SELECT COALESCE(SUM(CHAR_LENGTH(JSON_UNQUOTE(JSON_EXTRACT(data, '$.pasted_text')))), 0)
     FROM events WHERE submission_id = ? AND type = 'paste'
 ");
 $pasteCharsQuery->execute([$sid]);

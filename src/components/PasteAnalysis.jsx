@@ -36,11 +36,13 @@ export default function PasteAnalysis({ events, finalContent }) {
 
   // Check how much of pasted text survived in final document
   const survivalStats = useMemo(() => {
-    if (!finalContent || pastes.length === 0) return { totalPasted: 0, retained: 0 };
+    if (!finalContent || pastes.length === 0) return { totalPasted: 0, retained: 0, modified: 0 };
+    
+    // Extract plain text from the final document
     let finalText = '';
     try {
       const doc = JSON.parse(finalContent);
-      finalText = JSON.stringify(doc);
+      finalText = extractDocText(doc);
     } catch (e) {
       finalText = finalContent;
     }
@@ -49,13 +51,13 @@ export default function PasteAnalysis({ events, finalContent }) {
     let retained = 0;
     for (const paste of pastes) {
       totalPasted += paste.length;
-      // Check if the first 20 chars of the paste exist in the final document
-      const sample = paste.text.substring(0, Math.min(50, paste.text.length)).trim();
-      if (sample.length > 10 && finalText.includes(sample.replace(/[.*+?^${}()|[\]\\]/g, ''))) {
+      // Check if the first 30 chars of the paste exist in the final document
+      const sample = paste.text.substring(0, Math.min(30, paste.text.length)).trim();
+      if (sample.length > 5 && finalText.includes(sample)) {
         retained += paste.length;
       }
     }
-    return { totalPasted, retained };
+    return { totalPasted, retained, modified: totalPasted - retained };
   }, [pastes, finalContent]);
 
   if (pastes.length === 0) {
@@ -166,4 +168,16 @@ export default function PasteAnalysis({ events, finalContent }) {
       </div>
     </div>
   );
+}
+
+// Extract plain text from a ProseMirror JSON document
+function extractDocText(doc) {
+  if (!doc || !doc.content) return '';
+  return doc.content.map(node => extractNodeText(node)).join('\n');
+}
+
+function extractNodeText(node) {
+  if (node.text) return node.text;
+  if (!node.content) return '';
+  return node.content.map(child => extractNodeText(child)).join('');
 }
