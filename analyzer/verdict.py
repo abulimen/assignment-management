@@ -84,16 +84,65 @@ def compute_verdict(events, stats):
             elif etype == "delete":
                 deleted_chars += e.get("data", {}).get("length", 0)
 
-    # --- Factor 1: Paste Ratio (20%) ---
-    paste_score = max(0, 100 - paste_ratio * 500)
+    # --- Factor 1: Effective Paste Ratio (20%) ---
+    # Instead of raw paste ratio, compute how much pasted text SURVIVED
+    # unmodified. A student who pastes 1000 chars and edits 800 of them
+    # has an effective paste ratio of ~200/total, not 1000/total.
+    # Penalty is proportional to unmodified paste, rewarding editing effort.
+
+    # Track external paste ranges and subsequent deletes/edits
+    paste_ranges = []  # [(from, to)]
+    total_deleted_from_pastes = 0
+
+    for e in events:
+        etype = e.get("type", "")
+        data = e.get("data", {})
+
+        if etype == "paste" and data.get("external_paste"):
+            pos = data.get("position", 0)
+            text = data.get("pasted_text", "")
+            if text:
+                paste_ranges.append({"from": pos, "to": pos + len(text), "orig_len": len(text), "deleted": 0})
+
+        # Track deletes that overlap paste ranges
+        if etype == "delete":
+            del_pos = data.get("position", 0)
+            del_len = data.get("length", 0)
+            for pr in paste_ranges:
+                # Check if delete overlaps this paste range
+                if del_pos < pr["to"] and (del_pos + del_len) > pr["from"]:
+                    # Compute overlap
+                    overlap_start = max(del_pos, pr["from"])
+                    overlap_end = min(del_pos + del_len, pr["to"])
+                    overlap = max(0, overlap_end - overlap_start)
+                    pr["deleted"] += overlap
+
+    # Compute effective (unmodified) pasted chars
+    unmodified_paste_chars = sum(max(0, pr["orig_len"] - pr["deleted"]) for pr in paste_ranges)
+    total_chars = max(typed_chars + pasted_chars, 1)
+
+    # If we have paste ranges (new tracker with clipboard detection), use effective ratio.
+    # If no paste ranges (legacy data without clipboard tracking), fall back to raw stats.
+    if paste_ranges:
+        effective_paste_ratio = unmodified_paste_chars / total_chars if total_chars > 0 else 0
+        actual_paste_ratio = effective_paste_ratio
+        paste_detail = f"{actual_paste_ratio * 100:.1f}% unmodified paste ({unmodified_paste_chars} of {pasted_chars} pasted chars survived)"
+    else:
+        # Legacy: no clipboard-tracked paste events. Use raw paste_ratio from stats.
+        actual_paste_ratio = float(paste_ratio)
+        paste_detail = f"{actual_paste_ratio * 100:.1f}% of text was pasted (legacy — edit tracking unavailable)"
+
+    paste_score = max(0, 100 - actual_paste_ratio * 500)
     factors["paste_ratio"] = {
         "score": round(paste_score),
         "weight": 20,
         "label": "Paste Ratio",
-        "detail": f"{paste_ratio * 100:.1f}% of text was pasted"
+        "detail": paste_detail
     }
-    if paste_ratio > 0.5:
+    if actual_paste_ratio > 0.5:
         risk_flags.append({"level": "critical", "message": "High Risk: Excessive Copy-Paste"})
+    elif actual_paste_ratio > 0.3 and unmodified_paste_chars > pasted_chars * 0.5:
+        risk_flags.append({"level": "warning", "message": f"Significant unmodified paste: {unmodified_paste_chars} chars"})
 
     # --- Factor 2: Typing Cadence Consistency (25%) ---
     intervals = []
@@ -164,6 +213,75 @@ def compute_verdict(events, stats):
         "detail": f"Avg {avg_wpm:.0f} WPM over {total_minutes:.0f} minutes"
     }
 
+    # --- Factor 4b: Transcription Detection (15%) ---
+    # Detects manual retyping from an external source (looking at another
+    # screen and typing character by character). Looks for:
+    # (a) sustained runs of 50+ consecutive single-char insertions with zero backspaces
+    # (b) low inter-keystroke CV within those bursts (local CV < 0.15)
+    # (c) no "thinking pauses" at sentence boundaries
+    transcription_score = 100
+    transcription_flags = []
+
+    if len(keystroke_events) >= 50:
+        # Find sustained runs with no deletions
+        bursts = []
+        current_burst = []
+        for e in keystroke_events:
+            current_burst.append(e)
+
+        # Split bursts at delete events
+        all_events_sorted = sorted(events, key=lambda x: x.get("occurred_at", 0))
+        current_run = []
+        for e in all_events_sorted:
+            etype = e.get("type", "")
+            if etype == "delete":
+                if len(current_run) >= 50:
+                    bursts.append(current_run)
+                current_run = []
+            elif etype in ("keystroke", "step") and e in keystroke_events:
+                current_run.append(e)
+        if len(current_run) >= 50:
+            bursts.append(current_run)
+
+        suspicious_chars = 0
+        for burst in bursts:
+            # Compute local CV within this burst
+            burst_intervals = []
+            for i in range(1, len(burst)):
+                gap = burst[i]["occurred_at"] - burst[i-1]["occurred_at"]
+                if 0 < gap < 10:
+                    burst_intervals.append(gap)
+
+            if len(burst_intervals) >= 10:
+                burst_cv = stdev(burst_intervals) / mean(burst_intervals) if mean(burst_intervals) > 0 else 0
+                # Check for no thinking pauses at sentence boundaries
+                has_boundary_pauses = False
+                for i in range(1, len(burst)):
+                    gap = burst[i]["occurred_at"] - burst[i-1]["occurred_at"]
+                    if gap > 2.0:  # 2+ second pause = thinking
+                        has_boundary_pauses = True
+                        break
+
+                if burst_cv < 0.15 and not has_boundary_pauses:
+                    suspicious_chars += len(burst)
+
+        # Score: proportion of suspicious chars to total typed chars
+        if typed_chars > 0:
+            suspicious_ratio = suspicious_chars / typed_chars
+            transcription_score = round(max(0, 100 - suspicious_ratio * 200))
+            if suspicious_ratio > 0.5:
+                transcription_flags.append(f"{suspicious_chars} chars in suspicious bursts ({suspicious_ratio*100:.0f}% of typed)")
+            if suspicious_ratio > 0.7:
+                risk_flags.append({"level": "critical", "message": f"High Risk: Probable Manual Transcription — {suspicious_chars} chars typed in sustained bursts without pauses or corrections"})
+
+    trans_detail = "Natural typing pattern" if transcription_score >= 80 else (transcription_flags[0] if transcription_flags else "Some sustained bursts detected")
+    factors["transcription_detection"] = {
+        "score": round(transcription_score),
+        "weight": 15,
+        "label": "Transcription Detection",
+        "detail": trans_detail
+    }
+
     # --- Factor 5: Cursor Jumps (10%) ---
     jumps_per_min = cursor_jumps / total_minutes
     if jumps_per_min > 3:
@@ -208,26 +326,12 @@ def compute_verdict(events, stats):
     }
 
     # --- Compute weighted overall score ---
-    # Scale non-paste factors by (1 - paste_ratio): if 91% of the document
-    # was pasted, then the typing cadence, edit density, sustained speed,
-    # cursor jumps, and growth pattern factors are only measuring 9% of
-    # the document. Their scores should be proportionally discounted.
-    processed_factors = {}
-    for name, f in factors.items():
-        scaled = dict(f)  # copy
-        if name != "paste_ratio":
-            # Scale: at 100% paste → 0% relevance, at 0% paste → 100% relevance
-            relevance = max(0.05, 1.0 - paste_ratio)
-            scaled["score"] = round(f["score"] * relevance)
-            scaled["detail"] = f["detail"] + f" (relevance: {relevance*100:.0f}%)"
-        processed_factors[name] = scaled
-
-    total_weight = sum(f["weight"] for f in processed_factors.values())
-    weighted_sum = sum(f["score"] * f["weight"] for f in processed_factors.values())
+    total_weight = sum(f["weight"] for f in factors.values())
+    weighted_sum = sum(f["score"] * f["weight"] for f in factors.values())
     overall = round(weighted_sum / total_weight) if total_weight > 0 else 0
 
     # Critical factor override: if ANY factor scores 0, cap the overall at 40.
-    if any(f["score"] == 0 for f in processed_factors.values()):
+    if any(f["score"] == 0 for f in factors.values()):
         overall = min(overall, 40)
 
     if overall >= 80:
@@ -253,7 +357,7 @@ def compute_verdict(events, stats):
         "overall_score": overall,
         "verdict": verdict,
         "confidence": confidence,
-        "factors": processed_factors,
+        "factors": factors,
         "risk_flags": risk_flags
     }
 
