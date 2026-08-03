@@ -163,6 +163,25 @@ $pasteCharsQuery = $pdo->prepare("
 $pasteCharsQuery->execute([$sid]);
 $pastedChars = (int) $pasteCharsQuery->fetchColumn();
 
+// Also count from steps_json for older events without pasted_text
+$stepsQuery = $pdo->prepare("
+    SELECT SUM(
+        CASE WHEN steps_json IS NOT NULL THEN
+            (SELECT SUM(len) FROM JSON_TABLE(steps_json, '$[*]' COLUMNS(
+                len INT PATH '$.slice.content[0].text' DEFAULT '0' ON EMPTY
+            )) AS jt WHERE jt.len > 1)
+        ELSE 0 END
+    ) AS steps_pasted
+    FROM events WHERE submission_id = ? AND type = 'paste'
+");
+try {
+    $stepsQuery->execute([$sid]);
+    $stepsPasted = (int) ($stepsQuery->fetchColumn() ?? 0);
+    $pastedChars = max($pastedChars, $stepsPasted);
+} catch (PDOException $e) {
+    // MySQL JSON_TABLE might not support this syntax, ignore
+}
+
 $typedChars = $keystrokeCount; // Each keystroke = 1 char
 $totalChars = $typedChars + $pastedChars;
 $pasteRatio = $totalChars > 0 ? round($pastedChars / $totalChars, 4) : 0;
@@ -199,13 +218,25 @@ foreach ($fbEvents as $fb) {
         $lastFocus = null;
     }
 }
+// If last event is a focus with no matching blur, use last event timestamp as closing time
+if ($lastFocus !== null) {
+    $lastEventQuery = $pdo->prepare('SELECT MAX(occurred_at) as last_ts FROM events WHERE submission_id = ?');
+    $lastEventQuery->execute([$sid]);
+    $lastTs = $lastEventQuery->fetchColumn();
+    if ($lastTs) {
+        $gap = (float) $lastTs - $lastFocus;
+        if ($gap > 0 && $gap < 3600) {
+            $activeTimeMs += round($gap * 1000);
+        }
+    }
+}
 // If no focus/blur events, fall back to total_time_ms
 if ($activeTimeMs === 0) {
     $activeTimeMs = $totalMs;
 }
 
-// Compute word count from final submission content
-$wordCount = 0;
+// Compute word count from final submission content (only if content is not null)
+$wordCount = null;
 $contentQuery = $pdo->prepare('SELECT content FROM submissions WHERE id = ?');
 $contentQuery->execute([$sid]);
 $contentRow = $contentQuery->fetch();
@@ -215,6 +246,12 @@ if ($contentRow && $contentRow['content']) {
         $plainText = extractPlainText($doc);
         $wordCount = str_word_count($plainText);
     }
+}
+// If word_count is null (content not saved yet), keep existing value
+if ($wordCount === null) {
+    $existingStats = $pdo->prepare('SELECT word_count FROM submission_stats WHERE submission_id = ?');
+    $existingStats->execute([$sid]);
+    $wordCount = $existingStats->fetchColumn() ?: 0;
 }
 
 // Use active time for WPM if available

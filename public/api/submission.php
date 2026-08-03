@@ -3,6 +3,24 @@ require_once __DIR__ . '/../../src/db.php';
 require_once __DIR__ . '/../../src/guard.php';
 require_once __DIR__ . '/../../src/response.php';
 
+// Helper: extract plain text from a ProseMirror JSON document
+function extractPlainText($doc) {
+    $text = '';
+    if (!isset($doc['content'])) return $text;
+    foreach ($doc['content'] as $node) {
+        $text .= extractNodeText($node) . "\n";
+    }
+    return $text;
+}
+
+function extractNodeText($node) {
+    if (isset($node['text'])) return $node['text'];
+    if (isset($node['content'])) {
+        return implode('', array_map('extractNodeText', $node['content']));
+    }
+    return '';
+}
+
 $user = guard();
 $pdo = db();
 
@@ -56,6 +74,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $stmt = $pdo->prepare("UPDATE submissions SET status = 'submitted', submitted_at = NOW(), content = ? WHERE id = ?");
     $stmt->execute([$content, $id]);
+
+    // Recompute word_count from final content
+    if ($content) {
+        $doc = json_decode($content, true);
+        if ($doc) {
+            $wordCount = str_word_count(extractPlainText($doc));
+            $pdo->prepare('INSERT INTO submission_stats (submission_id, word_count) VALUES (?, ?) ON DUPLICATE KEY UPDATE word_count = VALUES(word_count)')->execute([$id, $wordCount]);
+        }
+    }
 
     $stmt = $pdo->prepare('SELECT id, assignment_id, student_id, status, submitted_at, created_at FROM submissions WHERE id = ?');
     $stmt->execute([$id]);

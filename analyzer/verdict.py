@@ -46,6 +46,13 @@ def compute_verdict(events, stats):
     for e in events:
         etype = e.get("type", "")
         steps = e.get("steps")
+        data = e.get("data", {})
+
+        # For external paste events, use pasted_text from data (authoritative)
+        if etype == "paste" and data.get("external_paste"):
+            pasted_text = data.get("pasted_text", "")
+            pasted_chars += len(pasted_text)
+            continue
 
         if steps:
             # New step-based event — classify from ProseMirror step types
@@ -72,7 +79,7 @@ def compute_verdict(events, stats):
                             typed_chars += 1
                         else:
                             pasted_chars += inserted_len
-                # addMark / removeMark = format, not counted in text stats
+                    # addMark / removeMark = format, not counted in text stats
         else:
             # Legacy event — classify from type field
             if etype == "keystroke":

@@ -36,29 +36,36 @@ export default function PasteAnalysis({ events, finalContent }) {
 
   // Check how much of pasted text survived in final document
   const survivalStats = useMemo(() => {
-    if (!finalContent || pastes.length === 0) return { totalPasted: 0, retained: 0, modified: 0 };
-    
-    // Extract plain text from the final document
-    let finalText = '';
-    try {
-      const doc = JSON.parse(finalContent);
-      finalText = extractDocText(doc);
-    } catch (e) {
-      finalText = finalContent;
-    }
+    if (!events || pastes.length === 0) return { totalPasted: 0, retained: 0, modified: 0 };
 
-    let totalPasted = 0;
-    let retained = 0;
-    for (const paste of pastes) {
-      totalPasted += paste.length;
-      // Check if the first 30 chars of the paste exist in the final document
-      const sample = paste.text.substring(0, Math.min(30, paste.text.length)).trim();
-      if (sample.length > 5 && finalText.includes(sample)) {
-        retained += paste.length;
+    // Track paste ranges and overlapping deletes (same logic as verdict)
+    const pasteRanges = pastes.map(p => ({
+      from: p.position,
+      to: p.position + p.length,
+      origLen: p.length,
+      deleted: 0,
+    }));
+
+    // Find delete events that overlap paste ranges
+    const deletes = events.filter(e => e.type === 'delete');
+    for (const del of deletes) {
+      const delPos = del.data?.position ?? 0;
+      const delLen = del.data?.length ?? 0;
+      for (const pr of pasteRanges) {
+        if (delPos < pr.to && (delPos + delLen) > pr.from) {
+          const overlapStart = Math.max(delPos, pr.from);
+          const overlapEnd = Math.min(delPos + delLen, pr.to);
+          const overlap = Math.max(0, overlapEnd - overlapStart);
+          pr.deleted += overlap;
+        }
       }
     }
-    return { totalPasted, retained, modified: totalPasted - retained };
-  }, [pastes, finalContent]);
+
+    const totalPasted = pasteRanges.reduce((sum, pr) => sum + pr.origLen, 0);
+    const unmodified = pasteRanges.reduce((sum, pr) => sum + Math.max(0, pr.origLen - pr.deleted), 0);
+    const modified = totalPasted - unmodified;
+    return { totalPasted, retained: unmodified, modified };
+  }, [pastes, events]);
 
   if (pastes.length === 0) {
     return (
