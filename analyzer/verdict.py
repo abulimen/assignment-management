@@ -131,9 +131,11 @@ def compute_verdict(events, stats):
     # If we have paste ranges (new tracker with clipboard detection), use effective ratio.
     # If no paste ranges (legacy data without clipboard tracking), fall back to raw stats.
     if paste_ranges:
-        effective_paste_ratio = unmodified_paste_chars / total_chars if total_chars > 0 else 0
+        # Use paste_text from paste_ranges for consistent pasted_chars count
+        total_pasted_from_ranges = sum(pr["orig_len"] for pr in paste_ranges)
+        effective_paste_ratio = unmodified_paste_chars / max(typed_chars + total_pasted_from_ranges, 1)
         actual_paste_ratio = effective_paste_ratio
-        paste_detail = f"{actual_paste_ratio * 100:.1f}% unmodified paste ({unmodified_paste_chars} of {pasted_chars} pasted chars survived)"
+        paste_detail = f"{actual_paste_ratio * 100:.1f}% unmodified paste ({unmodified_paste_chars} of {total_pasted_from_ranges} pasted chars survived)"
     else:
         # Legacy: no clipboard-tracked paste events. Use raw paste_ratio from stats.
         actual_paste_ratio = float(paste_ratio)
@@ -152,6 +154,9 @@ def compute_verdict(events, stats):
         risk_flags.append({"level": "warning", "message": f"Significant unmodified paste: {unmodified_paste_chars} chars"})
 
     # --- Factor 2: Typing Cadence Consistency (25%) ---
+    # Weight this factor down when paste ratio is high. If 77% was pasted,
+    # the typing cadence of the remaining 23% is measuring noise — it's
+    # naturally "natural" because the student only typed a few words.
     intervals = []
     if len(keystroke_events) >= 10:
         for i in range(1, len(keystroke_events)):
@@ -171,11 +176,16 @@ def compute_verdict(events, stats):
     else:
         cadence_score = 50
         detail = f"Insufficient keystroke data ({len(keystroke_events)} keystrokes found)"
+
+    # Scale cadence score by relevance: if 77% was pasted, cadence is only 23% meaningful
+    relevance = max(0.1, 1.0 - actual_paste_ratio)
+    cadence_score = round(cadence_score * relevance)
+
     factors["typing_cadence"] = {
         "score": round(cadence_score),
         "weight": 25,
         "label": "Typing Cadence",
-        "detail": detail
+        "detail": detail + f" (relevance: {relevance*100:.0f}% — only {typed_chars} chars typed)"
     }
 
     # --- Factor 3: Edit Density (20%) ---
@@ -190,34 +200,45 @@ def compute_verdict(events, stats):
         edit_score = 100
     else:
         edit_score = 60
+
+    # Scale edit density by relevance: if 77% was pasted, edit density is only
+    # measuring edits to the 23% that was typed. The pasted content was barely edited.
+    edit_score = round(edit_score * relevance)
+
     factors["edit_density"] = {
         "score": round(edit_score),
         "weight": 20,
         "label": "Edit Density",
-        "detail": f"{deleted_chars} chars deleted vs {typed_chars} typed ({delete_ratio * 100:.1f}% correction rate)"
+        "detail": f"{deleted_chars} chars deleted vs {typed_chars} typed ({delete_ratio * 100:.1f}% correction rate) (relevance: {relevance*100:.0f}%)"
     }
 
     # --- Factor 4: Sustained Speed (15%) ---
+    # Use effective minutes (total_time_ms if active_time_ms is 0)
+    effective_minutes = total_minutes if total_minutes > 0 else (active_time_ms / 60000 if active_time_ms > 0 else 0.016)
     speed_score = 100
-    if avg_wpm > 55 and total_minutes > 15 and delete_ratio < 0.02:
+    if avg_wpm > 55 and effective_minutes > 15 and delete_ratio < 0.02:
         speed_score = 20
         risk_flags.append({
             "level": "critical",
             "message": "High Risk: Transcription of External Screen Detected (WPM > 55, no corrections, > 15 min)"
         })
-    elif avg_wpm > 55 and total_minutes > 15:
+    elif avg_wpm > 55 and effective_minutes > 15:
         speed_score = 50
         risk_flags.append({
             "level": "warning",
-            "message": f"Warning: Sustained {avg_wpm:.0f} WPM for {total_minutes:.0f} minutes"
+            "message": f"Warning: Sustained {avg_wpm:.0f} WPM for {effective_minutes:.0f} minutes"
         })
     elif avg_wpm > 55:
         speed_score = 80
+
+    # Scale by relevance
+    speed_score = round(speed_score * relevance)
+
     factors["sustained_speed"] = {
         "score": round(speed_score),
         "weight": 15,
         "label": "Sustained Speed",
-        "detail": f"Avg {avg_wpm:.0f} WPM over {total_minutes:.0f} minutes"
+        "detail": f"Avg {avg_wpm:.0f} WPM over {effective_minutes:.0f} minutes (relevance: {relevance*100:.0f}%)"
     }
 
     # --- Factor 4b: Transcription Detection (15%) ---
@@ -282,11 +303,12 @@ def compute_verdict(events, stats):
                 risk_flags.append({"level": "critical", "message": f"High Risk: Probable Manual Transcription — {suspicious_chars} chars typed in sustained bursts without pauses or corrections"})
 
     trans_detail = "Natural typing pattern" if transcription_score >= 80 else (transcription_flags[0] if transcription_flags else "Some sustained bursts detected")
+    transcription_score = round(transcription_score * relevance)
     factors["transcription_detection"] = {
         "score": round(transcription_score),
         "weight": 15,
         "label": "Transcription Detection",
-        "detail": trans_detail
+        "detail": trans_detail + f" (relevance: {relevance*100:.0f}%)"
     }
 
     # --- Factor 5: Cursor Jumps (10%) ---
@@ -297,11 +319,12 @@ def compute_verdict(events, stats):
         jump_score = 70
     else:
         jump_score = 100
+    jump_score = round(jump_score * relevance)
     factors["cursor_jumps"] = {
         "score": round(jump_score),
         "weight": 10,
         "label": "Cursor Jumps",
-        "detail": f"{jumps_per_min:.1f} jumps per minute"
+        "detail": f"{jumps_per_min:.1f} jumps per minute (relevance: {relevance*100:.0f}%)"
     }
 
     # --- Factor 6: Snapshot Growth Pattern (10%) ---
@@ -325,11 +348,17 @@ def compute_verdict(events, stats):
             if burst_ratio > 0.5:
                 detail = f"Bursty growth pattern: {bursts}/{len(sizes)-1} intervals had large jumps"
                 risk_flags.append({"level": "warning", "message": "Bursty document growth — large pastes detected between snapshots"})
+    elif actual_paste_ratio > 0.5:
+        # High paste ratio without enough snapshots = bursty growth
+        growth_score = 50
+        detail = "Insufficient snapshots for growth analysis, but high paste ratio suggests bursty growth"
+
+    growth_score = round(growth_score * relevance)
     factors["snapshot_growth"] = {
         "score": round(growth_score),
         "weight": 10,
         "label": "Growth Pattern",
-        "detail": detail
+        "detail": detail + f" (relevance: {relevance*100:.0f}%)"
     }
 
     # --- Compute weighted overall score ---
