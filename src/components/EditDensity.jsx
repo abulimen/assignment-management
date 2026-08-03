@@ -3,9 +3,16 @@ import { useMemo } from 'react';
 export default function EditDensity({ events, totalTimeMs }) {
   const buckets = useMemo(() => {
     if (!events?.length) return [];
-    const first = events[0].occurred_at;
-    const last = events[events.length - 1].occurred_at;
+
+    // Find actual time range (events may not be sorted by time)
+    const times = events.filter(e => e.occurred_at != null).map(e => e.occurred_at);
+    if (times.length === 0) return [];
+
+    const first = Math.min(...times);
+    const last = Math.max(...times);
     const duration = last - first;
+    if (duration <= 0) return [];
+
     const bucketSize = Math.max(duration / 20, 5);
 
     const map = {};
