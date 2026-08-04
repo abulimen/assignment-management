@@ -52,20 +52,3 @@
 .playback-selection {
   background: rgba(59, 130, 246, 0.2);
 }
-
-/* Source highlighting overlays — Grammarly-style transparent backgrounds */
-.hl-typed {
-  background-color: rgba(34, 197, 94, 0.18);
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
-}
-.hl-pasted {
-  background-color: rgba(239, 68, 68, 0.18);
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
-}
-.hl-edited {
-  background-color: rgba(234, 179, 8, 0.22);
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
-}
