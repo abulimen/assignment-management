@@ -208,9 +208,10 @@ export default function Playback({ events, finalContent }) {
         }
 
         if (insertedSize > 0 && deleted === 0) {
-          // Pure insertion
-          const type = (event.type === 'paste' && event.data?.external_paste)
-                     ? 'pasted' : 'typed';
+          // Pure insertion — check if it's inside a pasted/edited range
+          const isPaste = event.type === 'paste' && event.data?.external_paste;
+          const wasInPasted = sourceMap.current.isInPastedRange(from);
+          const type = isPaste ? 'pasted' : (wasInPasted ? 'edited' : 'typed');
           sourceMap.current.addRange(from, from + insertedSize, type);
         } else if (deleted > 0 && insertedSize === 0) {
           // Pure deletion — mark overlapping pasted ranges as edited
