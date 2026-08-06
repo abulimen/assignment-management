@@ -10,10 +10,89 @@ import { Plugin } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { Play, Pause, SkipBack, SkipForward, FileText, Film, Highlighter } from 'lucide-react';
 
-// ProseMirror Step Replay with DOM overlay highlighting.
-// Highlighting is rendered as a separate transparent overlay layer on top
-// of the editor — no ProseMirror decorations, no position tracking, no
-// re-render bugs. Toggle just shows/hides the overlay div.
+// ProseMirror Step Replay with source highlighting.
+// Uses ProseMirror content size (not text length) for range bounds,
+// and tr.mapping for position tracking through document changes.
+
+// SourceMap: tracks which doc ranges are typed/pasted/edited.
+// All positions are ProseMirror positions (include structural tokens).
+class SourceMap {
+  constructor() {
+    this.ranges = []; // [{from, to, type: 'typed'|'pasted'|'edited'}]
+  }
+
+  reset() {
+    this.ranges = [];
+  }
+
+  // Map all range positions through a transaction's mapping
+  mapRanges(mapping) {
+    this.ranges = this.ranges.map(r => ({
+      ...r,
+      from: mapping.map(r.from, -1),
+      to: mapping.map(r.to, 1),
+    })).filter(r => r.from < r.to);
+  }
+
+  // Add a new range. If it overlaps existing ranges, split/merge them.
+  addRange(from, to, type) {
+    if (to <= from) return;
+    const newRanges = [];
+    let inserted = false;
+    for (const r of this.ranges) {
+      if (r.to <= from) {
+        newRanges.push(r);
+      } else if (r.from >= to) {
+        if (!inserted) {
+          newRanges.push({ from, to, type });
+          inserted = true;
+        }
+        newRanges.push(r);
+      } else {
+        // Overlap — split existing range
+        if (r.from < from) {
+          newRanges.push({ from: r.from, to: from, type: r.type });
+        }
+        if (!inserted) {
+          newRanges.push({ from, to, type });
+          inserted = true;
+        }
+        if (r.to > to) {
+          newRanges.push({ from: to, to: r.to, type: r.type });
+        }
+      }
+    }
+    if (!inserted) {
+      newRanges.push({ from, to, type });
+    }
+    this.ranges = newRanges.sort((a, b) => a.from - b.from);
+  }
+
+  // Mark pasted ranges overlapping a deletion as 'edited'
+  markDeleted(delFrom, delTo) {
+    for (const r of this.ranges) {
+      if (r.type === 'pasted' && delFrom < r.to && delTo > r.from) {
+        r.type = 'edited';
+      }
+    }
+  }
+
+  // Generate ProseMirror decorations for the current ranges
+  getDecorations(state) {
+    const decos = [];
+    for (const r of this.ranges) {
+      const safeFrom = Math.max(0, Math.min(r.from, state.doc.content.size));
+      const safeTo = Math.max(safeFrom, Math.min(r.to, state.doc.content.size));
+      if (safeTo > safeFrom) {
+        const cls = r.type === 'typed' ? 'hl-typed'
+                  : r.type === 'edited' ? 'hl-edited'
+                  : 'hl-pasted';
+        decos.push(Decoration.inline(safeFrom, safeTo, { class: cls }));
+      }
+    }
+    return decos;
+  }
+}
 
 export default function Playback({ events, finalContent }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -23,9 +102,14 @@ export default function Playback({ events, finalContent }) {
   const [highlight, setHighlight] = useState(false);
   const intervalRef = useRef(null);
   const contentRef = useRef(null);
-  const overlayRef = useRef(null);
   const isDispatching = useRef(false);
   const lastIndexRef = useRef(-1);
+
+  // SourceMap instance — tracks typed/pasted/edited ranges
+  const sourceMap = useRef(new SourceMap());
+  const highlightRef = useRef(false);
+
+  useEffect(() => { highlightRef.current = highlight; }, [highlight]);
 
   const stepEvents = useMemo(
     () => (events || []).filter(e => e.steps && e.steps.length > 0),
@@ -46,14 +130,17 @@ export default function Playback({ events, finalContent }) {
     },
   });
 
-  // Cursor decoration plugin
+  // Decoration plugin: cursor caret + source highlighting
   useEffect(() => {
     if (!editor) return;
-    const cursorPlugin = new Plugin({
+
+    const plugin = new Plugin({
       props: {
         decorations: (state) => {
           const decos = [];
           const { from, to } = state.selection;
+
+          // Cursor widget
           if (from === to) {
             decos.push(Decoration.widget(from, () => {
               const el = document.createElement('span');
@@ -63,138 +150,28 @@ export default function Playback({ events, finalContent }) {
           } else {
             decos.push(Decoration.inline(from, to, { class: 'playback-selection' }));
           }
+
+          // Source highlighting
+          if (highlightRef.current) {
+            decos.push(...sourceMap.current.getDecorations(state));
+          }
+
           return DecorationSet.create(state.doc, decos);
         },
       },
     });
-    editor.registerPlugin(cursorPlugin);
-    return () => { editor.unregisterPlugin(cursorPlugin.key); };
+
+    editor.registerPlugin(plugin);
+    return () => { editor.unregisterPlugin(plugin.key); };
   }, [editor]);
 
-  // --- Highlight ranges computed once from events ---
-  const highlightRanges = useMemo(() => {
-    if (!events) return { pasted: [], edited: [] };
-
-    const pasted = [];
-    const deletes = events.filter(e => e.type === 'delete');
-
-    // Find external paste events
-    for (const e of events) {
-      if (e.type === 'paste' && e.data?.external_paste) {
-        const pos = e.data.position ?? 0;
-        const len = e.data.pasted_text_length || e.data.pasted_text?.length || 0;
-        if (len > 0) {
-          pasted.push({ from: pos, to: pos + len, deleted: 0 });
-        }
-      }
-    }
-
-    // Track deletes that overlap paste ranges
-    for (const del of deletes) {
-      const delPos = del.data?.position ?? 0;
-      const delLen = del.data?.length ?? 0;
-      for (const pr of pasted) {
-        if (delPos < pr.to && (delPos + delLen) > pr.from) {
-          const overlapStart = Math.max(delPos, pr.from);
-          const overlapEnd = Math.min(delPos + delLen, pr.to);
-          pr.deleted += Math.max(0, overlapEnd - overlapStart);
-        }
-      }
-    }
-
-    // Split into unmodified pasted vs edited
-    const unmodified = [];
-    const edited = [];
-    for (const pr of pasted) {
-      const survived = pr.to - pr.from - pr.deleted;
-      if (survived > 0) {
-        unmodified.push({ from: pr.from, to: pr.from + survived });
-      }
-      if (pr.deleted > 0) {
-        edited.push({ from: pr.from, to: pr.to });
-      }
-    }
-
-    return { pasted: unmodified, edited };
-  }, [events]);
-
-  // --- Render overlay whenever currentIndex changes ---
-  useEffect(() => {
-    if (!highlight || !overlayRef.current || !contentRef.current) return;
-
-    const raf = requestAnimationFrame(() => {
-      const overlay = overlayRef.current;
-      if (!overlay) return;
-      overlay.innerHTML = '';
-
-      const editorEl = contentRef.current?.querySelector('.ProseMirror');
-      if (!editorEl) return;
-
-      const editorRect = editorEl.getBoundingClientRect();
-      const allRanges = [...highlightRanges.pasted, ...highlightRanges.edited];
-
-      for (const range of allRanges) {
-        try {
-          // Find the text node at the range position
-          const walker = document.createTreeWalker(editorEl, NodeFilter.SHOW_TEXT);
-          let node;
-          let charCount = 0;
-          let startNode = null, startOffset = 0;
-          let endNode = null, endOffset = 0;
-
-          while ((node = walker.nextNode())) {
-            const nodeLen = node.textContent.length;
-            if (!startNode && charCount + nodeLen > range.from) {
-              startNode = node;
-              startOffset = range.from - charCount;
-            }
-            if (!endNode && charCount + nodeLen >= range.to) {
-              endNode = node;
-              endOffset = range.to - charCount;
-              break;
-            }
-            charCount += nodeLen;
-          }
-
-          if (startNode && endNode) {
-            const r = document.createRange();
-            r.setStart(startNode, Math.min(startOffset, startNode.textContent.length));
-            r.setEnd(endNode, Math.min(endOffset, endNode.textContent.length));
-            const rects = r.getClientRects();
-
-            const isEdited = highlightRanges.edited.some(er => er.from === range.from);
-            const color = isEdited ? 'rgba(234, 179, 8, 0.22)' : 'rgba(239, 68, 68, 0.18)';
-
-            for (const rect of rects) {
-              const div = document.createElement('div');
-              div.style.cssText = `
-                position: absolute;
-                left: ${rect.left - editorRect.left}px;
-                top: ${rect.top - editorRect.top}px;
-                width: ${rect.width}px;
-                height: ${rect.height}px;
-                background: ${color};
-                pointer-events: none;
-                mix-blend-mode: multiply;
-              `;
-              overlay.appendChild(div);
-            }
-          }
-        } catch (e) {
-          // Skip invalid ranges
-        }
-      }
-    });
-
-    return () => cancelAnimationFrame(raf);
-  }, [highlight, currentIndex, highlightRanges]);
-
-  // Apply a single step event
+  // Apply a single step event + update source map
   const applyStepEvent = useCallback((event) => {
     if (!editor || !event?.steps) return;
 
     const { state } = editor.view;
     let tr = state.tr;
+
     for (const stepJson of event.steps) {
       try {
         const step = Step.fromJSON(state.schema, stepJson);
@@ -202,12 +179,49 @@ export default function Playback({ events, finalContent }) {
       } catch (e) { /* skip invalid */ }
     }
 
+    // Update source map BEFORE dispatching
+    // Map existing ranges through this transaction's mapping
+    sourceMap.current.mapRanges(tr.mapping);
+
+    // Process each step in the event
+    for (const stepJson of event.steps) {
+      if (stepJson.stepType === 'replace') {
+        const from = stepJson.from ?? 0;
+        const to = stepJson.to ?? 0;
+        const deleted = to - from;
+
+        // Compute inserted size using ProseMirror content size
+        // (NOT text length — includes paragraph boundary tokens)
+        let insertedSize = 0;
+        if (stepJson.slice?.content) {
+          insertedSize = getSliceContentSize(stepJson.slice.content);
+        }
+
+        if (insertedSize > 0 && deleted === 0) {
+          // Pure insertion
+          const type = (event.type === 'paste' && event.data?.external_paste)
+                     ? 'pasted' : 'typed';
+          sourceMap.current.addRange(from, from + insertedSize, type);
+        } else if (deleted > 0 && insertedSize === 0) {
+          // Pure deletion — mark overlapping pasted ranges as edited
+          sourceMap.current.markDeleted(from, to);
+        } else if (deleted > 0 && insertedSize > 0) {
+          // Replace (delete then insert)
+          sourceMap.current.markDeleted(from, to);
+          const type = (event.type === 'paste' && event.data?.external_paste)
+                     ? 'pasted' : 'typed';
+          sourceMap.current.addRange(from, from + insertedSize, type);
+        }
+      }
+    }
+
+    // Set selection
     if (event.selection?.from != null) {
-      const from = Math.min(event.selection.from, tr.doc.content.size);
+      const selFrom = Math.min(event.selection.from, tr.doc.content.size);
       try {
-        const resolved = tr.doc.resolve(from);
+        const resolved = tr.doc.resolve(selFrom);
         if (resolved.parent.isTextblock) {
-          tr = tr.setSelection(TextSelection.create(tr.doc, from));
+          tr = tr.setSelection(TextSelection.create(tr.doc, selFrom));
         }
       } catch (e) { /* skip */ }
     }
@@ -220,6 +234,7 @@ export default function Playback({ events, finalContent }) {
   // Full rebuild from 0 to index
   const rebuildToIndex = useCallback((index) => {
     if (!editor) return;
+    sourceMap.current.reset();
     isDispatching.current = true;
     editor.commands.clearContent();
     isDispatching.current = false;
@@ -229,9 +244,10 @@ export default function Playback({ events, finalContent }) {
     lastIndexRef.current = index;
   }, [editor, stepEvents, applyStepEvent]);
 
-  // Reset on events change
+  // Reset when events change
   useEffect(() => {
     lastIndexRef.current = -1;
+    sourceMap.current.reset();
   }, [stepEvents]);
 
   // Replay logic
@@ -257,10 +273,20 @@ export default function Playback({ events, finalContent }) {
       catch (e) { editor.commands.setContent(finalContent); }
       isDispatching.current = false;
       lastIndexRef.current = -1;
+      sourceMap.current.reset();
     } else if (mode === 'playback' && editor && lastIndexRef.current === -1) {
       rebuildToIndex(currentIndex);
     }
   }, [mode, editor, finalContent, currentIndex, rebuildToIndex]);
+
+  // Force decoration re-evaluation when highlight toggles
+  useEffect(() => {
+    if (editor && !isDispatching.current) {
+      isDispatching.current = true;
+      editor.view.dispatch(editor.state.tr);
+      isDispatching.current = false;
+    }
+  }, [highlight, editor]);
 
   // Playback loop
   useEffect(() => {
@@ -339,6 +365,7 @@ export default function Playback({ events, finalContent }) {
               </div>
               {highlight && (
                 <div className="flex items-center gap-3 text-xs">
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-200 border border-green-400" /> Typed</span>
                   <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-200 border border-red-400" /> Pasted</span>
                   <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-yellow-200 border border-yellow-400" /> Edited</span>
                 </div>
@@ -349,17 +376,29 @@ export default function Playback({ events, finalContent }) {
         {mode === 'final' && <div className="text-xs text-gray-500">The student's final submitted document</div>}
       </div>
 
-      <div ref={contentRef} className="relative min-h-[300px] max-h-[600px] overflow-y-auto">
+      <div ref={contentRef} className="min-h-[300px] max-h-[600px] overflow-y-auto">
         <div className="p-6">
           <EditorContent editor={editor} />
         </div>
-        {/* Highlight overlay — positioned absolutely over the editor content */}
-        <div
-          ref={overlayRef}
-          className="absolute inset-0 pointer-events-none"
-          style={{ display: highlight ? 'block' : 'none' }}
-        />
       </div>
     </div>
   );
+}
+
+// Compute ProseMirror content size from a JSON slice content array.
+// Text nodes: text.length
+// Block nodes (paragraph, heading, etc.): 2 (open/close) + children sizes
+// This gives the EXACT ProseMirror position count, including structural tokens.
+function getSliceContentSize(content) {
+  if (!content || !Array.isArray(content)) return 0;
+  let size = 0;
+  for (const node of content) {
+    if (node.text) {
+      size += node.text.length;
+    } else if (node.content) {
+      // Block node: open tag (1) + close tag (1) + children
+      size += 2 + getSliceContentSize(node.content);
+    }
+  }
+  return size;
 }
