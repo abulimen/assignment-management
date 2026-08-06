@@ -68,19 +68,30 @@ class SourceMap {
     this.ranges = newRanges.sort((a, b) => a.from - b.from);
   }
 
-  // Mark pasted ranges overlapping a deletion as 'edited'
+  // Shrink pasted ranges that overlap a deletion — deleted chars are gone
   markDeleted(delFrom, delTo) {
+    const newRanges = [];
     for (const r of this.ranges) {
       if (r.type === 'pasted' && delFrom < r.to && delTo > r.from) {
-        r.type = 'edited';
+        // Delete overlaps this pasted range — split it, keep surviving portions as 'pasted'
+        if (delFrom > r.from) {
+          newRanges.push({ from: r.from, to: delFrom, type: 'pasted' });
+        }
+        if (delTo < r.to) {
+          newRanges.push({ from: delTo, to: r.to, type: 'pasted' });
+        }
+        // The deleted portion is simply removed — no longer exists
+      } else {
+        newRanges.push(r);
       }
     }
+    this.ranges = newRanges;
   }
 
-  // Check if a position falls inside a pasted or edited range
+  // Check if a position falls inside a pasted range
   isInPastedRange(pos) {
     for (const r of this.ranges) {
-      if (pos >= r.from && pos < r.to && (r.type === 'pasted' || r.type === 'edited')) {
+      if (pos >= r.from && pos < r.to && r.type === 'pasted') {
         return true;
       }
     }
@@ -94,12 +105,8 @@ class SourceMap {
       const safeFrom = Math.max(0, Math.min(r.from, state.doc.content.size));
       const safeTo = Math.max(safeFrom, Math.min(r.to, state.doc.content.size));
       if (safeTo > safeFrom) {
-        const cls = r.type === 'typed' ? 'hl-typed'
-                  : r.type === 'edited' ? 'hl-edited'
-                  : 'hl-pasted';
-        const label = r.type === 'typed' ? 'Typed'
-                    : r.type === 'edited' ? 'Edited (was pasted)'
-                    : 'Pasted from external source';
+        const cls = r.type === 'typed' ? 'hl-typed' : 'hl-pasted';
+        const label = r.type === 'typed' ? 'Typed' : 'Pasted from external source';
         decos.push(Decoration.inline(safeFrom, safeTo, {
           class: cls,
           'data-label': label,
@@ -214,23 +221,18 @@ export default function Playback({ events, finalContent }) {
         }
 
         if (insertedSize > 0 && deleted === 0) {
-          // Pure insertion — check if it's inside a pasted/edited range
-          const isPaste = event.type === 'paste' && event.data?.external_paste;
-          const wasInPasted = sourceMap.current.isInPastedRange(from);
-          const type = isPaste ? 'pasted' : (wasInPasted ? 'edited' : 'typed');
+          // Pure insertion
+          const type = (event.type === 'paste' && event.data?.external_paste)
+                     ? 'pasted' : 'typed';
           sourceMap.current.addRange(from, from + insertedSize, type);
         } else if (deleted > 0 && insertedSize === 0) {
-          // Pure deletion — mark overlapping pasted ranges as edited
+          // Pure deletion — shrink overlapping pasted ranges
           sourceMap.current.markDeleted(from, to);
         } else if (deleted > 0 && insertedSize > 0) {
-          // Replace (delete then insert): user selected text and typed over it.
-          // If the deleted range was inside a pasted/edited block, the replacement
-          // text is an EDIT, not fresh typing. Mark it as 'edited' (yellow).
+          // Replace: delete pasted text then type new text at same position
           sourceMap.current.markDeleted(from, to);
-          const wasInPasted = sourceMap.current.isInPastedRange(from);
           const type = (event.type === 'paste' && event.data?.external_paste)
-                     ? 'pasted'
-                     : wasInPasted ? 'edited' : 'typed';
+                     ? 'pasted' : 'typed';
           sourceMap.current.addRange(from, from + insertedSize, type);
         }
       }
@@ -455,7 +457,6 @@ export default function Playback({ events, finalContent }) {
                 <div className="flex items-center gap-3 text-xs">
                   <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-200 border border-green-400" /> Typed</span>
                   <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-200 border border-red-400" /> Pasted</span>
-                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-yellow-200 border border-yellow-400" /> Edited</span>
                 </div>
               )}
             </div>
