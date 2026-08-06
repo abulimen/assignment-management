@@ -97,7 +97,13 @@ class SourceMap {
         const cls = r.type === 'typed' ? 'hl-typed'
                   : r.type === 'edited' ? 'hl-edited'
                   : 'hl-pasted';
-        decos.push(Decoration.inline(safeFrom, safeTo, { class: cls }));
+        const label = r.type === 'typed' ? 'Typed'
+                    : r.type === 'edited' ? 'Edited (was pasted)'
+                    : 'Pasted from external source';
+        decos.push(Decoration.inline(safeFrom, safeTo, {
+          class: cls,
+          'data-label': label,
+        }));
       }
     }
     return decos;
@@ -302,6 +308,49 @@ export default function Playback({ events, finalContent }) {
       isDispatching.current = false;
     }
   }, [highlight, editor]);
+
+  // Hover tooltips for highlighted text
+  useEffect(() => {
+    if (!editor || !highlight) return;
+    const pmEl = editor.view.dom;
+    let tooltipEl = null;
+
+    const showTooltip = (e) => {
+      const target = e.target;
+      if (!target.matches('.hl-typed, .hl-pasted, .hl-edited')) return;
+
+      const label = target.getAttribute('data-label');
+      if (!label) return;
+
+      const type = target.classList.contains('hl-typed') ? 'typed'
+                 : target.classList.contains('hl-edited') ? 'edited'
+                 : 'pasted';
+
+      tooltipEl = document.createElement('div');
+      tooltipEl.className = `hl-tooltip hl-tooltip-${type}`;
+      tooltipEl.textContent = label;
+      document.body.appendChild(tooltipEl);
+
+      const rect = target.getBoundingClientRect();
+      tooltipEl.style.left = `${rect.left + rect.width / 2 - tooltipEl.offsetWidth / 2}px`;
+      tooltipEl.style.top = `${rect.top - tooltipEl.offsetHeight - 6}px`;
+    };
+
+    const hideTooltip = () => {
+      if (tooltipEl) {
+        tooltipEl.remove();
+        tooltipEl = null;
+      }
+    };
+
+    pmEl.addEventListener('mouseover', showTooltip);
+    pmEl.addEventListener('mouseout', hideTooltip);
+    return () => {
+      pmEl.removeEventListener('mouseover', showTooltip);
+      pmEl.removeEventListener('mouseout', hideTooltip);
+      if (tooltipEl) tooltipEl.remove();
+    };
+  }, [editor, highlight, currentIndex]);
 
   // Playback loop
   useEffect(() => {
