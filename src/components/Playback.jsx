@@ -77,6 +77,16 @@ class SourceMap {
     }
   }
 
+  // Check if a position falls inside a pasted or edited range
+  isInPastedRange(pos) {
+    for (const r of this.ranges) {
+      if (pos >= r.from && pos < r.to && (r.type === 'pasted' || r.type === 'edited')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   // Generate ProseMirror decorations for the current ranges
   getDecorations(state) {
     const decos = [];
@@ -206,10 +216,14 @@ export default function Playback({ events, finalContent }) {
           // Pure deletion — mark overlapping pasted ranges as edited
           sourceMap.current.markDeleted(from, to);
         } else if (deleted > 0 && insertedSize > 0) {
-          // Replace (delete then insert)
+          // Replace (delete then insert): user selected text and typed over it.
+          // If the deleted range was inside a pasted/edited block, the replacement
+          // text is an EDIT, not fresh typing. Mark it as 'edited' (yellow).
           sourceMap.current.markDeleted(from, to);
+          const wasInPasted = sourceMap.current.isInPastedRange(from);
           const type = (event.type === 'paste' && event.data?.external_paste)
-                     ? 'pasted' : 'typed';
+                     ? 'pasted'
+                     : wasInPasted ? 'edited' : 'typed';
           sourceMap.current.addRange(from, from + insertedSize, type);
         }
       }
