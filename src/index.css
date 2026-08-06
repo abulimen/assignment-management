@@ -55,22 +55,22 @@
 
 /* Source highlighting overlays — Grammarly-style transparent backgrounds */
 .hl-typed {
-  background-color: rgba(22, 163, 74, 0.25);
-  border-bottom: 2px solid rgba(22, 163, 74, 0.5);
+  background-color: rgba(22, 163, 74, 0.35);
+  border-bottom: 3px solid #16a34a;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   cursor: help;
 }
 .hl-pasted {
-  background-color: rgba(220, 38, 38, 0.25);
-  border-bottom: 2px solid rgba(220, 38, 38, 0.5);
+  background-color: rgba(220, 38, 38, 0.35);
+  border-bottom: 3px solid #dc2626;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   cursor: help;
 }
 .hl-edited {
-  background-color: rgba(202, 138, 4, 0.30);
-  border-bottom: 2px solid rgba(202, 138, 4, 0.6);
+  background-color: rgba(249, 115, 22, 0.40);
+  border-bottom: 3px solid #f97316;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   cursor: help;
@@ -78,17 +78,17 @@
 
 /* Source highlight tooltips */
 .hl-tooltip {
-  position: absolute;
-  z-index: 50;
-  padding: 4px 10px;
+  position: fixed;
+  z-index: 9999;
+  padding: 6px 12px;
   border-radius: 6px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   color: white;
   pointer-events: none;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 .hl-tooltip-typed { background: #16a34a; }
 .hl-tooltip-pasted { background: #dc2626; }
-.hl-tooltip-edited { background: #ca8a04; }
+.hl-tooltip-edited { background: #f97316; }

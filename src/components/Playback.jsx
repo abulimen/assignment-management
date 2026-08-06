@@ -315,9 +315,23 @@ export default function Playback({ events, finalContent }) {
     const pmEl = editor.view.dom;
     let tooltipEl = null;
 
-    const showTooltip = (e) => {
-      const target = e.target;
-      if (!target.matches('.hl-typed, .hl-pasted, .hl-edited')) return;
+    const getHighlightTarget = (e) => {
+      let el = e.target;
+      // Walk up to find the element with hl- class
+      while (el && el !== pmEl) {
+        if (el.classList && el.matches('.hl-typed, .hl-pasted, .hl-edited')) return el;
+        el = el.parentElement;
+      }
+      return null;
+    };
+
+    const onMouseMove = (e) => {
+      const target = getHighlightTarget(e);
+
+      if (!target) {
+        if (tooltipEl) { tooltipEl.remove(); tooltipEl = null; }
+        return;
+      }
 
       const label = target.getAttribute('data-label');
       if (!label) return;
@@ -326,28 +340,38 @@ export default function Playback({ events, finalContent }) {
                  : target.classList.contains('hl-edited') ? 'edited'
                  : 'pasted';
 
-      tooltipEl = document.createElement('div');
-      tooltipEl.className = `hl-tooltip hl-tooltip-${type}`;
-      tooltipEl.textContent = label;
-      document.body.appendChild(tooltipEl);
+      if (!tooltipEl) {
+        tooltipEl = document.createElement('div');
+        tooltipEl.className = `hl-tooltip hl-tooltip-${type}`;
+        tooltipEl.textContent = label;
+        document.body.appendChild(tooltipEl);
+      } else {
+        tooltipEl.className = `hl-tooltip hl-tooltip-${type}`;
+        tooltipEl.textContent = label;
+      }
 
-      const rect = target.getBoundingClientRect();
-      tooltipEl.style.left = `${rect.left + rect.width / 2 - tooltipEl.offsetWidth / 2}px`;
-      tooltipEl.style.top = `${rect.top - tooltipEl.offsetHeight - 6}px`;
-    };
-
-    const hideTooltip = () => {
-      if (tooltipEl) {
-        tooltipEl.remove();
-        tooltipEl = null;
+      // Position tooltip near cursor, above the element
+      tooltipEl.style.left = `${e.clientX}px`;
+      tooltipEl.style.top = `${e.clientY - 35}px`;
+      // Clamp to viewport
+      const rect = tooltipEl.getBoundingClientRect();
+      if (rect.left + rect.width > window.innerWidth) {
+        tooltipEl.style.left = `${window.innerWidth - rect.width - 10}px`;
+      }
+      if (rect.top < 0) {
+        tooltipEl.style.top = `${e.clientY + 20}px`;
       }
     };
 
-    pmEl.addEventListener('mouseover', showTooltip);
-    pmEl.addEventListener('mouseout', hideTooltip);
+    const onMouseLeave = () => {
+      if (tooltipEl) { tooltipEl.remove(); tooltipEl = null; }
+    };
+
+    pmEl.addEventListener('mousemove', onMouseMove);
+    pmEl.addEventListener('mouseleave', onMouseLeave);
     return () => {
-      pmEl.removeEventListener('mouseover', showTooltip);
-      pmEl.removeEventListener('mouseout', hideTooltip);
+      pmEl.removeEventListener('mousemove', onMouseMove);
+      pmEl.removeEventListener('mouseleave', onMouseLeave);
       if (tooltipEl) tooltipEl.remove();
     };
   }, [editor, highlight, currentIndex]);
