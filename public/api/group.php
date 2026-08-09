@@ -7,10 +7,12 @@ $user = guard();
 $pdo = db();
 
 // Extract ID from URL: /api/group.php/123 or /api/group.php/123/join or /api/group.php/123/merge
+// Or: /api/group.php/join (no ID, action in first segment)
 $path = isset($_SERVER['PATH_INFO']) ? trim($_SERVER['PATH_INFO'], '/') : '';
 $parts = explode('/', $path);
-$id = (int) ($parts[0] ?? 0);
-$action = $parts[1] ?? '';
+$first = $parts[0] ?? '';
+$id = is_numeric($first) ? (int) $first : 0;
+$action = $id ? ($parts[1] ?? '') : $first;
 
 if (!$id) {
     // Join by invite code: POST /api/group.php/join
