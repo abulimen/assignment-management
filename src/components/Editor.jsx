@@ -61,7 +61,7 @@ function Toolbar({ editor }) {
   );
 }
 
-export default function Editor({ submissionId, initialContent, onContentChange }) {
+export default function Editor({ submissionId, initialContent, onContentChange, editable = true, extraExtensions = [] }) {
   const { flush, captureTransaction, setEditorRef, enqueue } = useTracker(submissionId);
   const registered = useRef(false);
   const pendingPasteRef = useRef(null);
@@ -73,8 +73,10 @@ export default function Editor({ submissionId, initialContent, onContentChange }
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Link.configure({ openOnClick: false }),
       Placeholder.configure({ placeholder: 'Start writing your assignment...' }),
+      ...extraExtensions,
     ],
     content: initialContent ? JSON.parse(initialContent) : null,
+    editable,
     editorProps: {
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none',
@@ -95,6 +97,8 @@ export default function Editor({ submissionId, initialContent, onContentChange }
     onUpdate: ({ editor, transaction }) => {
       const json = editor.getJSON();
       onContentChange?.(JSON.stringify(json));
+      // Skip tracking when read-only
+      if (!editable) return;
       // Pass the pending paste info (if any) to the tracker
       captureTransaction(transaction, pendingPasteRef.current);
       // Clear the pending paste after it's been consumed
@@ -102,7 +106,7 @@ export default function Editor({ submissionId, initialContent, onContentChange }
         pendingPasteRef.current = null;
       }
     },
-    onBlur: () => flush(),
+    onBlur: () => { if (editable) flush(); },
   });
 
   // Give the tracker access to the editor for snapshots
@@ -110,9 +114,9 @@ export default function Editor({ submissionId, initialContent, onContentChange }
     setEditorRef(() => editor);
   }, [editor, setEditorRef]);
 
-  // Focus/blur tracking for active time calculation
+  // Focus/blur tracking for active time calculation (skip when read-only)
   useEffect(() => {
-    if (!enqueue) return;
+    if (!enqueue || !editable) return;
 
     const handleFocus = () => {
       enqueue('focus', { timestamp: Date.now() / 1000 });
@@ -137,11 +141,11 @@ export default function Editor({ submissionId, initialContent, onContentChange }
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [enqueue]);
+  }, [enqueue, editable]);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-      <Toolbar editor={editor} />
+      {editable && <Toolbar editor={editor} />}
       <div className="min-h-[500px]">
         <EditorContent editor={editor} className="p-6" />
       </div>

@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
 import GroupMerge from '../components/GroupMerge';
-import { Users, Plus, Link as LinkIcon, Copy, UserPlus, FileText, Send, X } from 'lucide-react';
+import { Users, Plus, Link as LinkIcon, Copy, UserPlus, FileText, Send } from 'lucide-react';
 
 export default function GroupWork() {
   const { id, code } = useParams();
@@ -17,8 +17,6 @@ export default function GroupWork() {
   const [joinCode, setJoinCode] = useState(code || '');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
-  const [viewingMember, setViewingMember] = useState(null);
-  const [viewingContent, setViewingContent] = useState(null);
 
   // If navigated via /join/:code, auto-join
   useEffect(() => {
@@ -77,39 +75,6 @@ export default function GroupWork() {
     try {
       const d = await api.post(`group.php/${group.id}/create-section`, {});
       navigate(`/submissions/${group.assignment_id}?section=${d.section_id}&sub=${d.submission_id}`);
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  async function handleViewMember(memberId) {
-    const section = group.sections?.find(s => parseInt(s.student_id) === memberId);
-    if (!section?.submission_id) return;
-    try {
-      const d = await api.get(`submission.php/${section.submission_id}`);
-      setViewingMember(memberId);
-      // Content is TipTap JSON, extract text for display
-      const content = d.submission.content;
-      let text = '';
-      if (content) {
-        try {
-          const doc = JSON.parse(content);
-          if (doc.content) {
-            doc.content.forEach(node => {
-              if (node.content) {
-                node.content.forEach(child => {
-                  if (child.text) text += child.text + '\n';
-                });
-              } else if (node.text) {
-                text += node.text + '\n';
-              }
-            });
-          }
-        } catch (e) {
-          text = content;
-        }
-      }
-      setViewingContent(text);
     } catch (err) {
       setError(err.message);
     }
@@ -208,7 +173,7 @@ export default function GroupWork() {
                   <>
                     <span className="text-xs text-green-600">{group.sections.find(s => parseInt(s.student_id) === m.student_id).submission_status || 'draft'}</span>
                     {parseInt(m.student_id) !== user?.id && (
-                      <button onClick={() => handleViewMember(m.student_id)}
+                      <button onClick={() => navigate(`/section/${group.sections.find(s => parseInt(s.student_id) === m.student_id).submission_id}`)}
                         className="text-xs text-primary-600 hover:text-primary-700 underline">
                         View
                       </button>
@@ -245,24 +210,27 @@ export default function GroupWork() {
       </div>
 
       {/* Leader: Merge UI */}
-      {isLeader && group.sections?.length > 0 && (
-        <GroupMerge group={group} onMerged={(subId) => navigate(`/review/${subId}`)} />
+      {isLeader && group.sections?.length > 0 && !group.merged_submission_id && (
+        <GroupMerge group={group} onMerged={(subId) => navigate(`/merged/${subId}?group=${group.id}`)} />
       )}
 
-      {/* View member's content modal */}
-      {viewingMember && viewingContent && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setViewingMember(null)}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white">
-              <h3 className="font-semibold">
-                {group.members?.find(m => parseInt(m.student_id) === viewingMember)?.student_name}'s Section
-              </h3>
-              <button onClick={() => setViewingMember(null)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-5 h-5" />
-              </button>
+      {/* Leader: Open merged editor after merge */}
+      {isLeader && group.merged_submission_id && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-gray-400" />
+              <h3 className="text-sm font-semibold text-gray-700">Merged Document</h3>
             </div>
-            <div className="p-6">
-              <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">{viewingContent}</pre>
+            <div className="flex items-center gap-2">
+              <button onClick={() => navigate(`/merged/${group.merged_submission_id}?group=${group.id}`)}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+                <FileText className="w-4 h-4" /> Open Merged Editor
+              </button>
+              <button onClick={() => navigate(`/review/${group.merged_submission_id}`)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
+                Review
+              </button>
             </div>
           </div>
         </div>

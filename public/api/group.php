@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../src/db.php';
 require_once __DIR__ . '/../../src/guard.php';
 require_once __DIR__ . '/../../src/response.php';
+require_once __DIR__ . '/../../src/authorship.php';
 
 $user = guard();
 $pdo = db();
@@ -130,13 +131,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$id]);
         $sections = $stmt->fetchAll();
 
-        // Merge TipTap JSON content
+        // Merge TipTap JSON content, embedding an author mark per section so
+        // ownership is preserved through the leader's later edits.
         $mergedContent = ['type' => 'doc', 'content' => []];
         $sectionMeta = []; // for attribution
         foreach ($sections as $sec) {
             if (!$sec['content']) continue;
             $doc = json_decode($sec['content'], true);
             if (!$doc || !isset($doc['content'])) continue;
+
+            // Tag every text node in this section with the author's ID.
+            $doc = add_author_marks($doc, (int) $sec['student_id']);
+
             $startPos = count($mergedContent['content']);
             foreach ($doc['content'] as $node) {
                 $mergedContent['content'][] = $node;
@@ -150,26 +156,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
         }
 
-        // Create merged group submission
+        // Create merged group submission (leader's ID; teammates' individual
+        // submissions and their events are left untouched).
         $stmt = $pdo->prepare('INSERT INTO submissions (assignment_id, student_id, content, status) VALUES (?, ?, ?, ?)');
         $stmt->execute([
             $group['assignment_id'],
             $user['sub'], // leader's ID
             json_encode($mergedContent),
-            'submitted',
+            'draft',
         ]);
         $mergedSubmissionId = (int) $pdo->lastInsertId();
-        $pdo->prepare('UPDATE submissions SET submitted_at = NOW() WHERE id = ?')->execute([$mergedSubmissionId]);
 
-        // Mark sections as merged
+        // Mark sections as merged + store merged submission on the group
         $pdo->prepare('UPDATE group_sections SET merged = 1 WHERE group_id = ?')->execute([$id]);
-
-        // Store section metadata for attribution
-        $pdo->prepare('UPDATE submissions SET content = ? WHERE id = ?')
-            ->execute([json_encode($mergedContent), $mergedSubmissionId]);
+        $pdo->prepare('UPDATE `groups` SET merged_submission_id = ? WHERE id = ?')
+            ->execute([$mergedSubmissionId, $id]);
 
         json_response([
             'submission_id' => $mergedSubmissionId,
+            'merged_submission_id' => $mergedSubmissionId,
             'sections' => $sectionMeta,
         ]);
     }

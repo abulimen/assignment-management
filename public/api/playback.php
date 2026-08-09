@@ -49,9 +49,33 @@ $stmt = $pdo->prepare('SELECT * FROM submission_stats WHERE submission_id = ?');
 $stmt->execute([$id]);
 $stats = $stmt->fetch() ?: [];
 
+// If this is a merged group submission, return per-member sections for the
+// Contribution X-Ray (stats come from each member's own submission).
+$sections = null;
+$stmt = $pdo->prepare('SELECT id FROM `groups` WHERE merged_submission_id = ?');
+$stmt->execute([$id]);
+$grp = $stmt->fetch();
+if ($grp) {
+    $stmt = $pdo->prepare('
+        SELECT gs.id, gs.student_id, gs.submission_id, gs.sort_order, gs.title, gs.merged,
+               u.name AS student_name,
+               s.status AS submission_status,
+               ss.word_count, ss.keystroke_count, ss.paste_count, ss.total_time_ms
+        FROM group_sections gs
+        JOIN users u ON u.id = gs.student_id
+        LEFT JOIN submissions s ON s.id = gs.submission_id
+        LEFT JOIN submission_stats ss ON ss.submission_id = s.id
+        WHERE gs.group_id = ?
+        ORDER BY gs.sort_order ASC
+    ');
+    $stmt->execute([$grp['id']]);
+    $sections = $stmt->fetchAll();
+}
+
 json_response([
     'submission_id' => (int) $sub['id'],
     'content' => $sub['content'],
     'events' => $events,
     'stats' => $stats,
+    'sections' => $sections,
 ]);

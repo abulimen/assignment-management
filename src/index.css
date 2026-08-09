@@ -76,6 +76,14 @@
   cursor: help;
 }
 
+/* Author highlighting in merged group document */
+.author-highlight {
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
 /* Source highlight tooltips */
 .hl-tooltip {
   position: fixed;
