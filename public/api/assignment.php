@@ -11,7 +11,7 @@ $id = isset($_SERVER['PATH_INFO']) ? (int) trim($_SERVER['PATH_INFO'], '/') : 0;
 if (!$id) error_response('Assignment ID required', 400);
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $stmt = $pdo->prepare('SELECT id, lecturer_id, title, description, rubric, due_date, created_at FROM assignments WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, lecturer_id, title, description, rubric, due_date, is_group_work, created_at FROM assignments WHERE id = ?');
     $stmt->execute([$id]);
     $assignment = $stmt->fetch();
     if (!$assignment) error_response('Assignment not found', 404);
@@ -69,6 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         if (isset($data[$f])) { $fields[] = "$f = ?"; $values[] = $data[$f]; }
     }
     if (isset($data['rubric'])) { $fields[] = "rubric = ?"; $values[] = json_encode($data['rubric']); }
+    if (array_key_exists('is_group_work', $data)) { $fields[] = "is_group_work = ?"; $values[] = $data['is_group_work'] ? 1 : 0; }
     if (empty($fields)) error_response('No fields to update', 422);
 
     $values[] = $id;

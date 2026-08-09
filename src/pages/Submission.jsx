@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
 import Editor from '../components/Editor';
@@ -9,6 +9,7 @@ export default function Submission() {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [submission, setSubmission] = useState(null);
   const [assignment, setAssignment] = useState(null);
   const [content, setContent] = useState('');
@@ -17,6 +18,20 @@ export default function Submission() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Check if this is a group section submission (via query params)
+    const sectionSubId = searchParams.get('sub');
+    if (sectionSubId) {
+      api.get(`submission.php/${sectionSubId}`).then(r => {
+        setSubmission(r.submission);
+        setContent(r.submission.content || '');
+        return api.get(`assignment.php/${id}`);
+      }).then(d => {
+        setAssignment(d.assignment);
+      }).finally(() => setLoading(false));
+      return;
+    }
+
+    // Normal flow: find or create submission
     api.get(`assignment.php/${id}`).then(d => {
       setAssignment(d.assignment);
       const sub = d.assignment.submissions?.find(s => s.student_id === user?.id);
@@ -31,7 +46,7 @@ export default function Submission() {
         });
       }
     }).finally(() => setLoading(false));
-  }, [id, user?.id]);
+  }, [id, user?.id, searchParams]);
 
   async function handleSave() {
     if (!submission) return;

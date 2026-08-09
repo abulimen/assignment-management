@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
-import { Plus, FileText, Clock, CheckCircle } from 'lucide-react';
+import { Plus, FileText, Clock, CheckCircle, Users } from 'lucide-react';
 import AssignmentForm from '../components/AssignmentForm';
 
 export default function Dashboard() {
@@ -41,32 +41,39 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {assignments.map(a => (
-            <Link key={a.id} to={a.submission_id ? `/submissions/${a.id}` : `/assignments/${a.id}`}
-              className="block bg-white rounded-xl border border-gray-200 p-5 hover:border-primary-300 hover:shadow-sm transition-all">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold text-gray-900">{a.title}</h3>
-                  {a.description && <p className="text-sm text-gray-500 mt-1 line-clamp-2">{a.description}</p>}
+          {assignments.map(a => {
+            const isGroup = a.is_group_work == 1 || a.is_group_work === true;
+            const link = isGroup && !a.submission_id
+              ? `/group/${a.id}`
+              : a.submission_id ? `/submissions/${a.id}` : `/assignments/${a.id}`;
+            return (
+              <Link key={a.id} to={link}
+                className="block bg-white rounded-xl border border-gray-200 p-5 hover:border-primary-300 hover:shadow-sm transition-all">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{a.title}</h3>
+                    {a.description && <p className="text-sm text-gray-500 mt-1 line-clamp-2">{a.description}</p>}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    {isGroup && <span className="flex items-center gap-1 text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium"><Users className="w-3 h-3" /> Group</span>}
+                    {a.due_date && <><Clock className="w-4 h-4" /> {new Date(a.due_date).toLocaleDateString()}</>}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-gray-400">
-                  {a.due_date && <><Clock className="w-4 h-4" /> {new Date(a.due_date).toLocaleDateString()}</>}
-                </div>
-              </div>
-              {a.submission_status && (
-                <div className="mt-3">
-                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
-                    a.submission_status === 'submitted' ? 'bg-green-50 text-green-700' :
-                    a.submission_status === 'draft' ? 'bg-yellow-50 text-yellow-700' :
-                    'bg-gray-50 text-gray-600'
-                  }`}>
-                    <CheckCircle className="w-3 h-3" />
-                    {a.submission_status === 'submitted' ? 'Submitted' : 'Draft'}
-                  </span>
-                </div>
-              )}
-            </Link>
-          ))}
+                {a.submission_status && (
+                  <div className="mt-3">
+                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
+                      a.submission_status === 'submitted' ? 'bg-green-50 text-green-700' :
+                      a.submission_status === 'draft' ? 'bg-yellow-50 text-yellow-700' :
+                      'bg-gray-50 text-gray-600'
+                    }`}>
+                      <CheckCircle className="w-3 h-3" />
+                      {a.submission_status === 'submitted' ? 'Submitted' : 'Draft'}
+                    </span>
+                  </div>
+                )}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

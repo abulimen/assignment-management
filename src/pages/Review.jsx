@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../api';
 import VerdictPanel from '../components/VerdictPanel';
+import ContributionXray from '../components/ContributionXray';
 import PasteAnalysis from '../components/PasteAnalysis';
 import StatsBar from '../components/StatsBar';
 import EditDensity from '../components/EditDensity';
@@ -12,12 +13,17 @@ export default function Review() {
   const { id } = useParams();
   const [data, setData] = useState(null);
   const [verdict, setVerdict] = useState(null);
+  const [sections, setSections] = useState(null);
   const [loading, setLoading] = useState(true);
   const [verdictLoading, setVerdictLoading] = useState(true);
 
   useEffect(() => {
     api.get(`playback.php/${id}`)
-      .then(d => setData(d))
+      .then(d => {
+        setData(d);
+        // Check if this is a merged group submission by looking for section data
+        if (d.sections) setSections(d.sections);
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -40,6 +46,7 @@ export default function Review() {
         <p className="text-sm text-gray-400 mt-1">Proof of Work Analysis</p>
       </div>
 
+      {sections && <ContributionXray sections={sections} />}
       <VerdictPanel verdict={verdict} loading={verdictLoading} />
       <PasteAnalysis events={data.events} finalContent={data.content} />
       <StatsBar stats={data.stats} />

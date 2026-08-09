@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { api } from '../api';
-import { X } from 'lucide-react';
+import { X, Users } from 'lucide-react';
 
 export default function AssignmentForm({ onClose, onCreated }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [isGroupWork, setIsGroupWork] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -14,7 +15,11 @@ export default function AssignmentForm({ onClose, onCreated }) {
     setError('');
     setLoading(true);
     try {
-      const data = await api.post('assignments.php', { title, description, due_date: dueDate || null });
+      const data = await api.post('assignments.php', {
+        title, description,
+        due_date: dueDate || null,
+        is_group_work: isGroupWork,
+      });
       onCreated(data.assignment);
     } catch (err) {
       setError(err.message);
@@ -47,6 +52,16 @@ export default function AssignmentForm({ onClose, onCreated }) {
             <input type="datetime-local" value={dueDate} onChange={e => setDueDate(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" />
           </div>
+          <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+            <input type="checkbox" id="groupWork" checked={isGroupWork} onChange={e => setIsGroupWork(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+            <label htmlFor="groupWork" className="flex items-center gap-1.5 text-sm font-medium text-gray-700 cursor-pointer">
+              <Users className="w-4 h-4" /> Enable group work
+            </label>
+          </div>
+          {isGroupWork && (
+            <p className="text-xs text-gray-400 -mt-2">Students will create groups, write individual sections, then the group leader merges and submits.</p>
+          )}
           <div className="flex gap-3 justify-end pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
             <button type="submit" disabled={loading}

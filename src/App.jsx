@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Assignment from './pages/Assignment';
 import Submission from './pages/Submission';
 import Review from './pages/Review';
+import GroupWork from './pages/GroupWork';
 import NotFound from './pages/NotFound';
 
 function ProtectedRoute({ children }) {
@@ -35,6 +36,8 @@ export default function App() {
           <Route path="/assignments/:id" element={<ProtectedRoute><Layout><Assignment /></Layout></ProtectedRoute>} />
           <Route path="/submissions/:id" element={<ProtectedRoute><Layout><Submission /></Layout></ProtectedRoute>} />
           <Route path="/review/:id" element={<ProtectedRoute><Layout><Review /></Layout></ProtectedRoute>} />
+          <Route path="/group/:id" element={<ProtectedRoute><Layout><GroupWork /></Layout></ProtectedRoute>} />
+          <Route path="/join/:code" element={<ProtectedRoute><GroupWork /></ProtectedRoute>} />
           <Route path="/" element={<Navigate to="/dashboard" />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
