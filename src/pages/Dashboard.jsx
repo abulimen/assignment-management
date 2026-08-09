@@ -43,7 +43,8 @@ export default function Dashboard() {
         <div className="grid gap-4">
           {assignments.map(a => {
             const isGroup = a.is_group_work == 1 || a.is_group_work === true;
-            const link = isGroup && !a.submission_id
+            // Group assignments always go to group management page for students
+            const link = isGroup
               ? `/group/${a.id}`
               : a.submission_id ? `/submissions/${a.id}` : `/assignments/${a.id}`;
             return (

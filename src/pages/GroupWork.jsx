@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
 import GroupMerge from '../components/GroupMerge';
-import { Users, Plus, Link as LinkIcon, Copy, UserPlus, FileText, Send } from 'lucide-react';
+import { Users, Plus, Link as LinkIcon, Copy, UserPlus, FileText, Send, X } from 'lucide-react';
 
 export default function GroupWork() {
   const { id, code } = useParams();
@@ -17,6 +17,8 @@ export default function GroupWork() {
   const [joinCode, setJoinCode] = useState(code || '');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [viewingMember, setViewingMember] = useState(null);
+  const [viewingContent, setViewingContent] = useState(null);
 
   // If navigated via /join/:code, auto-join
   useEffect(() => {
@@ -75,6 +77,39 @@ export default function GroupWork() {
     try {
       const d = await api.post(`group.php/${group.id}/create-section`, {});
       navigate(`/submissions/${group.assignment_id}?section=${d.section_id}&sub=${d.submission_id}`);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleViewMember(memberId) {
+    const section = group.sections?.find(s => parseInt(s.student_id) === memberId);
+    if (!section?.submission_id) return;
+    try {
+      const d = await api.get(`submission.php/${section.submission_id}`);
+      setViewingMember(memberId);
+      // Content is TipTap JSON, extract text for display
+      const content = d.submission.content;
+      let text = '';
+      if (content) {
+        try {
+          const doc = JSON.parse(content);
+          if (doc.content) {
+            doc.content.forEach(node => {
+              if (node.content) {
+                node.content.forEach(child => {
+                  if (child.text) text += child.text + '\n';
+                });
+              } else if (node.text) {
+                text += node.text + '\n';
+              }
+            });
+          }
+        } catch (e) {
+          text = content;
+        }
+      }
+      setViewingContent(text);
     } catch (err) {
       setError(err.message);
     }
@@ -169,8 +204,16 @@ export default function GroupWork() {
               </div>
               <div className="flex items-center gap-2">
                 {m.is_leader == 1 && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">Leader</span>}
-                {group.sections?.find(s => s.student_id === m.student_id) ? (
-                  <span className="text-xs text-green-600">{group.sections.find(s => s.student_id === m.student_id).submission_status || 'draft'}</span>
+                {group.sections?.find(s => parseInt(s.student_id) === m.student_id) ? (
+                  <>
+                    <span className="text-xs text-green-600">{group.sections.find(s => parseInt(s.student_id) === m.student_id).submission_status || 'draft'}</span>
+                    {parseInt(m.student_id) !== user?.id && (
+                      <button onClick={() => handleViewMember(m.student_id)}
+                        className="text-xs text-primary-600 hover:text-primary-700 underline">
+                        View
+                      </button>
+                    )}
+                  </>
                 ) : (
                   <span className="text-xs text-gray-400">No section</span>
                 )}
@@ -204,6 +247,25 @@ export default function GroupWork() {
       {/* Leader: Merge UI */}
       {isLeader && group.sections?.length > 0 && (
         <GroupMerge group={group} onMerged={(subId) => navigate(`/review/${subId}`)} />
+      )}
+
+      {/* View member's content modal */}
+      {viewingMember && viewingContent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setViewingMember(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white">
+              <h3 className="font-semibold">
+                {group.members?.find(m => parseInt(m.student_id) === viewingMember)?.student_name}'s Section
+              </h3>
+              <button onClick={() => setViewingMember(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">{viewingContent}</pre>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

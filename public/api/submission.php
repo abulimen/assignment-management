@@ -43,8 +43,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if (!$sub) error_response('Submission not found', 404);
 
     // Access control: student can only view own, lecturer can view if they own the assignment
+    // Exception: group members can view each other's sections
     if ($user['role'] === 'student' && (int) $sub['student_id'] !== $user['sub']) {
-        error_response('Forbidden', 403);
+        // Check if both students are in the same group
+        $stmt = $pdo->prepare('
+            SELECT COUNT(*) FROM group_members gm1
+            JOIN group_members gm2 ON gm1.group_id = gm2.group_id
+            WHERE gm1.student_id = ? AND gm2.student_id = ?
+        ');
+        $stmt->execute([$user['sub'], $sub['student_id']]);
+        if ((int) $stmt->fetchColumn() === 0) {
+            error_response('Forbidden', 403);
+        }
     }
     if ($user['role'] === 'lecturer') {
         $stmt = $pdo->prepare('SELECT lecturer_id FROM assignments WHERE id = ?');
