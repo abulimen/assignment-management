@@ -56,7 +56,8 @@ export default function GroupWork() {
 
   async function handleJoin(codeToUse) {
     setError('');
-    const code = codeToUse || joinCode;
+    // codeToUse might be a click event if called from onClick directly
+    const code = typeof codeToUse === 'string' ? codeToUse : joinCode;
     if (!code) return;
     try {
       const d = await api.post('group.php/join', { invite_code: code });
@@ -114,7 +115,7 @@ export default function GroupWork() {
             <div className="flex gap-2">
               <input type="text" value={joinCode} onChange={e => setJoinCode(e.target.value)} placeholder="ABC123"
                 className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase" />
-              <button onClick={handleJoin} disabled={!joinCode}
+              <button onClick={() => handleJoin()} disabled={!joinCode}
                 className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
                 Join
               </button>
