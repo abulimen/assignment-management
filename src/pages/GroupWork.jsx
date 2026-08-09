@@ -128,8 +128,8 @@ export default function GroupWork() {
   }
 
   // Has a group
-  const isLeader = group.leader_id === user?.id;
-  const mySection = group.sections?.find(s => s.student_id === user?.id);
+  const isLeader = parseInt(group.leader_id) === user?.id;
+  const mySection = group.sections?.find(s => parseInt(s.student_id) === user?.id);
 
   return (
     <div>

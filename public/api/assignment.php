@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         if ((int) $assignment['lecturer_id'] !== $user['sub']) {
             $assignment['submissions'] = [];
         } else {
+            // Exclude individual group sections — lecturer only sees merged group submission
             $stmt = $pdo->prepare('
                 SELECT s.id, s.student_id, u.name AS student_name, u.email AS student_email,
                        s.status, s.submitted_at, s.created_at,
@@ -29,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 JOIN users u ON u.id = s.student_id
                 LEFT JOIN submission_stats st ON st.submission_id = s.id
                 WHERE s.assignment_id = ?
+                  AND NOT EXISTS (SELECT 1 FROM group_sections gs WHERE gs.submission_id = s.id)
                 ORDER BY s.created_at DESC
             ');
             $stmt->execute([$id]);
