@@ -450,8 +450,27 @@ export default function Playback({ events, finalContent }) {
               </button>
             </div>
             <div className="flex items-center justify-between">
-              <div className="text-xs text-gray-500">
-                Step {currentIndex + 1} of {stepEvents.length}
+              <div className="flex items-center gap-3 text-xs text-gray-500">
+                <span>Step {currentIndex + 1} of {stepEvents.length}</span>
+                {(() => {
+                  const e = stepEvents[currentIndex];
+                  if (!e?.occurred_at) return null;
+                  const time = new Date(e.occurred_at * 1000).toLocaleTimeString();
+                  const firstTime = stepEvents[0]?.occurred_at ? new Date(stepEvents[0].occurred_at * 1000).toLocaleTimeString() : null;
+                  const elapsed = firstTime ? e.occurred_at - stepEvents[0].occurred_at : 0;
+                  const elapsedSec = Math.round(elapsed);
+                  const elapsedStr = elapsedSec >= 60
+                    ? `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s`
+                    : `${elapsedSec}s`;
+                  return (
+                    <>
+                      <span className="text-gray-300">·</span>
+                      <span className="font-mono">{time}</span>
+                      <span className="text-gray-300">·</span>
+                      <span>+{elapsedStr}</span>
+                    </>
+                  );
+                })()}
               </div>
               {highlight && (
                 <div className="flex items-center gap-3 text-xs">
