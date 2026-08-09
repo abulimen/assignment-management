@@ -70,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         SELECT gm.student_id, u.name AS student_name, u.email, gm.joined_at,
                (g.leader_id = gm.student_id) AS is_leader
         FROM group_members gm
+        JOIN `groups` g ON g.id = gm.group_id
         JOIN users u ON u.id = gm.student_id
         WHERE gm.group_id = ?
         ORDER BY gm.joined_at ASC
