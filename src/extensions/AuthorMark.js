@@ -29,7 +29,7 @@ export const AuthorMark = Mark.create({
     return [
       'span',
       mergeAttributes(HTMLAttributes, {
-        class: 'author-highlight author-' + HTMLAttributes.authorId,
+        class: 'author-highlight author-' + HTMLAttributes['data-author'],
       }),
       0,
     ];

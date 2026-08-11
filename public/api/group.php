@@ -96,6 +96,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $stmt->execute([$id]);
     $group['sections'] = $stmt->fetchAll();
 
+    // Externally pasted texts per section, for the red "copied" overlay in
+    // the merged editor.
+    foreach ($group['sections'] as &$secRow) {
+        $secRow['pasted_texts'] = section_pasted_texts($pdo, (int) $secRow['submission_id']);
+    }
+    unset($secRow);
+
     json_response(['group' => $group]);
 }
 
@@ -131,29 +138,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$id]);
         $sections = $stmt->fetchAll();
 
-        // Merge TipTap JSON content, embedding an author mark per section so
-        // ownership is preserved through the leader's later edits.
-        $mergedContent = ['type' => 'doc', 'content' => []];
+        // Merge via the shared deterministic helper so playback can later
+        // reconstruct this exact base document as its replay keyframe.
+        $mergedContent = merge_section_docs($sections);
+
         $sectionMeta = []; // for attribution
+        $nodeOffset = 0;
         foreach ($sections as $sec) {
             if (!$sec['content']) continue;
             $doc = json_decode($sec['content'], true);
             if (!$doc || !isset($doc['content'])) continue;
-
-            // Tag every text node in this section with the author's ID.
-            $doc = add_author_marks($doc, (int) $sec['student_id']);
-
-            $startPos = count($mergedContent['content']);
-            foreach ($doc['content'] as $node) {
-                $mergedContent['content'][] = $node;
-            }
             $sectionMeta[] = [
                 'student_id' => (int) $sec['student_id'],
                 'student_name' => $sec['student_name'],
                 'title' => $sec['title'],
-                'start_pos' => $startPos,
+                'start_pos' => $nodeOffset,
                 'node_count' => count($doc['content']),
             ];
+            $nodeOffset += count($doc['content']);
         }
 
         // Create merged group submission (leader's ID; teammates' individual

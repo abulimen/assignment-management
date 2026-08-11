@@ -19,9 +19,18 @@ $stmt->execute([$id]);
 $sub = $stmt->fetch();
 if (!$sub) error_response('Submission not found', 404);
 
-// Access control: lecturers can view any, students can only view their own
+// Access control: lecturers can view any, students can only view their own.
+// Exception: group members can view each other's sections.
 if ($user['role'] !== 'lecturer' && (int) $sub['student_id'] !== $user['sub']) {
-    error_response('Forbidden', 403);
+    $stmt = $pdo->prepare('
+        SELECT COUNT(*) FROM group_members gm1
+        JOIN group_members gm2 ON gm1.group_id = gm2.group_id
+        WHERE gm1.student_id = ? AND gm2.student_id = ?
+    ');
+    $stmt->execute([$user['sub'], $sub['student_id']]);
+    if ((int) $stmt->fetchColumn() === 0) {
+        error_response('Forbidden', 403);
+    }
 }
 
 $verdict = get_verdict($id);

@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../src/db.php';
 require_once __DIR__ . '/../../src/guard.php';
 require_once __DIR__ . '/../../src/response.php';
+require_once __DIR__ . '/../../src/authorship.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     error_response('Method not allowed', 405);
@@ -60,7 +61,7 @@ if ($grp) {
         SELECT gs.id, gs.student_id, gs.submission_id, gs.sort_order, gs.title, gs.merged,
                u.name AS student_name,
                s.status AS submission_status,
-               ss.word_count, ss.keystroke_count, ss.paste_count, ss.total_time_ms
+               ss.word_count, ss.keystroke_count, ss.paste_count, ss.total_time_ms, ss.paste_ratio
         FROM group_sections gs
         JOIN users u ON u.id = gs.student_id
         LEFT JOIN submissions s ON s.id = gs.submission_id
@@ -70,6 +71,13 @@ if ($grp) {
     ');
     $stmt->execute([$grp['id']]);
     $sections = $stmt->fetchAll();
+
+    // Externally pasted texts per section, for the red "copied" overlay in
+    // the merged document view.
+    foreach ($sections as &$secRow) {
+        $secRow['pasted_texts'] = section_pasted_texts($pdo, (int) $secRow['submission_id']);
+    }
+    unset($secRow);
 }
 
 json_response([

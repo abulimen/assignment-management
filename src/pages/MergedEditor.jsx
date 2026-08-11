@@ -1,10 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { useAuth } from '../hooks/useAuth';
 import Editor from '../components/Editor';
 import { AuthorMark } from '../extensions/AuthorMark';
+import { AuthorOverride } from '../extensions/AuthorOverride';
+import { PastedMark } from '../extensions/PastedMark';
 import { buildAuthorColorMap, AUTHOR_PALETTE } from '../utils/authorship';
-import { Save, Send, Users } from 'lucide-react';
+import { annotatePasted, stripPastedMarks } from '../utils/pasted';
+import { Save, Send, Users, ClipboardPaste } from 'lucide-react';
 
 // Leader-editable merged group document.
 // Author text is always highlighted in a distinct color per member so the
@@ -15,6 +19,7 @@ export default function MergedEditor() {
   const [searchParams] = useSearchParams();
   const groupId = searchParams.get('group');
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [submission, setSubmission] = useState(null);
   const [group, setGroup] = useState(null);
@@ -47,6 +52,34 @@ export default function MergedEditor() {
     return map;
   }, [group]);
 
+  // authorId -> externally pasted strings (red "copied" overlay)
+  const pastedByAuthor = useMemo(() => {
+    const map = {};
+    (group?.sections || []).forEach(s => {
+      map[String(s.student_id)] = s.pasted_texts || [];
+    });
+    return map;
+  }, [group]);
+
+  // Merged content + red pasted overlay (display-only; stripped on save)
+  const annotated = useMemo(() => {
+    if (!submission?.content) return null;
+    try {
+      return JSON.stringify(annotatePasted(JSON.parse(submission.content), pastedByAuthor));
+    } catch (e) {
+      return submission.content;
+    }
+  }, [submission, pastedByAuthor]);
+
+  // Strip the display-only pasted marks before persisting the artifact
+  const cleanForSave = (raw) => {
+    try {
+      return JSON.stringify(stripPastedMarks(JSON.parse(raw || '{}')));
+    } catch (e) {
+      return raw;
+    }
+  };
+
   // Inject a <style> block mapping .author-{id} to its color
   useEffect(() => {
     const styleId = 'author-colors';
@@ -66,7 +99,8 @@ export default function MergedEditor() {
     setSaving(true);
     setSavedMsg('');
     try {
-      await api.put(`submission.php/${submissionId}`, { content });
+      // Persist without the display-only pasted overlay marks
+      await api.put(`submission.php/${submissionId}`, { content: cleanForSave(content) });
       setSavedMsg('Saved');
       setTimeout(() => setSavedMsg(''), 2000);
     } catch (err) {
@@ -79,7 +113,7 @@ export default function MergedEditor() {
   async function handleSubmit() {
     setSaving(true);
     try {
-      await api.post(`submission.php/${submissionId}/submit`, { content });
+      await api.post(`submission.php/${submissionId}/submit`, { content: cleanForSave(content) });
       navigate(`/review/${submissionId}`);
     } catch (err) {
       alert(err.message);
@@ -121,14 +155,19 @@ export default function MergedEditor() {
               {m.student_name}
             </span>
           ))}
+          <span className="flex items-center gap-1.5 text-xs text-gray-600">
+            <ClipboardPaste className="w-3.5 h-3.5 text-red-600" />
+            <span className="w-3 h-3 rounded-sm bg-red-600/10 border-b-[3px] border-red-600" />
+            Pasted from external source
+          </span>
         </div>
       )}
 
       <Editor
         submissionId={parseInt(submissionId)}
         editable={true}
-        extraExtensions={[AuthorMark]}
-        initialContent={submission.content}
+        extraExtensions={[AuthorMark, AuthorOverride.configure({ authorId: user?.id }), PastedMark]}
+        initialContent={annotated}
         onContentChange={setContent}
       />
     </div>

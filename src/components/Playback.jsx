@@ -117,6 +117,18 @@ class SourceMap {
   }
 }
 
+// Stable option objects — new identities each render would make useEditor's
+// instance manager re-apply/re-create the editor unnecessarily.
+const PLAYBACK_EXTENSIONS = [
+  StarterKit,
+  Underline,
+  TextAlign.configure({ types: ['heading', 'paragraph'] }),
+  Link.configure({ openOnClick: false }),
+];
+const PLAYBACK_EDITOR_PROPS = {
+  attributes: { class: 'prose prose-sm max-w-none focus:outline-none' },
+};
+
 export default function Playback({ events, finalContent }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -140,22 +152,18 @@ export default function Playback({ events, finalContent }) {
   );
 
   const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Underline,
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Link.configure({ openOnClick: false }),
-    ],
+    extensions: PLAYBACK_EXTENSIONS,
     content: '',
     editable: false,
-    editorProps: {
-      attributes: { class: 'prose prose-sm max-w-none focus:outline-none' },
-    },
+    editorProps: PLAYBACK_EDITOR_PROPS,
   });
 
   // Decoration plugin: cursor caret + source highlighting
   useEffect(() => {
-    if (!editor) return;
+    // useEditor's instance manager can destroy/recreate the editor between
+    // commits (StrictMode, scheduled destroy); registerPlugin has no
+    // isDestroyed guard of its own, so skip stale instances.
+    if (!editor || editor.isDestroyed) return;
 
     const plugin = new Plugin({
       props: {
@@ -185,12 +193,14 @@ export default function Playback({ events, finalContent }) {
     });
 
     editor.registerPlugin(plugin);
-    return () => { editor.unregisterPlugin(plugin.key); };
+    return () => {
+      if (!editor.isDestroyed) editor.unregisterPlugin(plugin.key);
+    };
   }, [editor]);
 
   // Apply a single step event + update source map
   const applyStepEvent = useCallback((event) => {
-    if (!editor || !event?.steps) return;
+    if (!editor || editor.isDestroyed || !event?.steps) return;
 
     const { state } = editor.view;
     let tr = state.tr;
@@ -256,7 +266,7 @@ export default function Playback({ events, finalContent }) {
 
   // Full rebuild from 0 to index
   const rebuildToIndex = useCallback((index) => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
     sourceMap.current.reset();
     isDispatching.current = true;
     editor.commands.clearContent();
@@ -290,21 +300,22 @@ export default function Playback({ events, finalContent }) {
 
   // Switch to final document
   useEffect(() => {
-    if (mode === 'final' && editor && finalContent) {
+    if (!editor || editor.isDestroyed) return;
+    if (mode === 'final' && finalContent) {
       isDispatching.current = true;
       try { editor.commands.setContent(JSON.parse(finalContent)); }
       catch (e) { editor.commands.setContent(finalContent); }
       isDispatching.current = false;
       lastIndexRef.current = -1;
       sourceMap.current.reset();
-    } else if (mode === 'playback' && editor && lastIndexRef.current === -1) {
+    } else if (mode === 'playback' && lastIndexRef.current === -1) {
       rebuildToIndex(currentIndex);
     }
   }, [mode, editor, finalContent, currentIndex, rebuildToIndex]);
 
   // Force decoration re-evaluation when highlight toggles
   useEffect(() => {
-    if (editor && !isDispatching.current) {
+    if (editor && !editor.isDestroyed && !isDispatching.current) {
       isDispatching.current = true;
       editor.view.dispatch(editor.state.tr);
       isDispatching.current = false;
@@ -313,7 +324,7 @@ export default function Playback({ events, finalContent }) {
 
   // Hover tooltips for highlighted text
   useEffect(() => {
-    if (!editor || !highlight) return;
+    if (!editor || editor.isDestroyed || !highlight) return;
     const pmEl = editor.view.dom;
     let tooltipEl = null;
 
@@ -479,6 +490,7 @@ export default function Playback({ events, finalContent }) {
                 </div>
               )}
             </div>
+
           </>
         )}
         {mode === 'final' && <div className="text-xs text-gray-500">The student's final submitted document</div>}

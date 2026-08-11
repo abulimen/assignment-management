@@ -8,6 +8,7 @@ import StatsBar from '../components/StatsBar';
 import EditDensity from '../components/EditDensity';
 import EditTimeline from '../components/EditTimeline';
 import Playback from '../components/Playback';
+import GroupFinalDoc from '../components/GroupFinalDoc';
 
 export default function Review() {
   const { id } = useParams();
@@ -46,15 +47,32 @@ export default function Review() {
         <p className="text-sm text-gray-400 mt-1">Proof of Work Analysis</p>
       </div>
 
-      {sections && <ContributionXray sections={sections} />}
-      <VerdictPanel verdict={verdict} loading={verdictLoading} />
-      <PasteAnalysis events={data.events} finalContent={data.content} />
-      <StatsBar stats={data.stats} />
-      <EditDensity events={data.events} totalTimeMs={data.stats?.total_time_ms} />
-      <EditTimeline events={data.events} />
+      {sections ? (
+        // Merged group: the X-Ray is the originality hub (per-member verdicts).
+        // The single-student panels below analyze the leader's merge session,
+        // which would be misleading here, so they're hidden.
+        <ContributionXray sections={sections} />
+      ) : (
+        <>
+          <VerdictPanel verdict={verdict} loading={verdictLoading} />
+          <PasteAnalysis events={data.events} finalContent={data.content} />
+          <StatsBar stats={data.stats} />
+          <EditDensity events={data.events} totalTimeMs={data.stats?.total_time_ms} />
+          <EditTimeline events={data.events} />
+        </>
+      )}
 
-      <h2 className="text-lg font-semibold mb-3">Document Playback</h2>
-      <Playback events={data.events} finalContent={data.content} />
+      {sections ? (
+        <>
+          <h2 className="text-lg font-semibold mb-3">Merged Document</h2>
+          <GroupFinalDoc content={data.content} sections={sections} />
+        </>
+      ) : (
+        <>
+          <h2 className="text-lg font-semibold mb-3">Document Playback</h2>
+          <Playback events={data.events} finalContent={data.content} />
+        </>
+      )}
     </div>
   );
 }

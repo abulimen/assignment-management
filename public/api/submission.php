@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../src/db.php';
 require_once __DIR__ . '/../../src/guard.php';
 require_once __DIR__ . '/../../src/response.php';
+require_once __DIR__ . '/../../src/authorship.php';
 
 // Helper: extract plain text from a ProseMirror JSON document
 function extractPlainText($doc) {
@@ -63,6 +64,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         if (!$a || (int) $a['lecturer_id'] !== $user['sub']) error_response('Forbidden', 403);
     }
 
+    // Is this submission a group section that has been merged (locked)?
+    $stmt = $pdo->prepare('SELECT merged FROM group_sections WHERE submission_id = ?');
+    $stmt->execute([$id]);
+    $secRow = $stmt->fetch();
+    $sub['section_merged'] = $secRow ? (int) $secRow['merged'] === 1 : false;
+
+    // Externally pasted texts, for the red "copied" overlay in read-only views.
+    $sub['pasted_texts'] = section_pasted_texts($pdo, (int) $id);
+
     json_response(['submission' => $sub]);
 }
 
@@ -105,8 +115,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     $stmt->execute([$id]);
     $sub = $stmt->fetch();
     if (!$sub) error_response('Submission not found', 404);
-    if ((int) $sub['student_id'] !== $user['sub']) error_response('Forbidden', 403);
-    if ($sub['status'] === 'submitted') error_response('Cannot edit submitted submission', 409);
+if ((int) $sub['student_id'] !== $user['sub']) error_response('Forbidden', 403);
+if ($sub['status'] === 'submitted') error_response('Cannot edit submitted submission', 409);
+
+// Sections freeze once the group document is merged.
+$stmt = $pdo->prepare('SELECT id FROM group_sections WHERE submission_id = ? AND merged = 1');
+$stmt->execute([$id]);
+if ($stmt->fetch()) error_response('Section is locked after merge', 409);
+
+    // Sections freeze once the group document is merged.
+    $stmt = $pdo->prepare('SELECT id FROM group_sections WHERE submission_id = ? AND merged = 1');
+    $stmt->execute([$id]);
+    if ($stmt->fetch()) error_response('Section is locked after merge', 409);
 
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
     $content = $body['content'] ?? null;

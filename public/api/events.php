@@ -63,6 +63,18 @@ if (!$sub) error_response('Submission not found', 404);
 if ((int) $sub['student_id'] !== $user['sub']) error_response('Forbidden', 403);
 if ($sub['status'] === 'submitted') error_response('Cannot add events to submitted submission', 409);
 
+// Sections freeze once the group document is merged — late events would
+// desync the merged playback's reconstructed base.
+$stmt = $pdo->prepare('SELECT id FROM group_sections WHERE submission_id = ? AND merged = 1');
+$stmt->execute([$data['submission_id']]);
+if ($stmt->fetch()) error_response('Section is locked after merge', 409);
+
+// Sections freeze once the group document is merged — late events would
+// desync the merged playback's reconstructed base.
+$stmt = $pdo->prepare('SELECT id FROM group_sections WHERE submission_id = ? AND merged = 1');
+$stmt->execute([$data['submission_id']]);
+if ($stmt->fetch()) error_response('Section is locked after merge', 409);
+
 // Batch insert events with steps_json
 $stmt = $pdo->prepare('INSERT INTO events (submission_id, type, data, steps_json, selection_from, selection_to, occurred_at, sequence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
 $count = 0;

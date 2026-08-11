@@ -1,16 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../api';
 import Editor from '../components/Editor';
 import { AuthorMark } from '../extensions/AuthorMark';
-import { User, FileText } from 'lucide-react';
+import { PastedMark } from '../extensions/PastedMark';
+import { annotatePasted } from '../utils/pasted';
+import { User, FileText, ClipboardPaste } from 'lucide-react';
 
 // Read-only view of a teammate's section, rendered in the TipTap editor.
+// Externally pasted text is highlighted red so everyone sees what was copied.
 export default function SectionView() {
   const { submissionId } = useParams();
   const [submission, setSubmission] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Red overlay: this member's doc has no author marks, so match via '*'.
+  const annotated = useMemo(() => {
+    if (!submission?.content) return null;
+    try {
+      return JSON.stringify(annotatePasted(JSON.parse(submission.content), {
+        '*': submission.pasted_texts || [],
+      }));
+    } catch (e) {
+      return submission.content;
+    }
+  }, [submission]);
 
   useEffect(() => {
     api.get(`submission.php/${submissionId}`)
@@ -37,12 +52,19 @@ export default function SectionView() {
             </p>
           </div>
         </div>
+        {(submission.pasted_texts?.length > 0) && (
+          <span className="mt-2 inline-flex items-center gap-1.5 text-xs text-gray-600">
+            <ClipboardPaste className="w-3.5 h-3.5 text-red-600" />
+            <span className="w-3 h-3 rounded-sm bg-red-600/10 border-b-[3px] border-red-600" />
+            Pasted from external source
+          </span>
+        )}
       </div>
 
       <Editor
         editable={false}
-        extraExtensions={[AuthorMark]}
-        initialContent={submission.content}
+        extraExtensions={[AuthorMark, PastedMark]}
+        initialContent={annotated}
       />
     </div>
   );

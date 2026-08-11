@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api } from '../api';
-import { GripVertical, FileText, Send, Clock } from 'lucide-react';
+import { GripVertical, FileText, GitMerge } from 'lucide-react';
 
 export default function GroupMerge({ group, onMerged }) {
   const [sections, setSections] = useState(group.sections || []);
@@ -46,11 +46,11 @@ export default function GroupMerge({ group, onMerged }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
       <div className="flex items-center gap-2 mb-4">
-        <Send className="w-4 h-4 text-primary-600" />
-        <h3 className="text-sm font-semibold text-gray-700">Merge & Submit</h3>
+        <GitMerge className="w-4 h-4 text-primary-600" />
+        <h3 className="text-sm font-semibold text-gray-700">Merge Sections</h3>
       </div>
 
-      <p className="text-xs text-gray-400 mb-3">Drag or use arrows to reorder sections. The merge will concatenate them in this order.</p>
+      <p className="text-xs text-gray-400 mb-3">Reorder the sections below, then merge. Merging joins everyone's work into ONE draft document — nothing is submitted yet. You'll then open it in the merged editor to review, edit and format it (each member's text stays color-coded by author), and submit the final version from there.</p>
 
       <div className="space-y-2">
         {sections.map((s, idx) => (
@@ -80,8 +80,8 @@ export default function GroupMerge({ group, onMerged }) {
 
       <button onClick={handleMerge} disabled={merging}
         className="w-full mt-4 flex items-center justify-center gap-2 bg-primary-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50">
-        <Send className="w-4 h-4" />
-        {merging ? 'Merging...' : 'Merge & Submit'}
+        <GitMerge className="w-4 h-4" />
+        {merging ? 'Merging...' : 'Merge Sections'}
       </button>
     </div>
   );
