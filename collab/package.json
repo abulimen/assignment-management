@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Hocuspocus realtime collaboration server for group assignments",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node src/main.js",
     "test": "vitest run"
   },
   "dependencies": {
