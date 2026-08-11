@@ -44,5 +44,7 @@ CREATE TABLE IF NOT EXISTS group_sections (
 ) ENGINE=InnoDB;
 
 -- Drop UNIQUE(assignment_id, student_id) from submissions
--- Group members each have their own submission for the same assignment
+-- Group members each have their own submission for the same assignment.
+-- The assignment_id FK still needs a supporting index once the unique one goes.
+ALTER TABLE submissions ADD INDEX idx_assignment (assignment_id);
 ALTER TABLE submissions DROP INDEX assignment_id;

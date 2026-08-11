@@ -16,4 +16,9 @@ return [
     'app' => [
         'cors_origin' => getenv('CORS_ORIGIN') ?: 'http://localhost:3000',
     ],
+    'collab' => [
+        // Node collaboration server's INTERNAL HTTP API (loopback, shared secret).
+        'url'             => getenv('COLLAB_INTERNAL_URL') ?: 'http://127.0.0.1:8004',
+        'internal_secret' => getenv('INTERNAL_API_SECRET') ?: 'local-dev-internal-secret',
+    ],
 ];
