@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { AlertTriangle } from 'lucide-react';
 import { api } from '../api';
 import VerdictPanel from '../components/VerdictPanel';
 import ContributionXray from '../components/ContributionXray';
@@ -47,6 +48,27 @@ export default function Review() {
         <p className="text-sm text-gray-400 mt-1">Proof of Work Analysis</p>
       </div>
 
+      {data.override?.used && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-5 h-5 text-amber-600" />
+            <h3 className="font-semibold text-amber-800">Submitted via leader override</h3>
+          </div>
+          <p className="text-sm text-amber-800 mb-2">
+            <strong>{data.override.by_name}</strong> submitted even though these members had not marked themselves Done:
+          </p>
+          <ul className="list-disc list-inside text-sm text-amber-800 mb-2">
+            {(data.override.non_done || []).map(n => (
+              <li key={n.student_id}>
+                {n.student_name}
+                {n.last_activity_at ? ` — last activity ${new Date(n.last_activity_at).toLocaleString()}` : ' — no recorded activity'}
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm text-amber-900"><strong>Leader's reason:</strong> {data.override.reason}</p>
+        </div>
+      )}
+
       {sections ? (
         // Merged group: the X-Ray is the originality hub (per-member verdicts).
         // The single-student panels below analyze the leader's merge session,
@@ -64,7 +86,9 @@ export default function Review() {
 
       {sections ? (
         <>
-          <h2 className="text-lg font-semibold mb-3">Merged Document</h2>
+          <h2 className="text-lg font-semibold mb-3">
+            {data.realtime ? 'Final Group Document' : 'Merged Document'}
+          </h2>
           <GroupFinalDoc content={data.content} sections={sections} />
         </>
       ) : (

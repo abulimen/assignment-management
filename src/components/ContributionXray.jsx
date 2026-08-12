@@ -58,25 +58,30 @@ export default function ContributionXray({ sections }) {
     return sections.map((s, i) => ({
       id: String(s.student_id),
       name: s.student_name || 'Unknown',
-      title: s.title || 'Untitled',
+      title: s.title || (typeof s.surviving_chars === 'number' ? 'Shared document' : 'Untitled'),
       wordCount: s.word_count || 0,
       keystrokes: s.keystroke_count || 0,
       timeMs: s.total_time_ms || 0,
       pasteRatio: s.paste_ratio,
+      // Realtime groups: contribution = surviving text in the sealed doc.
+      // Legacy merged groups: fall back to per-section word counts.
+      survivingChars: typeof s.surviving_chars === 'number' ? s.surviving_chars : null,
       color: AUTHOR_COLORS[i % AUTHOR_COLORS.length],
     }));
   }, [sections]);
 
-  const totalWords = contributors.reduce((sum, c) => sum + c.wordCount, 0);
+  // Share metric: surviving chars (realtime) or word count (legacy).
+  const shareOf = (c) => c.survivingChars ?? c.wordCount;
+  const totalShare = contributors.reduce((sum, c) => sum + shareOf(c), 0);
 
-  // Group summary: word-weighted average + flagged members
+  // Group summary: share-weighted average + flagged members
   const { avgScore, flagged } = useMemo(() => {
     const scored = contributors
       .map(c => ({ c, v: verdicts[c.id] }))
       .filter(x => x.v && typeof x.v.overall_score === 'number');
-    const totalW = scored.reduce((s, x) => s + x.c.wordCount, 0);
+    const totalW = scored.reduce((s, x) => s + shareOf(x.c), 0);
     const avg = totalW > 0
-      ? Math.round(scored.reduce((s, x) => s + x.c.wordCount * x.v.overall_score, 0) / totalW)
+      ? Math.round(scored.reduce((s, x) => s + shareOf(x.c) * x.v.overall_score, 0) / totalW)
       : null;
     return { avgScore: avg, flagged: scored.filter(x => x.v.overall_score < 50).map(x => x.c.name) };
   }, [contributors, verdicts]);
@@ -108,16 +113,17 @@ export default function ContributionXray({ sections }) {
         </div>
       )}
 
-      {/* Stacked bar */}
-      {totalWords > 0 && (
+      {/* Stacked bar — share of the final text (surviving chars or words) */}
+      {totalShare > 0 && (
         <div className="flex h-8 rounded-lg overflow-hidden mb-4">
           {contributors.map(c => {
-            const pct = (c.wordCount / totalWords) * 100;
+            const pct = (shareOf(c) / totalShare) * 100;
             if (pct === 0) return null;
+            const unit = c.survivingChars != null ? `${c.survivingChars} chars kept` : `${c.wordCount} words`;
             return (
               <div key={c.id} style={{ width: `${pct}%`, backgroundColor: c.color }}
                 className="flex items-center justify-center text-xs font-medium text-gray-700 truncate"
-                title={`${c.name}: ${c.wordCount} words (${pct.toFixed(1)}%)`}>
+                title={`${c.name}: ${unit} (${pct.toFixed(1)}%)`}>
                 {pct > 10 ? c.name.split(' ')[0] : ''}
               </div>
             );
@@ -129,7 +135,7 @@ export default function ContributionXray({ sections }) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {contributors.map(c => {
           const v = verdicts[c.id];
-          const pct = totalWords > 0 ? (c.wordCount / totalWords) * 100 : 0;
+          const pct = totalShare > 0 ? (shareOf(c) / totalShare) * 100 : 0;
           const minutes = Math.round(c.timeMs / 60000);
           const isOpen = expanded === c.id;
           const pastePct = typeof c.pasteRatio === 'number'
@@ -147,6 +153,11 @@ export default function ContributionXray({ sections }) {
                   </span>
                 </div>
                 <p className="text-xs text-gray-400 mb-2">{c.title}</p>
+                {c.survivingChars != null && (
+                  <p className="text-xs text-gray-600 mb-2">
+                    <strong>{pct.toFixed(1)}%</strong> of the final text survived ({c.survivingChars} chars)
+                  </p>
+                )}
                 <div className="grid grid-cols-3 gap-2 text-xs mb-2">
                   <div className="flex items-center gap-1 text-gray-500"><FileText className="w-3 h-3" /> {c.wordCount}w</div>
                   <div className="flex items-center gap-1 text-gray-500"><Keyboard className="w-3 h-3" /> {c.keystrokes}k</div>
