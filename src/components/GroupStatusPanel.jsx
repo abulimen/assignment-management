@@ -14,7 +14,7 @@ const STATUS_ICON = {
 };
 
 // Members list with contribution statuses and the mark-Done/reopen actions.
-// Statuses come from MySQL (via group.php); actions hit group_status.php.
+// Statuses come from MySQL (via GET /api/groups/:id); actions hit POST /api/groups/:id/done|reopen.
 export default function GroupStatusPanel({ group, currentUserId, onAction, busy = false, frozen = false }) {
   const summary = statusSummary(group?.members);
 

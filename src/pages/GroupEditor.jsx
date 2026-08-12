@@ -19,7 +19,7 @@ import { ArrowLeft, Wifi, WifiOff, Lock, Send } from 'lucide-react';
 // Realtime shared editor for a group assignment (Yjs + Hocuspocus).
 // Every member edits ONE document; authorship travels as `author` marks,
 // presence via awareness, and each client's OWN keystrokes still feed the
-// behavioral tracker (events.php) through an anchor submission row.
+// behavioral tracker (tracking WS / POST /api/events) through an anchor submission row.
 export default function GroupEditor() {
   const { groupId } = useParams();
   const { user } = useAuth();

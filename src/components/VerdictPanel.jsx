@@ -67,7 +67,7 @@ export default function VerdictPanel({ verdict, loading }) {
           <h2 className="text-lg font-semibold">AI Originality Analysis</h2>
         </div>
         <p className="text-gray-400 text-center py-8">
-          {verdict?.error || 'Analyzer unavailable. Start the Python service: uvicorn analyzer.main:app --port 8002'}
+          {verdict?.error || 'Analyzer unavailable. Start the analyzer service: cd analyzer-node && npm start (port 8002)'}
         </p>
       </div>
     );
