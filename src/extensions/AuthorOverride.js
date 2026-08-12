@@ -1,6 +1,7 @@
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { ReplaceStep } from '@tiptap/pm/transform';
+import { isRemoteSyncTransaction } from '../utils/yjsMeta';
 
 // In the merged group editor, ProseMirror's default typing behavior makes new
 // text inherit the marks at the cursor — so typing next to (or in an empty
@@ -29,6 +30,10 @@ export const AuthorOverride = Extension.create({
           if (!transactions.some(tr => tr.docChanged)) return null;
           // Programmatic transactions excluded from history don't re-stamp.
           if (transactions.every(tr => tr.getMeta('addToHistory') === false)) return null;
+          // Collaborative mode: remote peer syncs (and Yjs undo/redo) already
+          // carry correct authorship from their origin — re-stamping would
+          // steal ownership of a teammate's keystrokes.
+          if (transactions.some(isRemoteSyncTransaction)) return null;
           // Undo/redo transactions carry metadata under the history plugin's
           // key (they do NOT set addToHistory:false). They restore text with
           // its original marks — re-stamping would steal ownership back.

@@ -7,9 +7,14 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:collab": "npm test --prefix collab",
+    "test:all": "vitest run && npm test --prefix collab"
   },
   "dependencies": {
+    "@hocuspocus/provider": "^2.15.3",
+    "@tiptap/extension-collaboration": "^2.6.0",
+    "@tiptap/extension-collaboration-cursor": "^2.6.0",
     "@tiptap/extension-color": "^2.6.0",
     "@tiptap/extension-font-family": "^2.6.0",
     "@tiptap/extension-highlight": "^2.6.0",
@@ -28,7 +33,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.0",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "yjs": "^13.6.32"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.0",

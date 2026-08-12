@@ -188,6 +188,21 @@ export default function GroupWork() {
         </div>
       </div>
 
+      {/* Shared realtime editor */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-gray-400" />
+            <h3 className="text-sm font-semibold text-gray-700">Shared Document</h3>
+          </div>
+          <button onClick={() => navigate(`/group/${group.id}/edit`)}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+            <FileText className="w-4 h-4" /> Open Shared Editor
+          </button>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">Everyone in the group works on one live document together.</p>
+      </div>
+
       {/* My Section */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
         <div className="flex items-center justify-between">

@@ -4,6 +4,9 @@ import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
+import Collaboration from '@tiptap/extension-collaboration';
+import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
+import { AuthorMark } from '../extensions/AuthorMark';
 import { useTracker } from '../hooks/useTracker';
 import { useEffect, useRef } from 'react';
 import {
@@ -61,21 +64,39 @@ function Toolbar({ editor }) {
   );
 }
 
-export default function Editor({ submissionId, initialContent, onContentChange, editable = true, extraExtensions = [] }) {
+export default function Editor({ submissionId, initialContent, onContentChange, editable = true, extraExtensions = [], collab = null }) {
   const { flush, captureTransaction, setEditorRef, enqueue } = useTracker(submissionId);
   const registered = useRef(false);
   const pendingPasteRef = useRef(null);
 
+  // Collaborative mode (Yjs/Hocuspocus): document content lives in the shared
+  // Y.Doc, undo/redo is Yjs-managed (StarterKit history off), and remote
+  // peers' cursors are rendered via CollaborationCursor. The tracker still
+  // runs — it filters remote transactions and captures only local input.
+  const extensions = collab
+    ? [
+        StarterKit.configure({ history: false }),
+        Collaboration.configure({ document: collab.ydoc, field: 'default' }),
+        CollaborationCursor.configure({ provider: collab.provider, user: collab.user }),
+        Underline,
+        TextAlign.configure({ types: ['heading', 'paragraph'] }),
+        Link.configure({ openOnClick: false }),
+        Placeholder.configure({ placeholder: 'Start writing together...' }),
+        AuthorMark,
+        ...extraExtensions,
+      ]
+    : [
+        StarterKit,
+        Underline,
+        TextAlign.configure({ types: ['heading', 'paragraph'] }),
+        Link.configure({ openOnClick: false }),
+        Placeholder.configure({ placeholder: 'Start writing your assignment...' }),
+        ...extraExtensions,
+      ];
+
   const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Underline,
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Link.configure({ openOnClick: false }),
-      Placeholder.configure({ placeholder: 'Start writing your assignment...' }),
-      ...extraExtensions,
-    ],
-    content: initialContent ? JSON.parse(initialContent) : null,
+    extensions,
+    ...(collab ? {} : { content: initialContent ? JSON.parse(initialContent) : null }),
     editable,
     editorProps: {
       attributes: {

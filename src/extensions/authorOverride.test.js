@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { Editor } from '@tiptap/core';
 import Document from '@tiptap/extension-document';
 import Paragraph from '@tiptap/extension-paragraph';
@@ -32,7 +32,7 @@ function authorOf(textNode) {
 }
 
 function makeEditor(content) {
-  return new Editor({
+  const editor = new Editor({
     extensions: [
       Document,
       Paragraph,
@@ -46,7 +46,17 @@ function makeEditor(content) {
     ],
     content,
   });
+  editors.push(editor);
+  return editor;
 }
+
+// ProseMirror schedules DOMObserver flush timers; without destroy() they fire
+// after the jsdom environment is torn down ("document is not defined").
+const editors = [];
+afterEach(() => {
+  editors.forEach(e => e.destroy());
+  editors.length = 0;
+});
 
 const matePara = {
   type: 'paragraph',

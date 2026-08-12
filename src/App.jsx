@@ -9,6 +9,7 @@ import Assignment from './pages/Assignment';
 import Submission from './pages/Submission';
 import Review from './pages/Review';
 import GroupWork from './pages/GroupWork';
+import GroupEditor from './pages/GroupEditor';
 import SectionView from './pages/SectionView';
 import MergedEditor from './pages/MergedEditor';
 import NotFound from './pages/NotFound';
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/submissions/:id" element={<ProtectedRoute><Layout><Submission /></Layout></ProtectedRoute>} />
           <Route path="/review/:id" element={<ProtectedRoute><Layout><Review /></Layout></ProtectedRoute>} />
           <Route path="/group/:id" element={<ProtectedRoute><Layout><GroupWork /></Layout></ProtectedRoute>} />
+          <Route path="/group/:groupId/edit" element={<ProtectedRoute><Layout><GroupEditor /></Layout></ProtectedRoute>} />
           <Route path="/section/:submissionId" element={<ProtectedRoute><Layout><SectionView /></Layout></ProtectedRoute>} />
           <Route path="/merged/:submissionId" element={<ProtectedRoute><Layout><MergedEditor /></Layout></ProtectedRoute>} />
           <Route path="/join/:code" element={<ProtectedRoute><GroupWork /></ProtectedRoute>} />

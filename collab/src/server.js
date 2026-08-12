@@ -29,8 +29,64 @@ export async function createCollabServer({
   jwtSecret = process.env.JWT_SECRET || 'CHANGE_ME_IN_PRODUCTION',
   internalSecret = process.env.INTERNAL_API_SECRET || 'local-dev-internal-secret',
   quiet = true,
+  attributionThrottleMs = 2000,
 } = {}) {
   const pool = createPool(db);
+
+  // --- Server-anchored attribution ---------------------------------------
+  // Every applied update is credited to the AUTHENTICATED connection — never
+  // to client-supplied data. Writes are throttled per user/document and
+  // flushed on disconnect. Status transitions piggyback the same flush:
+  //   not_started -> in_progress  on first server-observed edit
+  //   done        -> in_progress  when a member edits after marking Done
+  const docSeq = new Map(); // documentName -> next update_seq
+  const pendingAttr = new Map(); // `${documentName}:${userId}` -> { bytes, lastFlushAt }
+
+  async function flushAttribution(documentName, userId) {
+    const key = `${documentName}:${userId}`;
+    const pend = pendingAttr.get(key);
+    if (!pend || pend.bytes === 0) return;
+    const groupId = parseDocName(documentName);
+    if (!groupId) return;
+
+    const seq = (docSeq.get(documentName) || 0) + 1;
+    docSeq.set(documentName, seq);
+
+    await pool.query(
+      'INSERT INTO collab_attribution (group_id, student_id, update_seq, received_at, update_bytes) VALUES (?, ?, ?, NOW(3), ?)',
+      [groupId, userId, seq, pend.bytes],
+    );
+
+    const [[st]] = await pool.query(
+      'SELECT status FROM group_member_status WHERE group_id = ? AND student_id = ?',
+      [groupId, userId],
+    );
+    if (!st) {
+      await pool.query(
+        "INSERT IGNORE INTO group_member_status (group_id, student_id, status, last_activity_at) VALUES (?, ?, 'in_progress', NOW())",
+        [groupId, userId],
+      );
+    } else if (st.status === 'done') {
+      // Edited after marking Done: the commitment is revoked.
+      await pool.query(
+        "UPDATE group_member_status SET status = 'in_progress', done_at = NULL, done_doc_sha = NULL, last_activity_at = NOW() WHERE group_id = ? AND student_id = ?",
+        [groupId, userId],
+      );
+    } else if (st.status === 'not_started') {
+      await pool.query(
+        "UPDATE group_member_status SET status = 'in_progress', last_activity_at = NOW() WHERE group_id = ? AND student_id = ?",
+        [groupId, userId],
+      );
+    } else {
+      await pool.query(
+        'UPDATE group_member_status SET last_activity_at = NOW() WHERE group_id = ? AND student_id = ?',
+        [groupId, userId],
+      );
+    }
+
+    pend.bytes = 0;
+    pend.lastFlushAt = Date.now();
+  }
 
   const hocuspocus = new Hocuspocus({
     name: 'assignment-collab',
@@ -72,6 +128,29 @@ export async function createCollabServer({
       // read-only case only (e.g. if ordering ever changes).
       if (context.readOnly) connection.readOnly = true;
       return context;
+    },
+
+    async onChange({ context, documentName, update }) {
+      const userId = context?.userId;
+      if (!userId) return; // server-side / direct-connection changes
+      const key = `${documentName}:${userId}`;
+      const pend = pendingAttr.get(key) || { bytes: 0, lastFlushAt: 0 };
+      pend.bytes += update ? update.byteLength || update.length || 0 : 0;
+      pendingAttr.set(key, pend);
+      if (Date.now() - pend.lastFlushAt >= attributionThrottleMs) {
+        await flushAttribution(documentName, userId);
+      }
+    },
+
+    async onDisconnect({ context, documentName }) {
+      const userId = context?.userId;
+      if (!userId) return;
+      try {
+        await flushAttribution(documentName, userId);
+      } catch (err) {
+        // Fail loud in logs, never lose silently beyond this point.
+        console.error('[collab] attribution flush failed:', err.message);
+      }
     },
 
     extensions: [

@@ -1,6 +1,7 @@
 import { useRef, useCallback, useMemo } from 'react';
 import { Plugin } from '@tiptap/pm/state';
 import { api } from '../api';
+import { isRemoteSyncTransaction } from '../utils/yjsMeta';
 
 // ProseMirror Step Replay tracker.
 // Captures raw ProseMirror transaction steps (serialized via Step.toJSON())
@@ -88,6 +89,10 @@ export function useTracker(submissionId, editorRef) {
   const captureTransaction = useCallback((tr, pendingPaste = null) => {
     const enq = enqueueRef.current;
     if (!enq || !tr || !tr.docChanged) return;
+    // Collaborative mode: remote peers' edits arrive as y-sync transactions.
+    // Each client only tracks its OWN local typing — attribution of remote
+    // changes belongs to the peer's own tracker (and the server's log).
+    if (isRemoteSyncTransaction(tr)) return;
 
     // Serialize the steps
     const stepsJson = JSON.stringify(tr.steps.map(s => s.toJSON()));
