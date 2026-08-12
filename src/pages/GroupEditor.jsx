@@ -4,12 +4,14 @@ import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
 import Editor from '../components/Editor';
 import GroupStatusPanel from '../components/GroupStatusPanel';
+import GroupSubmitDialog from '../components/GroupSubmitDialog';
 import { AuthorOverride } from '../extensions/AuthorOverride';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
 import { collabUrl } from '../collabConfig';
 import { buildAuthorColorMap, AUTHOR_PALETTE } from '../utils/authorship';
-import { ArrowLeft, Wifi, WifiOff, Lock } from 'lucide-react';
+import { statusSummary } from '../utils/groupStatus';
+import { ArrowLeft, Wifi, WifiOff, Lock, Send } from 'lucide-react';
 
 // Realtime shared editor for a group assignment (Yjs + Hocuspocus).
 // Every member edits ONE document; authorship travels as `author` marks,
@@ -23,6 +25,8 @@ export default function GroupEditor() {
   const [anchorId, setAnchorId] = useState(null);
   const [collab, setCollab] = useState(null);
   const [statusBusy, setStatusBusy] = useState(false);
+  const [submitDialog, setSubmitDialog] = useState(null); // null | 'normal' | 'override'
+  const [submitBusy, setSubmitBusy] = useState(false);
 
   // Group detail + status polling (MySQL is the source of truth for status).
   useEffect(() => {
@@ -54,6 +58,22 @@ export default function GroupEditor() {
       alert(err.message || 'Could not update your status');
     } finally {
       setStatusBusy(false);
+    }
+  }
+
+  // Leader submit — the server seals the canonical document (never client content).
+  async function handleSubmit(overrideReason) {
+    if (!group || submitBusy) return;
+    setSubmitBusy(true);
+    try {
+      await api.post(`group_submit.php/${group.id}`, overrideReason ? { override_reason: overrideReason } : {});
+      setSubmitDialog(null);
+      const d = await api.get(`group.php/${group.id}`);
+      setGroup(d.group);
+    } catch (err) {
+      alert(err.message || 'Submission failed');
+    } finally {
+      setSubmitBusy(false);
     }
   }
 
@@ -107,6 +127,8 @@ export default function GroupEditor() {
   }
 
   const frozen = !!group?.frozen_at;
+  const isLeader = group ? parseInt(group.leader_id) === user?.id : false;
+  const summary = statusSummary(group?.members);
   const colorMap = buildAuthorColorMap(group?.members || []);
   const myMember = group?.members?.find(m => parseInt(m.student_id) === user?.id);
   const cursorUser = {
@@ -162,8 +184,50 @@ export default function GroupEditor() {
             busy={statusBusy}
             frozen={frozen}
           />
+
+          {frozen && group?.merged_submission_id && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <p className="text-sm font-medium text-green-800 mb-2">Submitted — document sealed.</p>
+              <Link to={`/review/${group.merged_submission_id}`}
+                className="text-sm text-green-700 underline">View submission review</Link>
+            </div>
+          )}
+
+          {isLeader && !frozen && (
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Submit</h3>
+              {summary.allDone ? (
+                <button onClick={() => setSubmitDialog('normal')}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+                  <Send className="w-4 h-4" /> Submit — Everyone Complete
+                </button>
+              ) : (
+                <>
+                  <button disabled
+                    className="w-full px-3 py-2 text-sm bg-gray-100 text-gray-400 rounded-lg cursor-not-allowed mb-2"
+                    title="Waiting for all members to mark Done">
+                    Submit ({summary.doneCount}/{summary.total} complete)
+                  </button>
+                  <button onClick={() => setSubmitDialog('override')}
+                    className="w-full px-3 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600">
+                    Submit Anyway as Leader
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </aside>
       </div>
+
+      {submitDialog && (
+        <GroupSubmitDialog
+          summary={summary}
+          isOverride={submitDialog === 'override'}
+          busy={submitBusy}
+          onClose={() => !submitBusy && setSubmitDialog(null)}
+          onConfirm={handleSubmit}
+        />
+      )}
     </div>
   );
 }
