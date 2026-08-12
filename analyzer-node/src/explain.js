@@ -171,20 +171,20 @@ export function buildDecisionRecord({ factors, overall, verdict, confidence, nee
 
   let summary;
   if (overall < 40) {
-    summary = 'The behavioral evidence raises significant concerns about originality across multiple factors.';
+    summary = 'Several writing patterns raise concern that this may not be original work.';
   } else if (needsReview) {
-    summary = 'The behavioral evidence is mixed: strong signals of original composition coexist with one or more factors that look unusual and deserve a human look.';
+    summary = 'Mostly original, but one pattern raises a concern — worth a quick look.';
   } else if (overall < 60) {
-    summary = 'The behavioral evidence is weak or inconsistent, with several factors below a comfortable threshold.';
+    summary = 'The evidence is mixed — several signals are weaker than expected.';
   } else if (red.length === 0 && overall >= 80) {
-    summary = 'The behavioral evidence largely supports original composition, with no factor raising a serious concern.';
+    summary = 'This looks like genuine, original writing.';
   } else {
-    summary = 'The behavioral evidence is broadly consistent with original composition, though not uniformly strong.';
+    summary = 'The writing looks broadly original, though not every signal is strong.';
   }
 
   const verdict_rationale = red.length > 0
-    ? `Scored ${overall}/100 and labeled “${verdict}” because ${red.length} factor${red.length > 1 ? 's' : ''} fell below the concern threshold even though the weighted average stayed high.`
-    : `Scored ${overall}/100 and labeled “${verdict}” with ${confidence} confidence; no factor fell below the concern threshold.`;
+    ? `Overall ${overall}/100, marked “${verdict}” because ${red.length} signal${red.length > 1 ? 's' : ''} fell below the expected range even though the average stayed high.`
+    : `Overall ${overall}/100, marked “${verdict}” with ${confidence} confidence; no signal fell below the expected range.`;
 
   return { summary, verdict_rationale, evidence_for_originality, concerns, flip_conditions };
 }

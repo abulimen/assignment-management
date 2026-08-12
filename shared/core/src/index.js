@@ -56,8 +56,7 @@ export function verifyJwt(token, secret) {
   return payload;
 }
 
-export function createPool(db) {
-  return mysql.createPool({
+export function createPool(db) {  return mysql.createPool({
     host: db.host,
     port: Number(db.port),
     user: db.user,
@@ -68,3 +67,6 @@ export function createPool(db) {
     connectionLimit: 10,
   });
 }
+
+export * from "./text.js";
+export * from "./stats.js";

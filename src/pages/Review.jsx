@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronUp, FileText, BarChart3 } from 'lucide-react';
 import { api } from '../api';
 import VerdictPanel from '../components/VerdictPanel';
 import ContributionXray from '../components/ContributionXray';
@@ -26,7 +26,6 @@ export default function Review() {
     api.get(`submissions/${id}/playback`)
       .then(d => {
         setData(d);
-        // Check if this is a merged group submission by looking for section data
         if (d.sections) setSections(d.sections);
       })
       .finally(() => setLoading(false));
@@ -73,10 +72,7 @@ export default function Review() {
       )}
 
       {sections ? (
-        // Group submission: X-Ray (per-member verdicts) + workload + activity
-        // + copied-text inspector. Single-student panels would analyze only the
-        // leader's session, so they're hidden here. Insight panels need the
-        // realtime payload (legacy merged docs predate per-member tracking).
+        // Group submission: X-Ray + workload + activity + copied-text inspector.
         <>
           <ContributionXray sections={sections} />
           {data.realtime && data.insights && (
@@ -86,29 +82,52 @@ export default function Review() {
               <CopiedTextViewer insights={data.insights} members={sections} />
             </>
           )}
-        </>
-      ) : (
-        <>
-          <VerdictPanel verdict={verdict} loading={verdictLoading} />
-          <PasteAnalysis events={data.events} finalContent={data.content} />
-          <StatsBar stats={data.stats} />
-          <EditDensity events={data.events} totalTimeMs={data.stats?.total_time_ms} />
-          <EditTimeline events={data.events} />
-        </>
-      )}
-
-      {sections ? (
-        <>
-          <h2 className="text-lg font-semibold mb-3">
+          <h2 className="text-lg font-semibold mb-3 mt-6 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-primary-600" />
             {data.realtime ? 'Final Group Document' : 'Merged Document'}
           </h2>
           <GroupFinalDoc content={data.content} sections={sections} />
         </>
       ) : (
+        // Individual submission: at-a-glance verdict, effort stats, the document,
+        // then the detailed evidence tucked away.
         <>
-          <h2 className="text-lg font-semibold mb-3">Document Playback</h2>
+          <VerdictPanel verdict={verdict} loading={verdictLoading} />
+          <StatsBar stats={data.stats} />
+
+          <h2 className="text-lg font-semibold mb-3 mt-6 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-primary-600" />
+            Document
+          </h2>
           <Playback events={data.events} finalContent={data.content} />
+
+          <EvidenceFold events={data.events} finalContent={data.content} stats={data.stats} />
         </>
+      )}
+    </div>
+  );
+}
+
+// Detailed supporting evidence, collapsed by default so the review stays
+// scannable. A lecturer who wants to dig can expand it.
+function EvidenceFold({ events, finalContent, stats }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-6">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700"
+      >
+        <BarChart3 className="w-4 h-4" />
+        {open ? 'Hide detailed evidence' : 'Show detailed evidence'}
+        {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+      </button>
+      {open && (
+        <div className="mt-4">
+          <PasteAnalysis events={events} finalContent={finalContent} />
+          <EditDensity events={events} totalTimeMs={stats?.total_time_ms} />
+          <EditTimeline events={events} />
+        </div>
       )}
     </div>
   );

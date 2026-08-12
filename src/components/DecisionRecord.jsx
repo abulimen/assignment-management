@@ -1,69 +1,86 @@
-import { FileSearch, CheckCircle2, AlertTriangle, RefreshCcw } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, RefreshCcw } from 'lucide-react';
 
-// Renders the analyzer's decision record: why the verdict landed where it did,
-// the evidence for and against originality, and exactly what would change the
-// call. Shown un-collapsed on purpose — the point is that a green headline can
-// never hide a red factor, and a disputed verdict carries its own rebuttal.
-export default function DecisionRecord({ record }) {
-  if (!record) return null;
-  const { summary, verdict_rationale, evidence_for_originality, concerns, flip_conditions } = record;
+// The detailed "why this verdict" block, rendered inside the VerdictPanel's
+// expander. No outer card — it embeds in the verdict card so the review page
+// stays a single, scannable surface instead of stacked panels.
+
+function FactorCard({ factor }) {
+  const score = factor.score;
+  const scoreColor = score >= 80 ? 'text-green-600' : score >= 60 ? 'text-yellow-600' : score >= 40 ? 'text-orange-600' : 'text-red-600';
+  const barColor = score >= 80 ? 'bg-green-500' : score >= 60 ? 'bg-yellow-500' : score >= 40 ? 'bg-orange-500' : 'bg-red-500';
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-      <div className="flex items-center gap-2 mb-3">
-        <FileSearch className="w-5 h-5 text-primary-600" />
-        <h3 className="text-lg font-semibold">Decision Record</h3>
+    <div className={`rounded-lg border p-3 ${score < 40 ? 'border-red-200 bg-red-50/40' : 'border-gray-200 bg-white'}`}>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-sm font-medium text-gray-700">{factor.label}</span>
+        <span className={`text-sm font-bold ${scoreColor}`}>{score}</span>
       </div>
-
-      <p className="text-sm text-gray-800 font-medium mb-1">{summary}</p>
-      {verdict_rationale && <p className="text-xs text-gray-500 mb-4">{verdict_rationale}</p>}
-
-      <div className="space-y-4">
-        {evidence_for_originality?.length > 0 && (
-          <Section
-            icon={<CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />}
-            title="Evidence supporting originality"
-            tone="text-green-700"
-            items={evidence_for_originality}
-          />
-        )}
-
-        {concerns?.length > 0 && (
-          <Section
-            icon={<AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />}
-            title="Concerns"
-            tone="text-orange-700"
-            items={concerns}
-          />
-        )}
-
-        {flip_conditions?.length > 0 && (
-          <Section
-            icon={<RefreshCcw className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />}
-            title="What would change this verdict"
-            tone="text-blue-700"
-            items={flip_conditions}
-          />
-        )}
-
-        {!concerns?.length && !flip_conditions?.length && (
-          <p className="text-sm text-gray-400">No factors raised a concern for this submission.</p>
-        )}
+      <div className="w-full bg-gray-100 rounded-full h-1 mb-2">
+        <div className={`h-1 rounded-full ${barColor}`} style={{ width: `${score}%` }} />
       </div>
+      <p className="text-xs text-gray-600 leading-snug">{factor.narrative || factor.detail}</p>
+      {score < 40 && factor.flip && (
+        <p className="text-xs text-blue-700 mt-1.5 leading-snug">
+          <RefreshCcw className="w-3 h-3 inline mr-1" />{factor.flip}
+        </p>
+      )}
     </div>
   );
 }
 
-function Section({ icon, title, tone, items }) {
+export default function DecisionRecord({ record, factors }) {
+  if (!record) return null;
+  const { evidence_for_originality, concerns, flip_conditions } = record;
+  const hasConcerns = concerns?.length > 0;
+
+  return (
+    <div className="space-y-5">
+      {hasConcerns && (
+        <DetailList
+          icon={<AlertTriangle className="w-4 h-4 text-orange-600" />}
+          title="What raised a concern"
+          items={concerns}
+          tone="text-orange-700"
+        />
+      )}
+
+      {evidence_for_originality?.length > 0 && (
+        <DetailList
+          icon={<CheckCircle2 className="w-4 h-4 text-green-600" />}
+          title="What looks original"
+          items={evidence_for_originality}
+          tone="text-green-700"
+        />
+      )}
+
+      {factors && (
+        <div>
+          <h4 className="text-sm font-semibold text-gray-700 mb-2">How each signal scored</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {Object.entries(factors).map(([key, factor]) => (
+              <FactorCard key={key} factor={factor} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!hasConcerns && flip_conditions?.length > 0 && (
+        <p className="text-xs text-gray-400">No signals raised a concern for this submission.</p>
+      )}
+    </div>
+  );
+}
+
+function DetailList({ icon, title, items, tone }) {
   return (
     <div>
       <div className="flex items-center gap-1.5 mb-1.5">
         {icon}
         <h4 className={`text-sm font-semibold ${tone}`}>{title}</h4>
       </div>
-      <ul className="space-y-1.5 ml-5.5">
+      <ul className="space-y-1.5">
         {items.map((item, i) => (
-          <li key={i} className="text-sm text-gray-700 leading-snug list-disc">{item}</li>
+          <li key={i} className="text-sm text-gray-700 leading-snug pl-5.5 ml-0.5 list-disc">{item}</li>
         ))}
       </ul>
     </div>

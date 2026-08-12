@@ -5,6 +5,7 @@
 import http from 'node:http';
 import { WebSocketServer } from 'ws';
 import { verifyJwt } from './jwt.js';
+import { recomputeSubmissionStats } from '@am/core';
 
 export async function createTrackingServer({
   port = Number(process.env.COLLAB_TRACKING_PORT || 8005),
@@ -74,6 +75,12 @@ export async function createTrackingServer({
           'INSERT INTO events (submission_id, type, data, steps_json, selection_from, selection_to, occurred_at, sequence, received_at) VALUES ?',
           [rows],
         );
+        // Keep submission_stats in sync (single source shared with HTTP intake).
+        // Without this the StatsBar reads stale zeros while the verdict sees the
+        // real numbers — the exact contradiction this fixes.
+        try {
+          await recomputeSubmissionStats(pool, submissionId);
+        } catch { /* stats are best-effort; don't fail the intake */ }
         send({ type: 'ack', count: rows.length });
       } catch {
         send({ type: 'error', message: 'intake failed' });

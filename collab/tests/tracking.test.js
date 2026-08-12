@@ -102,6 +102,32 @@ describe('tracking WS intake', () => {
     socket.close();
   });
 
+  it('recomputes submission_stats after intake (regression: WS left stats at 0)', async () => {
+    // Before the fix, the WS intake inserted events but never recomputed
+    // submission_stats, so the StatsBar read stale zeros while the verdict
+    // (which reads raw events) saw the real numbers.
+    const seeded = await seedGroup(pool);
+    const submissionId = await seedSubmission(seeded);
+    const token = signJwt({ sub: seeded.memberIds[0], role: 'student' }, TEST_JWT_SECRET);
+    const { socket, messages } = await wsConnect(token);
+
+    const t0 = Date.now() / 1000;
+    const events = [1, 2, 3, 4, 5].map((i) => stepEvent(i, t0 + i * 0.15));
+    send(socket, { type: 'events', submission_id: submissionId, events });
+    await waitFor(() => messages.find((m) => m.type === 'ack'));
+
+    await waitFor(async () => {
+      const [rows] = await pool.query(
+        'SELECT keystroke_count, total_time_ms FROM submission_stats WHERE submission_id = ?',
+        [submissionId],
+      );
+      return rows.length && Number(rows[0].keystroke_count) === 5 ? rows[0] : null;
+    });
+    const [rows] = await pool.query('SELECT keystroke_count FROM submission_stats WHERE submission_id = ?', [submissionId]);
+    expect(Number(rows[0].keystroke_count)).toBe(5);
+    socket.close();
+  });
+
   it('refuses events for another student\'s submission', async () => {
     const seeded = await seedGroup(pool);
     const submissionId = await seedSubmission(seeded, { studentId: seeded.memberIds[1] });
