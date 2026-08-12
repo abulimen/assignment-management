@@ -10,6 +10,7 @@ import { Database } from '@hocuspocus/extension-database';
 import { verifyJwt } from './jwt.js';
 import { createPool } from './db.js';
 import { createInternalApi } from './internal.js';
+import { migrateDocToSections } from './sections.js';
 
 export const DOC_PREFIX = 'group:';
 
@@ -128,6 +129,13 @@ export async function createCollabServer({
       // read-only case only (e.g. if ordering ever changes).
       if (context.readOnly) connection.readOnly = true;
       return context;
+    },
+
+    // Runs after the Database extension has applied the persisted state:
+    // seed new documents with one empty section and migrate legacy flat
+    // documents into the sectioned model. Changes persist via onChange.
+    async afterLoadDocument({ document }) {
+      migrateDocToSections(document);
     },
 
     async onChange({ context, documentName, update }) {

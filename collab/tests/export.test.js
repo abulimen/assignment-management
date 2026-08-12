@@ -21,8 +21,8 @@ afterAll(async () => {
   await pool?.end();
 });
 
-// Connect and build a doc with paragraphs + author marks, the way TipTap's
-// Collaboration extension stores them (marks = Y.Text formatting attrs).
+// Connect and build content INSIDE the seeded first section (the server
+// seeds every new document with one empty section), the way TipTap edits it.
 async function withDoc(groupId, userId, build) {
   const document = new Y.Doc();
   const provider = new HocuspocusProvider({
@@ -33,7 +33,9 @@ async function withDoc(groupId, userId, build) {
   });
   await waitFor(async () => provider.synced);
   const frag = document.getXmlFragment('default');
-  build(frag, Y);
+  await waitFor(async () => frag.length > 0);
+  const section = frag.get(0);
+  build(section, Y);
   await new Promise((r) => setTimeout(r, 300));
   const json = docToProseMirrorJSON(document);
   provider.destroy();
@@ -51,13 +53,16 @@ function paragraphWith(text, authorId) {
 describe('headless export', () => {
   it('round-trips paragraphs, text, and author marks to ProseMirror JSON', async () => {
     const seeded = await seedGroup(pool);
-    const { json } = await withDoc(seeded.groupId, seeded.memberIds[0], (frag) => {
-      frag.insert(0, [paragraphWith('hello world', 11)]);
+    const { json } = await withDoc(seeded.groupId, seeded.memberIds[0], (section) => {
+      section.insert(section.length, [paragraphWith('hello world', 11)]);
     });
 
     expect(json.type).toBe('doc');
     expect(json.content).toHaveLength(1);
-    const para = json.content[0];
+    const sectionNode = json.content[0];
+    expect(sectionNode.type).toBe('section');
+    // Our paragraph lands after the seeded title + seed paragraph.
+    const para = sectionNode.content[sectionNode.content.length - 1];
     expect(para.type).toBe('paragraph');
     const text = para.content[0];
     expect(text.text).toBe('hello world');
@@ -68,8 +73,9 @@ describe('headless export', () => {
   it('counts surviving characters per author', async () => {
     const seeded = await seedGroup(pool);
     const [m0, m1] = seeded.memberIds;
-    const { json } = await withDoc(seeded.groupId, m0, (frag) => {
-      frag.insert(0, [paragraphWith('aaaa', m0), paragraphWith('bbbbbb', m1)]);
+    const { json } = await withDoc(seeded.groupId, m0, (section) => {
+      section.insert(section.length, [paragraphWith('aaaa', m0)]);
+      section.insert(section.length, [paragraphWith('bbbbbb', m1)]);
     });
 
     const counts = survivingCharsByAuthor(json);
@@ -80,10 +86,10 @@ describe('headless export', () => {
   it('deleted text does NOT count toward surviving chars', async () => {
     const seeded = await seedGroup(pool);
     const [m0] = seeded.memberIds;
-    const { json } = await withDoc(seeded.groupId, m0, (frag, Yjs) => {
-      frag.insert(0, [paragraphWith('keep', m0)]);
+    const { json } = await withDoc(seeded.groupId, m0, (section) => {
+      section.insert(section.length, [paragraphWith('keep', m0)]);
       const p2 = paragraphWith('vanish', m0);
-      frag.insert(1, [p2]);
+      section.insert(section.length, [p2]);
       // Delete 'vanish' from the text node — tombstoned text must score zero.
       p2.get(0).delete(0, 'vanish'.length);
     });
@@ -94,8 +100,8 @@ describe('headless export', () => {
 
   it('generates HTML with author attribution spans', async () => {
     const seeded = await seedGroup(pool);
-    const { json } = await withDoc(seeded.groupId, seeded.memberIds[0], (frag) => {
-      frag.insert(0, [paragraphWith('render me', 77)]);
+    const { json } = await withDoc(seeded.groupId, seeded.memberIds[0], (section) => {
+      section.insert(section.length, [paragraphWith('render me', 77)]);
     });
     const html = docToHTML(json);
     expect(html).toContain('render me');

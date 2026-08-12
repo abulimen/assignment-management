@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import { yDocToProsemirrorJSON } from 'y-prosemirror';
 import { generateHTML } from '@tiptap/html';
-import { Mark, mergeAttributes } from '@tiptap/core';
+import { Mark, Node, mergeAttributes } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
@@ -39,6 +39,43 @@ const AuthorMark = Mark.create({
   },
 });
 
+// Mirrors of frontend src/extensions/Section.js (same hand-sync rule).
+const SectionTitle = Node.create({
+  name: 'sectionTitle',
+  content: 'inline*',
+  group: 'block',
+  defining: true,
+  parseHTML() {
+    return [{ tag: 'div[data-section-title]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['div', mergeAttributes(HTMLAttributes, { 'data-section-title': 'true' }), 0];
+  },
+});
+
+const Section = Node.create({
+  name: 'section',
+  group: 'block',
+  content: 'sectionTitle block+',
+  defining: true,
+  isolating: true,
+  addAttributes() {
+    return {
+      id: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-section-id'),
+        renderHTML: (attributes) => ({ 'data-section-id': attributes.id }),
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'section[data-section-id]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['section', mergeAttributes(HTMLAttributes), 0];
+  },
+});
+
 // Same content extensions the frontend editor uses (minus UI-only ones).
 const exportExtensions = [
   StarterKit,
@@ -46,6 +83,8 @@ const exportExtensions = [
   TextAlign.configure({ types: ['heading', 'paragraph'] }),
   Link.configure({ openOnClick: false }),
   AuthorMark,
+  SectionTitle,
+  Section,
 ];
 
 export function docToProseMirrorJSON(ydoc) {

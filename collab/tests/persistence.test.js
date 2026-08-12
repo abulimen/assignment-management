@@ -50,10 +50,12 @@ describe('MySQL-backed persistence', () => {
     provider.destroy();
     await serverA.destroy();
 
-    // Fresh server instance, same DB.
+    // Fresh server instance, same DB. Content survives inside the sectioned
+    // structure (the bare test insert lands loose and gets wrapped by the
+    // load-time migration — the text itself must survive untouched).
     const serverB = await startTestServer();
     const { provider: p2, document: d2 } = await connectMember(serverB, seeded.groupId, seeded.memberIds[1], null);
-    expect(d2.getXmlFragment('default').toString()).toBe('hello realtime');
+    expect(d2.getXmlFragment('default').toString()).toContain('hello realtime');
     p2.destroy();
     await serverB.destroy();
   }, 60000);
