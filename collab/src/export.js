@@ -72,7 +72,7 @@ const Section = Node.create({
     return [{ tag: 'section[data-section-id]' }];
   },
   renderHTML({ HTMLAttributes }) {
-    return ['section', mergeAttributes(HTMLAttributes), 0];
+    return ['section', mergeAttributes(HTMLAttributes), ['div', { class: 'section-body' }, 0]];
   },
 });
 

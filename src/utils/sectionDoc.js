@@ -70,3 +70,17 @@ export function listSections(docJson) {
     .filter((n) => n && n.type === 'section')
     .map((s) => ({ id: s.attrs?.id ?? null, title: extractInlineText(s.content?.[0]) }));
 }
+
+// Compute the {from, to} indices for a drag-and-drop reorder, matching the
+// splice semantics of the moveSection command (remove at `from`, land at
+// index `to`). Returns null for a no-op or unknown ids.
+export function planSectionMove(ids, draggedId, targetId, place) {
+  const from = ids.indexOf(draggedId);
+  if (from === -1 || ids.indexOf(targetId) === -1) return null;
+  const reduced = ids.filter((id) => id !== draggedId);
+  const reducedTarget = reduced.indexOf(targetId);
+  if (reducedTarget === -1) return null;
+  const to = place === 'after' ? reducedTarget + 1 : reducedTarget;
+  if (to === from) return null;
+  return { from, to };
+}

@@ -1,6 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import { TextSelection } from '@tiptap/pm/state';
-import { newSectionId } from '../utils/sectionDoc';
+import { newSectionId, planSectionMove } from '../utils/sectionDoc';
 
 // The Word-style document model: a document is one or more SECTIONS, and each
 // section renders as its own page-like sheet. Students create, rename,
@@ -81,7 +81,14 @@ export const Section = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ['section', mergeAttributes(HTMLAttributes), 0];
+    return ['section', mergeAttributes(HTMLAttributes), ['div', { class: 'section-body' }, 0]];
+  },
+
+  // Live chrome: drag handle for reordering + a portal mount for presence
+  // chips. The section element is the node DOM; ProseMirror manages the
+  // children inside .section-body only.
+  addNodeView() {
+    return (props) => new SectionNodeView(props);
   },
 
   addCommands() {
@@ -198,3 +205,71 @@ export const Section = Node.create({
     };
   },
 });
+
+class SectionNodeView {
+  constructor({ node, editor }) {
+    this.editor = editor;
+
+    const dom = document.createElement('section');
+    dom.setAttribute('data-section-id', node.attrs.id);
+
+    const handle = document.createElement('div');
+    handle.className = 'section-drag-handle';
+    handle.title = 'Drag to reorder this section';
+    handle.draggable = true;
+    handle.textContent = '⠿';
+
+    const chips = document.createElement('div');
+    chips.className = 'section-chips';
+
+    const body = document.createElement('div');
+    body.className = 'section-body';
+
+    dom.append(handle, chips, body);
+    this.dom = dom;
+    this.contentDOM = body;
+
+    handle.addEventListener('dragstart', (e) => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/section-id', dom.getAttribute('data-section-id'));
+      dom.classList.add('section-dragging');
+    });
+    handle.addEventListener('dragend', () => {
+      dom.classList.remove('section-dragging');
+    });
+
+    dom.addEventListener('dragover', (e) => {
+      if (!Array.from(e.dataTransfer.types).includes('text/section-id')) return;
+      e.preventDefault();
+      const rect = dom.getBoundingClientRect();
+      const before = e.clientY < rect.top + rect.height / 2;
+      dom.classList.toggle('section-drop-before', before);
+      dom.classList.toggle('section-drop-after', !before);
+    });
+    dom.addEventListener('dragleave', (e) => {
+      if (!dom.contains(e.relatedTarget)) {
+        dom.classList.remove('section-drop-before', 'section-drop-after');
+      }
+    });
+    dom.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dom.classList.remove('section-drop-before', 'section-drop-after');
+      const draggedId = e.dataTransfer.getData('text/section-id');
+      const targetId = dom.getAttribute('data-section-id');
+      if (!draggedId || draggedId === targetId) return;
+      const rect = dom.getBoundingClientRect();
+      const place = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+
+      const ids = [];
+      this.editor.state.doc.forEach((child) => ids.push(child.attrs.id));
+      const plan = planSectionMove(ids, draggedId, targetId, place);
+      if (plan) this.editor.commands.moveSection(plan.from, plan.to);
+    });
+  }
+
+  update(node) {
+    if (node.type.name !== 'section') return false;
+    this.dom.setAttribute('data-section-id', node.attrs.id);
+    return true;
+  }
+}

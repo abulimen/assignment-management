@@ -164,3 +164,33 @@ describe('Section document model', () => {
     ids.forEach((id) => expect(typeof id).toBe('string'));
   });
 });
+
+// Playback replays BOTH legacy flat documents and new sectioned documents,
+// so its schema uses the default permissive doc (block+) with Section nodes
+// available. Both shapes must load and edit without schema violations.
+describe('permissive replay schema (default doc + sections)', () => {
+  function makeReplayEditor(content) {
+    const editor = new Editor({
+      extensions: [Section, SectionTitle, StarterKit],
+      content,
+    });
+    editors.push(editor);
+    return editor;
+  }
+
+  it('accepts sectioned content', () => {
+    const editor = makeReplayEditor(oneSectionDoc('rp-1'));
+    expect(editor.state.doc.childCount).toBe(1);
+    expect(editor.state.doc.child(0).type.name).toBe('section');
+  });
+
+  it('accepts legacy flat content', () => {
+    const editor = makeReplayEditor({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'legacy replay' }] }],
+    });
+    expect(editor.state.doc.childCount).toBe(1);
+    expect(editor.state.doc.child(0).type.name).toBe('paragraph');
+    expect(editor.state.doc.textContent).toBe('legacy replay');
+  });
+});

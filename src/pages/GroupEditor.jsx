@@ -5,8 +5,11 @@ import { HocuspocusProvider } from '@hocuspocus/provider';
 import Editor from '../components/Editor';
 import GroupStatusPanel from '../components/GroupStatusPanel';
 import GroupSubmitDialog from '../components/GroupSubmitDialog';
+import SectionMap from '../components/SectionMap';
+import SectionPresenceChips from '../components/SectionPresenceChips';
 import { AuthorOverride } from '../extensions/AuthorOverride';
 import { useAuth } from '../hooks/useAuth';
+import { useSectionPresence } from '../hooks/useSectionPresence';
 import { api } from '../api';
 import { collabUrl } from '../collabConfig';
 import { buildAuthorColorMap, AUTHOR_PALETTE } from '../utils/authorship';
@@ -27,6 +30,10 @@ export default function GroupEditor() {
   const [statusBusy, setStatusBusy] = useState(false);
   const [submitDialog, setSubmitDialog] = useState(null); // null | 'normal' | 'override'
   const [submitBusy, setSubmitBusy] = useState(false);
+  const [editor, setEditor] = useState(null);
+
+  // Who is editing which section right now (remote users only).
+  const presence = useSectionPresence(collab?.provider, editor);
 
   // Group detail + status polling (MySQL is the source of truth for status).
   useEffect(() => {
@@ -168,6 +175,7 @@ export default function GroupEditor() {
               editable={!frozen}
               collab={{ ydoc: collab.ydoc, provider: collab.provider, user: cursorUser }}
               extraExtensions={[AuthorOverride.configure({ authorId: user?.id })]}
+              onReady={setEditor}
             />
           ) : (
             <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400 text-sm">
@@ -177,6 +185,14 @@ export default function GroupEditor() {
         </div>
 
         <aside className="space-y-4">
+          {editor && !frozen && (
+            <SectionMap
+              editor={editor}
+              presence={presence}
+              onAddSection={() => editor.chain().focus('end').addSectionAfter().run()}
+            />
+          )}
+
           <GroupStatusPanel
             group={group}
             currentUserId={user?.id}
@@ -228,6 +244,9 @@ export default function GroupEditor() {
           onConfirm={handleSubmit}
         />
       )}
+
+      {/* "Sarah is editing here" chips, portaled onto each section sheet */}
+      {editor && !frozen && <SectionPresenceChips editor={editor} presence={presence} />}
     </div>
   );
 }

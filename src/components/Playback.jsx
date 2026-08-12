@@ -8,6 +8,7 @@ import { TextSelection } from '@tiptap/pm/state';
 import { Step } from '@tiptap/pm/transform';
 import { Plugin } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { Section, SectionTitle } from '../extensions/Section';
 import { Play, Pause, SkipBack, SkipForward, FileText, Film, Highlighter } from 'lucide-react';
 
 // ProseMirror Step Replay with source highlighting.
@@ -119,11 +120,16 @@ class SourceMap {
 
 // Stable option objects — new identities each render would make useEditor's
 // instance manager re-apply/re-create the editor unnecessarily.
+// The default permissive document (block+) is kept on purpose: replay must
+// load BOTH legacy flat documents and new sectioned ones, so Section nodes
+// are available without enforcing the strict section+ model.
 const PLAYBACK_EXTENSIONS = [
   StarterKit,
   Underline,
   TextAlign.configure({ types: ['heading', 'paragraph'] }),
   Link.configure({ openOnClick: false }),
+  Section,
+  SectionTitle,
 ];
 const PLAYBACK_EDITOR_PROPS = {
   attributes: { class: 'prose prose-sm max-w-none focus:outline-none' },

@@ -5,6 +5,7 @@ import TextAlign from '@tiptap/extension-text-align';
 import Link from '@tiptap/extension-link';
 import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
+import { Plus } from 'lucide-react';
 import { AuthorMark } from '../extensions/AuthorMark';
 import { SectionDocument, Section, SectionTitle } from '../extensions/Section';
 import { useTracker } from '../hooks/useTracker';
@@ -23,6 +24,7 @@ export default function Editor({
   extraExtensions = [],
   collab = null,
   statusBarExtra = null,
+  onReady = null,
 }) {
   const { flush, captureTransaction, setEditorRef, enqueue } = useTracker(submissionId);
   const pendingPasteRef = useRef(null);
@@ -95,6 +97,15 @@ export default function Editor({
     setEditorRef(() => editor);
   }, [editor, setEditorRef]);
 
+  // Expose the editor instance to the page (section map, presence chips).
+  useEffect(() => {
+    if (editor && onReady) onReady(editor);
+  }, [editor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleAddSection() {
+    editor?.chain().focus('end').addSectionAfter().run();
+  }
+
   // Focus/blur tracking for active time calculation (skip when read-only)
   useEffect(() => {
     if (!enqueue || !editable) return;
@@ -129,6 +140,11 @@ export default function Editor({
       <div className="word-canvas">
         <div className="word-sheet-wrap">
           <EditorContent editor={editor} />
+          {editable && (
+            <button type="button" className="word-add-section" onClick={handleAddSection}>
+              <Plus className="w-4 h-4" /> Add Section
+            </button>
+          )}
         </div>
       </div>
       <WordStatusBar editor={editor} editable={editable}>

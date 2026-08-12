@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
 import Editor from '../components/Editor';
+import SectionMap from '../components/SectionMap';
 import { wrapFlatContent } from '../utils/sectionDoc';
 import { Save, Send } from 'lucide-react';
 
@@ -27,6 +28,7 @@ export default function Submission() {
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState('');
   const [loading, setLoading] = useState(true);
+  const [editor, setEditor] = useState(null);
 
   useEffect(() => {
     // Check if this is a group section submission (via query params)
@@ -118,11 +120,21 @@ export default function Submission() {
       </div>
 
       {submission && (
-        <Editor
-          submissionId={submission.id}
-          initialContent={submission.content}
-          onContentChange={setContent}
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_250px] gap-4 items-start">
+          <Editor
+            submissionId={submission.id}
+            initialContent={normalizeForEditor(submission.content)}
+            onContentChange={setContent}
+            editable={submission.status !== 'submitted'}
+            onReady={setEditor}
+          />
+          {editor && submission.status !== 'submitted' && (
+            <SectionMap
+              editor={editor}
+              onAddSection={() => editor.chain().focus('end').addSectionAfter().run()}
+            />
+          )}
+        </div>
       )}
     </div>
   );

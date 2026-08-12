@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { wrapFlatContent, emptySectionedDoc, listSections } from './sectionDoc';
+import { wrapFlatContent, emptySectionedDoc, listSections, planSectionMove } from './sectionDoc';
 
 const flat = {
   type: 'doc',
@@ -97,5 +97,36 @@ describe('emptySectionedDoc / listSections', () => {
       { id: 's1', title: 'Introduction' },
       { id: 's2', title: '' },
     ]);
+  });
+});
+
+describe('planSectionMove — drag-and-drop target computation', () => {
+  const ids = ['intro', 'methods', 'results'];
+
+  it('drag first section after the last', () => {
+    expect(planSectionMove(ids, 'intro', 'results', 'after')).toEqual({ from: 0, to: 2 });
+  });
+
+  it('drag last section before the first', () => {
+    expect(planSectionMove(ids, 'results', 'intro', 'before')).toEqual({ from: 2, to: 0 });
+  });
+
+  it('drag middle section before the first', () => {
+    expect(planSectionMove(ids, 'methods', 'intro', 'before')).toEqual({ from: 1, to: 0 });
+  });
+
+  it('drag middle section after the last', () => {
+    expect(planSectionMove(ids, 'methods', 'results', 'after')).toEqual({ from: 1, to: 2 });
+  });
+
+  it('dropping a section on its own position is a no-op', () => {
+    expect(planSectionMove(ids, 'methods', 'intro', 'after')).toBeNull(); // lands back at index 1
+    expect(planSectionMove(ids, 'methods', 'results', 'before')).toBeNull();
+    expect(planSectionMove(ids, 'methods', 'methods', 'before')).toBeNull();
+  });
+
+  it('rejects unknown ids', () => {
+    expect(planSectionMove(ids, 'nope', 'intro', 'before')).toBeNull();
+    expect(planSectionMove(ids, 'intro', 'nope', 'before')).toBeNull();
   });
 });
