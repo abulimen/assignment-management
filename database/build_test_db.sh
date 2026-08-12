@@ -21,5 +21,6 @@ apply "$DIR/migration_merge.sql"
 apply "$DIR/migration_steps.sql"
 apply "$DIR/migration_analytics.sql"
 apply "$DIR/migration_realtime.sql"
+apply "$DIR/migration_events_received_at.sql"
 
 echo "Test database '$DB' rebuilt."

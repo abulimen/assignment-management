@@ -1,0 +1,14 @@
+{
+  "name": "assignment-management-analyzer",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Originality verdict engine — evidence-based scoring, stateless HTTP",
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10"
+  }
+}

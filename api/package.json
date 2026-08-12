@@ -1,0 +1,19 @@
+{
+  "name": "assignment-management-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@am/core": "file:../shared/core",
+    "bcryptjs": "^2.4.3",
+    "mysql2": "^3.14.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10"
+  }
+}
