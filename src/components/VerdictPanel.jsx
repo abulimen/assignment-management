@@ -73,12 +73,18 @@ export default function VerdictPanel({ verdict, loading }) {
     );
   }
 
-  const verdictIcon = verdict.overall_score >= 80 ? <CheckCircle className="w-5 h-5 text-green-500" />
+  // A red factor beside a green aggregate reads as "Needs Review" — amber,
+  // never a clean green, so the conflict can't be missed.
+  const needsReview = verdict.needs_review === true;
+
+  const verdictIcon = needsReview ? <AlertTriangle className="w-5 h-5 text-orange-500" />
+    : verdict.overall_score >= 80 ? <CheckCircle className="w-5 h-5 text-green-500" />
     : verdict.overall_score >= 60 ? <AlertCircle className="w-5 h-5 text-yellow-500" />
     : verdict.overall_score >= 40 ? <AlertTriangle className="w-5 h-5 text-orange-500" />
     : <XCircle className="w-5 h-5 text-red-500" />;
 
-  const verdictColor = verdict.overall_score >= 80 ? 'text-green-700 bg-green-50 border-green-200'
+  const verdictColor = needsReview ? 'text-orange-700 bg-orange-50 border-orange-200'
+    : verdict.overall_score >= 80 ? 'text-green-700 bg-green-50 border-green-200'
     : verdict.overall_score >= 60 ? 'text-yellow-700 bg-yellow-50 border-yellow-200'
     : verdict.overall_score >= 40 ? 'text-orange-700 bg-orange-50 border-orange-200'
     : 'text-red-700 bg-red-50 border-red-200';
@@ -91,7 +97,7 @@ export default function VerdictPanel({ verdict, loading }) {
       </div>
 
       {/* Verdict banner */}
-      <div className={`rounded-xl border p-4 mb-6 ${verdictColor}`}>
+      <div className={`rounded-xl border p-4 mb-4 ${verdictColor}`}>
         <div className="flex items-center gap-3">
           {verdictIcon}
           <div>
@@ -103,6 +109,33 @@ export default function VerdictPanel({ verdict, loading }) {
           </div>
         </div>
       </div>
+
+      {/* Red-factor conflict banner: a green aggregate must not bury a red factor */}
+      {needsReview && verdict.flagged_factors?.length > 0 && (
+        <div className="rounded-xl border border-orange-300 bg-orange-50 p-4 mb-6">
+          <div className="flex items-start gap-2 mb-2">
+            <AlertTriangle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-orange-800">One or more factors raise a concern</p>
+              <p className="text-sm text-orange-700 mt-1">
+                The overall score is pulled up by strong signals, but the factor{verdict.flagged_factors.length > 1 ? 's' : ''} below
+                look{verdict.flagged_factors.length === 1 ? 's' : ''} unusual. Review the playback before relying on the green headline.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-1.5 mt-2">
+            {verdict.flagged_factors.map((f) => (
+              <div key={f.key} className="flex items-center gap-2 bg-white/70 rounded-lg border border-orange-200 px-3 py-2">
+                <span className="text-xs font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded flex-shrink-0">{f.score}</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800">{f.label}</p>
+                  <p className="text-xs text-gray-500 truncate">{f.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Risk flags */}
       {verdict.risk_flags?.length > 0 && (

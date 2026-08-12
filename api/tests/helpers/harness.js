@@ -74,6 +74,7 @@ export async function startAnalyzerStub() {
     let data = '';
     req.on('data', (c) => { data += c; });
     req.on('end', () => {
+      const parsed = data ? JSON.parse(data) : {};
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         overall_score: 77,
@@ -81,7 +82,10 @@ export async function startAnalyzerStub() {
         confidence: 'high',
         factors: {},
         risk_flags: [],
-        received_events: data ? JSON.parse(data).events?.length : 0,
+        received_events: parsed.events?.length || 0,
+        // Echo whether events carried server receive times, so tests can
+        // assert the recording-integrity input reaches the analyzer.
+        received_at_present: (parsed.events || []).some((e) => e.received_at != null),
       }));
     });
   });

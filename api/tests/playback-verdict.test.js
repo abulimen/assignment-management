@@ -131,6 +131,14 @@ describe('GET /api/submissions/:id/verdict', () => {
     expect(json.confidence).toBe('high');
   });
 
+  it('forwards server receive times to the analyzer (recording-integrity input)', async () => {
+    const { sid, token } = await makeSubmissionWithEvents();
+    const { status, json } = await apiCall(h.api, `submissions/${sid}/verdict`, { token });
+    expect(status).toBe(200);
+    // The stub echoes whether the events it received carried received_at.
+    expect(json.received_at_present).toBe(true);
+  });
+
   it('returns the fallback shape when the analyzer is unreachable', async () => {
     const { sid, token } = await makeSubmissionWithEvents();
     const isolated = await (await import('./helpers/harness.js')).startApi({

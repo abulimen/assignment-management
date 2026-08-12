@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { computeVerdict } from '../src/engine.js';
 import {
   genGenuineWriter, genPurePaster, genPasterWhoRewrites,
-  genTranscriptionBot, genSparse, genClockTamper,
+  genTranscriptionBot, genSparse, genClockTamper, genNaturalButUncorrected,
 } from './fixtures.js';
 
 describe('scoring v2 — fairness contract', () => {
@@ -81,6 +81,58 @@ describe('scoring v2 — fairness contract', () => {
     expect(v.overall_score).toBe(0);
     expect(v.verdict).toBe('No Data');
     expect(v.confidence).toBe('none');
+  });
+
+  it('a red factor beside a green aggregate is surfaced, not laundered', () => {
+    // The awkward real case: natural cadence + no paste pull the aggregate
+    // up, but Revision Behavior is red (near-zero corrections). The headline
+    // must NOT be an unqualified "Likely Original / high confidence".
+    const { events, stats } = genNaturalButUncorrected();
+    const v = computeVerdict(events, stats);
+    expect(v.factors.revision_health.score).toBeLessThan(40);
+    expect(v.overall_score).toBeGreaterThanOrEqual(60);
+    // The aggregate stays honest (no fake cap), but the verdict must not be
+    // the clean top band and confidence must not be "high".
+    expect(v.verdict).not.toBe('Likely Original');
+    expect(v.confidence).not.toBe('high');
+    expect(v.needs_review).toBe(true);
+    expect(v.flagged_factors.map((f) => f.key)).toContain('revision_health');
+  });
+
+  it('a clean profile (no red factors) keeps its normal verdict and needs_review=false', () => {
+    const { events, stats } = genGenuineWriter();
+    const v = computeVerdict(events, stats);
+    expect(v.needs_review).toBe(false);
+    expect(v.flagged_factors).toHaveLength(0);
+    expect(['Likely Original', 'Mostly Consistent']).toContain(v.verdict);
+  });
+});
+
+describe('scoring v2 — confidence calibration', () => {
+  it('confidence is capped at medium when exactly one factor is red, even with high data volume', () => {
+    const { events, stats } = genNaturalButUncorrected();
+    const v = computeVerdict(events, stats);
+    const redCount = Object.values(v.factors).filter((f) => f.score < 40).length;
+    expect(redCount).toBe(1);
+    // Plenty of keystrokes (volume would say "high"), but the red factor caps it.
+    expect(v.confidence).toBe('medium');
+  });
+
+  it('confidence drops to low when two or more factors are red', () => {
+    const { events, stats } = genTranscriptionBot();
+    const v = computeVerdict(events, stats);
+    const redCount = Object.values(v.factors).filter((f) => f.score < 40).length;
+    expect(redCount).toBeGreaterThanOrEqual(2);
+    expect(v.confidence).toBe('low');
+  });
+
+  it('conflict-downgraded confidence does NOT silently cap the score', () => {
+    // The score stays the true aggregate; only the label/confidence reflect the
+    // conflict. A red factor must not act as a hidden veto on the number.
+    const { events, stats } = genNaturalButUncorrected();
+    const v = computeVerdict(events, stats);
+    expect(v.overall_score).toBeGreaterThanOrEqual(60);
+    expect(v.confidence).not.toBe('high');
   });
 });
 

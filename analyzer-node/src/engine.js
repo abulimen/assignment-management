@@ -350,24 +350,49 @@ export function computeVerdict(events, stats) {
   }
   overall = Math.round(overall / 100);
 
-  const verdict = overall >= 80 ? 'Likely Original'
+  // Red factors (< 40) are a strong concern on one line of evidence. They do
+  // NOT cap the aggregate (no hidden veto) — but they must not be laundered
+  // into a clean headline either.
+  const flagged = Object.keys(factors)
+    .filter((k) => factors[k].score < 40)
+    .map((k) => ({ key: k, label: factors[k].label, score: factors[k].score, detail: factors[k].detail }));
+  const redCount = flagged.length;
+
+  // Confidence starts from evidence volume; overwhelming paste evidence is
+  // itself strong evidence even without keystrokes.
+  const coverage = typedChars / Math.max(typedChars + externalPastedChars, 1);
+  let volumeConfidence = keystrokeEvents.length >= 300 && events.length >= 200 ? 'high'
+    : keystrokeEvents.length >= 100 || events.length >= 100 ? 'medium'
+    : 'low';
+  if (volumeConfidence === 'low' && externalPastedChars > 500 && coverage < 0.1) volumeConfidence = 'medium';
+
+  // Insufficient evidence => shrink toward neutral (affects the score).
+  if (volumeConfidence === 'low') {
+    overall = Math.round(overall * 0.7 + 60 * 0.3);
+  }
+
+  // Conflict downgrades the reported confidence only — the score above stays
+  // the true aggregate, so a red factor is surfaced, never silently averaged away.
+  let confidence = volumeConfidence;
+  if (redCount >= 2) confidence = 'low';
+  else if (redCount === 1 && confidence === 'high') confidence = 'medium';
+
+  // A red factor beside a green aggregate reads "Needs Review", never an
+  // unqualified "Likely Original".
+  const needsReview = redCount >= 1 && overall >= 60;
+  const verdict = needsReview ? 'Needs Review'
+    : overall >= 80 ? 'Likely Original'
     : overall >= 60 ? 'Mostly Consistent'
     : overall >= 40 ? 'Mixed Evidence'
     : 'Significant Concerns';
 
-  // Confidence reflects evidence volume; overwhelming paste evidence is
-  // itself strong evidence even without keystrokes.
-  const coverage = typedChars / Math.max(typedChars + externalPastedChars, 1);
-  let confidence = keystrokeEvents.length >= 300 && events.length >= 200 ? 'high'
-    : keystrokeEvents.length >= 100 || events.length >= 100 ? 'medium'
-    : 'low';
-  if (confidence === 'low' && externalPastedChars > 500 && coverage < 0.1) confidence = 'medium';
-
-  // Insufficient evidence => shrink toward neutral instead of claiming either
-  // innocence or guilt.
-  if (confidence === 'low') {
-    overall = Math.round(overall * 0.7 + 60 * 0.3);
-  }
-
-  return { overall_score: overall, verdict, confidence, factors, risk_flags: riskFlags };
+  return {
+    overall_score: overall,
+    verdict,
+    confidence,
+    factors,
+    risk_flags: riskFlags,
+    needs_review: needsReview,
+    flagged_factors: flagged,
+  };
 }

@@ -232,6 +232,46 @@ export function genTranscriptionBot(seed = 44) {
   };
 }
 
+// The awkward real case: natural, irregular cadence (high CV — human-like)
+// but near-zero corrections and no paste. Types a clean draft fluently. This
+// is the profile that produces a green aggregate beside a RED Revision
+// Behavior factor; the engine must not present it as an unqualified "Likely
+// Original / high confidence". (Correction rate ~0.5%, like a clean typist
+// or a careful transcription.)
+export function genNaturalButUncorrected(seed = 77) {
+  const rng = mulberry32(seed);
+  const events = [];
+  let seq = 0;
+  let t = 1786500000;
+  let pos = 1;
+  // Bursty human cadence: CV well above 0.45, including thinking pauses.
+  for (let i = 0; i < 880; i++) {
+    t += -Math.log(1 - rng()) * 0.13 + rng() * 0.1 + (rng() < 0.08 ? 0.9 + rng() * 2.4 : 0);
+    events.push(stepEvent('n', pos, t, ++seq));
+    pos += 1;
+    if (rng() < 0.005) { // ~0.5% correction rate — firmly in the red band
+      t += 0.4;
+      events.push(deleteEvent(Math.max(1, pos - 5), 1, t, ++seq));
+      pos -= 1;
+    }
+    if (seq % 30 === 0) events.push(snapshotEvent(pos, t, ++seq));
+  }
+  return {
+    events,
+    stats: {
+      keystroke_count: 880,
+      paste_count: 0,
+      delete_count: events.filter((e) => e.type === 'delete').length,
+      cursor_jumps: 0,
+      avg_wpm: 38,
+      paste_ratio: 0,
+      total_time_ms: 24 * 60000,
+      active_time_ms: 20 * 60000,
+      word_count: 170,
+    },
+  };
+}
+
 // Barely any data — the engine must be honest about uncertainty.
 export function genSparse(seed = 55) {
   const rng = mulberry32(seed);

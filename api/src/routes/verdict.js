@@ -27,13 +27,14 @@ export default async function verdict(ctx) {
   }
 
   const [evRows] = await ctx.pool.query(
-    'SELECT type, data, steps_json, occurred_at, sequence FROM events WHERE submission_id = ? ORDER BY sequence ASC',
+    'SELECT type, data, steps_json, occurred_at, received_at, sequence FROM events WHERE submission_id = ? ORDER BY sequence ASC',
     [id],
   );
   const events = evRows.map((e) => ({
     type: e.type,
     data: e.data,
     occurred_at: Number(e.occurred_at),
+    received_at: e.received_at ? new Date(e.received_at).getTime() / 1000 : null,
     steps: e.steps_json ? parseJsonObj(e.steps_json) : null,
   }));
   const [statsRows] = await ctx.pool.query('SELECT * FROM submission_stats WHERE submission_id = ?', [id]);
