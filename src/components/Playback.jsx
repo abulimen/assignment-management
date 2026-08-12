@@ -157,6 +157,29 @@ export default function Playback({ events, finalContent }) {
     [events]
   );
 
+  // Replay must start from the SAME document shape the recording was made
+  // against, or every recorded position is out of range and nothing renders.
+  // Sectioned documents record positions inside doc > section > [title, para];
+  // legacy documents are flat. Detect from the final content and seed the
+  // matching empty structure.
+  const seedContent = useMemo(() => {
+    if (!finalContent) return null;
+    try {
+      const parsed = typeof finalContent === 'string' ? JSON.parse(finalContent) : finalContent;
+      if (parsed?.content?.[0]?.type === 'section') {
+        return JSON.stringify({
+          type: 'doc',
+          content: [{
+            type: 'section',
+            attrs: parsed.content[0].attrs || {},
+            content: [{ type: 'sectionTitle' }, { type: 'paragraph' }],
+          }],
+        });
+      }
+    } catch { /* fall through to flat seed */ }
+    return null;
+  }, [finalContent]);
+
   const editor = useEditor({
     extensions: PLAYBACK_EXTENSIONS,
     content: '',
@@ -275,13 +298,18 @@ export default function Playback({ events, finalContent }) {
     if (!editor || editor.isDestroyed) return;
     sourceMap.current.reset();
     isDispatching.current = true;
-    editor.commands.clearContent();
+    if (seedContent) {
+      try { editor.commands.setContent(JSON.parse(seedContent)); }
+      catch { editor.commands.clearContent(); }
+    } else {
+      editor.commands.clearContent();
+    }
     isDispatching.current = false;
     for (let i = 0; i <= index && i < stepEvents.length; i++) {
       applyStepEvent(stepEvents[i]);
     }
     lastIndexRef.current = index;
-  }, [editor, stepEvents, applyStepEvent]);
+  }, [editor, stepEvents, applyStepEvent, seedContent]);
 
   // Reset when events change
   useEffect(() => {
