@@ -21,19 +21,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         if ((int) $assignment['lecturer_id'] !== $user['sub']) {
             $assignment['submissions'] = [];
         } else {
-            // Exclude individual group sections — lecturer only sees merged group submission
+            // Group work: show only group submissions (realtime group_id rows
+            // and legacy merged rows) — not legacy sections, and not the
+            // per-member anchor drafts that only carry tracking events.
             $stmt = $pdo->prepare('
                 SELECT s.id, s.student_id, u.name AS student_name, u.email AS student_email,
-                       s.status, s.submitted_at, s.created_at,
+                       s.status, s.submitted_at, s.created_at, s.group_id,
                        st.keystroke_count, st.paste_count, st.delete_count, st.avg_wpm, st.total_time_ms
                 FROM submissions s
                 JOIN users u ON u.id = s.student_id
                 LEFT JOIN submission_stats st ON st.submission_id = s.id
                 WHERE s.assignment_id = ?
                   AND NOT EXISTS (SELECT 1 FROM group_sections gs WHERE gs.submission_id = s.id)
+                  AND (
+                    ? = 0
+                    OR s.group_id IS NOT NULL
+                    OR EXISTS (SELECT 1 FROM `groups` g WHERE g.merged_submission_id = s.id)
+                  )
                 ORDER BY s.created_at DESC
             ');
-            $stmt->execute([$id]);
+            $stmt->execute([$id, (int) $assignment['is_group_work']]);
             $assignment['submissions'] = $stmt->fetchAll();
         }
     } else {

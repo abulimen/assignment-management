@@ -160,6 +160,21 @@ describe('playback.php for sealed realtime submissions', () => {
     expect(res.json.sections).toHaveLength(2);
   });
 
+  it('lecturer submission list shows only the group submission, not anchor drafts', async () => {
+    const { group, submissionId } = await makeSubmittedGroup({ allDone: true });
+    const res = await apiCall(php, `assignment.php/${assignmentId}`, { token: lecturer.token });
+    expect(res.status).toBe(200);
+    const subs = res.json.assignment.submissions;
+    // Exactly one row for this group: the sealed group submission. The two
+    // per-member anchor drafts (tracking-only) must not pollute the list.
+    const forGroup = subs.filter((s) => parseInt(s.id) === submissionId);
+    expect(forGroup).toHaveLength(1);
+    expect(subs.every((s) => s.group_id != null || parseInt(s.id) === submissionId)).toBe(true);
+    const anchors = subs.filter((s) => s.status === 'draft');
+    expect(anchors).toHaveLength(0);
+    void group;
+  });
+
   it('legacy merged submissions keep the old review shape (regression)', async () => {
     // Seed a legacy merged submission the old way: section rows + merged row.
     const leader = await registerUser(php, { name: 'Legacy Leader' });

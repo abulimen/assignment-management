@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
+import { assignmentLink } from '../utils/links';
 import { Plus, FileText, Clock, CheckCircle, Users } from 'lucide-react';
 import AssignmentForm from '../components/AssignmentForm';
 
@@ -43,10 +44,7 @@ export default function Dashboard() {
         <div className="grid gap-4">
           {assignments.map(a => {
             const isGroup = a.is_group_work == 1 || a.is_group_work === true;
-            // Group assignments always go to group management page for students
-            const link = isGroup
-              ? `/group/${a.id}`
-              : a.submission_id ? `/submissions/${a.id}` : `/assignments/${a.id}`;
+            const link = assignmentLink(a, user?.role);
             return (
               <Link key={a.id} to={link}
                 className="block bg-white rounded-xl border border-gray-200 p-5 hover:border-primary-300 hover:shadow-sm transition-all">

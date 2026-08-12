@@ -24,6 +24,12 @@ export default function GroupWork() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
 
+  // The group hub is for student members. Lecturers review submissions on
+  // the assignment page — never the live editor.
+  useEffect(() => {
+    if (user?.role === 'lecturer' && id) navigate(`/assignments/${id}`, { replace: true });
+  }, [user?.role, id, navigate]);
+
   // If navigated via /join/:code, auto-join
   useEffect(() => {
     if (code) {
