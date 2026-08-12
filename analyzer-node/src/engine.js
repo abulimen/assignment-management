@@ -10,6 +10,11 @@
 //  - Client clocks are cross-checked against server receive times.
 // Pure + deterministic: same input, same output.
 
+import {
+  explainPaste, explainNaturalness, explainRevision,
+  explainEngagement, explainIntegrity, buildDecisionRecord,
+} from './explain.js';
+
 const WEIGHTS = {
   paste_integrity: 30,
   typing_naturalness: 25,
@@ -169,6 +174,15 @@ export function computeVerdict(events, stats) {
   const avgWpm = num(stats, 'avg_wpm');
   const wordCount = num(stats, 'word_count');
 
+  // Signals collected as each factor computes, fed to the decision record.
+  const sig = {
+    typedChars, deletedChars, externalPastedChars, unmodifiedPasteChars,
+    cv: 0, burstRatio: 0, sessions: 0,
+    deleteRatio: 0, wpm: avgWpm, activeMinutes, wordCount,
+    timedCount: 0, inconsistentCount: 0,
+    keystrokeCount: keystrokeEvents.length,
+  };
+
   // ---- Factor 1: paste integrity (unmodified paste share of final text) ----
   let pasteScore;
   let pasteDetail;
@@ -204,6 +218,8 @@ export function computeVerdict(events, stats) {
       wSum += ivs.length;
     }
     const cv = wSum > 0 ? cvSum / wSum : 0;
+    sig.cv = cv;
+    sig.sessions = sessions.length;
     naturalnessScore = clamp(lerp(cv, 0.08, 0.45, 0, 100));
 
     // Transcription bursts: long delete-free runs, flat local cadence, no pauses.
@@ -226,6 +242,7 @@ export function computeVerdict(events, stats) {
     scoreRun();
 
     const burstRatio = typedChars > 0 ? suspiciousChars / typedChars : 0;
+    sig.burstRatio = burstRatio;
     if (burstRatio > 0) {
       naturalnessScore = Math.round(naturalnessScore * (1 - 0.7 * Math.min(1, burstRatio)));
     }
@@ -257,6 +274,7 @@ export function computeVerdict(events, stats) {
     revisionDetail = `Insufficient typed volume for revision analysis (${typedChars} chars)`;
   } else {
     const ratio = deletedChars / Math.max(typedChars + deletedChars, 1);
+    sig.deleteRatio = ratio;
     if (ratio < 0.03) revisionScore = Math.round(lerp(ratio, 0, 0.03, 10, 100));
     else if (ratio <= 0.35) revisionScore = 100;
     else if (ratio <= 0.7) revisionScore = Math.round(lerp(ratio, 0.35, 0.7, 100, 60));
@@ -275,6 +293,7 @@ export function computeVerdict(events, stats) {
     engagementDetail = 'Negligible observed active time';
   } else {
     const wpm = wordCount / activeMinutes;
+    sig.wpm = wpm;
     if (wpm >= 4 && wpm <= 45) engagementScore = 100;
     else if (wpm < 4) engagementScore = Math.round(clamp(lerp(wpm, 0.5, 4, 70, 100), 70, 100));
     else engagementScore = Math.round(Math.max(10, 100 - (wpm - 45) * 1.2));
@@ -301,6 +320,8 @@ export function computeVerdict(events, stats) {
     const deltas = timed.map((e) => e.received_at - e.occurred_at);
     const med = median(deltas);
     const inconsistent = deltas.filter((d) => Math.abs(d - med) > 30).length;
+    sig.timedCount = timed.length;
+    sig.inconsistentCount = inconsistent;
     const trust = 1 - inconsistent / timed.length;
     integrityScore = Math.round(100 * Math.pow(Math.max(0, trust), 0.7));
     integrityDetail = `${inconsistent}/${timed.length} events deviate from the median clock offset`;
@@ -342,10 +363,26 @@ export function computeVerdict(events, stats) {
     recording_integrity: 'Recording Integrity',
   };
 
+  // Plain-language evidence per factor (narrative + what would flip it).
+  const explanations = {
+    paste_integrity: explainPaste(sig),
+    typing_naturalness: explainNaturalness(sig),
+    revision_health: explainRevision({ ...sig, avgWpm }),
+    engagement: explainEngagement(sig),
+    recording_integrity: explainIntegrity(sig),
+  };
+
   const factors = {};
   let overall = 0;
   for (const key of Object.keys(weights)) {
-    factors[key] = { score: scores[key], weight: weights[key], label: labels[key], detail: details[key] };
+    factors[key] = {
+      score: scores[key],
+      weight: weights[key],
+      label: labels[key],
+      detail: details[key],
+      narrative: explanations[key].narrative,
+      flip: explanations[key].flip,
+    };
     overall += scores[key] * weights[key];
   }
   overall = Math.round(overall / 100);
@@ -386,6 +423,9 @@ export function computeVerdict(events, stats) {
     : overall >= 40 ? 'Mixed Evidence'
     : 'Significant Concerns';
 
+  // The decision record: why this verdict, and what would change it.
+  const decision_record = buildDecisionRecord({ factors, overall, verdict, confidence, needsReview });
+
   return {
     overall_score: overall,
     verdict,
@@ -394,5 +434,6 @@ export function computeVerdict(events, stats) {
     risk_flags: riskFlags,
     needs_review: needsReview,
     flagged_factors: flagged,
+    decision_record,
   };
 }

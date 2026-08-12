@@ -1,4 +1,5 @@
 import { Shield, AlertTriangle, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import DecisionRecord from './DecisionRecord';
 
 function ScoreGauge({ score }) {
   const color = score >= 80 ? 'text-green-500' : score >= 60 ? 'text-yellow-500' : score >= 40 ? 'text-orange-500' : 'text-red-500';
@@ -30,7 +31,7 @@ function FactorCard({ factor }) {
   const barColor = factor.score >= 80 ? 'bg-green-500' : factor.score >= 60 ? 'bg-yellow-500' : factor.score >= 40 ? 'bg-orange-500' : 'bg-red-500';
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-3">
+    <div className={`bg-white rounded-lg border p-3 ${factor.score < 40 ? 'border-red-200' : 'border-gray-200'}`}>
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-medium text-gray-700">{factor.label}</span>
         <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${color}`}>{factor.score}</span>
@@ -38,7 +39,13 @@ function FactorCard({ factor }) {
       <div className="w-full bg-gray-100 rounded-full h-1.5 mb-2">
         <div className={`h-1.5 rounded-full ${barColor}`} style={{ width: `${factor.score}%`, transition: 'width 0.6s ease' }} />
       </div>
-      <p className="text-xs text-gray-500">{factor.detail}</p>
+      <p className="text-xs text-gray-600 leading-snug">{factor.narrative || factor.detail}</p>
+      {factor.narrative && factor.detail && (
+        <p className="text-[11px] text-gray-400 mt-1.5">{factor.detail}</p>
+      )}
+      {factor.score < 40 && factor.flip && (
+        <p className="text-[11px] text-blue-600 mt-1.5 leading-snug">Would change if: {factor.flip}</p>
+      )}
     </div>
   );
 }
@@ -136,6 +143,9 @@ export default function VerdictPanel({ verdict, loading }) {
           </div>
         </div>
       )}
+
+      {/* Decision record: why this verdict and what would change it */}
+      <DecisionRecord record={verdict.decision_record} />
 
       {/* Risk flags */}
       {verdict.risk_flags?.length > 0 && (

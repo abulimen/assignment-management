@@ -183,3 +183,53 @@ describe('scoring v2 — contract shape', () => {
     }
   });
 });
+
+describe('scoring v2 — decision record', () => {
+  it('every factor carries a narrative and a flip condition', () => {
+    const { events, stats } = genGenuineWriter();
+    const v = computeVerdict(events, stats);
+    for (const f of Object.values(v.factors)) {
+      expect(typeof f.narrative).toBe('string');
+      expect(f.narrative.length).toBeGreaterThan(10);
+      expect(typeof f.flip).toBe('string');
+      expect(f.flip.length).toBeGreaterThan(5);
+    }
+  });
+
+  it('returns a well-formed decision record', () => {
+    const { events, stats } = genGenuineWriter();
+    const v = computeVerdict(events, stats);
+    const rec = v.decision_record;
+    expect(rec).toBeTruthy();
+    expect(typeof rec.summary).toBe('string');
+    expect(typeof rec.verdict_rationale).toBe('string');
+    expect(Array.isArray(rec.evidence_for_originality)).toBe(true);
+    expect(Array.isArray(rec.concerns)).toBe(true);
+    expect(Array.isArray(rec.flip_conditions)).toBe(true);
+  });
+
+  it('the conflicted case surfaces its concern and flip in the record', () => {
+    const { events, stats } = genNaturalButUncorrected();
+    const v = computeVerdict(events, stats);
+    const rec = v.decision_record;
+    expect(rec.concerns.length).toBeGreaterThanOrEqual(1);
+    expect(rec.concerns.join(' ')).toMatch(/correction|revision/i);
+    expect(rec.flip_conditions.length).toBeGreaterThanOrEqual(1);
+    expect(rec.summary).toMatch(/mixed|concern/i);
+  });
+
+  it('a clean case has evidence-for and no concerns', () => {
+    const { events, stats } = genGenuineWriter();
+    const v = computeVerdict(events, stats);
+    const rec = v.decision_record;
+    expect(rec.evidence_for_originality.length).toBeGreaterThanOrEqual(3);
+    expect(rec.concerns).toHaveLength(0);
+  });
+
+  it('decision record is deterministic', () => {
+    const { events, stats } = genNaturalButUncorrected();
+    const a = computeVerdict(events, stats).decision_record;
+    const b = computeVerdict(events, stats).decision_record;
+    expect(b).toEqual(a);
+  });
+});
