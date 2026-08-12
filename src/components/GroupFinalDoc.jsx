@@ -4,6 +4,7 @@ import { AuthorMark } from '../extensions/AuthorMark';
 import { PastedMark } from '../extensions/PastedMark';
 import { buildAuthorColorMap, AUTHOR_PALETTE } from '../utils/authorship';
 import { annotatePasted } from '../utils/pasted';
+import { wrapFlatContent } from '../utils/sectionDoc';
 import { Users, ClipboardPaste } from 'lucide-react';
 
 // Read-only annotated view of a merged group document. The merged TipTap
@@ -30,11 +31,12 @@ export default function GroupFinalDoc({ content, sections }) {
     return map;
   }, [sections]);
 
-  // Merged content + red pasted overlay marks
+  // Merged content + red pasted overlay marks; legacy flat snapshots are
+  // normalized into a single section so they render on the same sheets.
   const annotated = useMemo(() => {
     if (!content) return null;
     try {
-      return JSON.stringify(annotatePasted(JSON.parse(content), pastedByAuthor));
+      return JSON.stringify(wrapFlatContent(annotatePasted(JSON.parse(content), pastedByAuthor)));
     } catch (e) {
       return content;
     }

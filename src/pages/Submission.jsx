@@ -3,7 +3,18 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
 import Editor from '../components/Editor';
+import { wrapFlatContent } from '../utils/sectionDoc';
 import { Save, Send } from 'lucide-react';
+
+// Legacy drafts are flat; normalize into the sectioned model before editing.
+function normalizeForEditor(raw) {
+  if (!raw) return JSON.stringify(wrapFlatContent(null));
+  try {
+    return JSON.stringify(wrapFlatContent(JSON.parse(raw)));
+  } catch {
+    return raw;
+  }
+}
 
 export default function Submission() {
   const { id } = useParams();
@@ -23,7 +34,7 @@ export default function Submission() {
     if (sectionSubId) {
       api.get(`submission.php/${sectionSubId}`).then(r => {
         setSubmission(r.submission);
-        setContent(r.submission.content || '');
+        setContent(normalizeForEditor(r.submission.content));
         return api.get(`assignment.php/${id}`);
       }).then(d => {
         setAssignment(d.assignment);
@@ -38,7 +49,7 @@ export default function Submission() {
       if (sub) {
         return api.get(`submission.php/${sub.id}`).then(r => {
           setSubmission(r.submission);
-          setContent(r.submission.content || '');
+          setContent(normalizeForEditor(r.submission.content));
         });
       } else {
         return api.post('submissions.php', { assignment_id: parseInt(id) }).then(r => {
