@@ -9,6 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@am/core": "file:../shared/core",
     "@hocuspocus/extension-database": "^2.15.2",
     "@hocuspocus/server": "^2.15.2",
     "@tiptap/core": "^2.6.0",
