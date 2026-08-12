@@ -42,8 +42,10 @@ export async function createCollabServer({
   //   done        -> in_progress  when a member edits after marking Done
   const docSeq = new Map(); // documentName -> next update_seq
   const pendingAttr = new Map(); // `${documentName}:${userId}` -> { bytes, lastFlushAt }
+  let closing = false; // set during destroy; suppresses late flushes
 
   async function flushAttribution(documentName, userId) {
+    if (closing) return;
     const key = `${documentName}:${userId}`;
     const pend = pendingAttr.get(key);
     if (!pend || pend.bytes === 0) return;
@@ -196,6 +198,7 @@ export async function createCollabServer({
     hocuspocus,
     pool,
     async destroy() {
+      closing = true;
       await internal.close();
       await hocuspocus.destroy();
       await pool.end();

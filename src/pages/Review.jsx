@@ -4,6 +4,9 @@ import { AlertTriangle } from 'lucide-react';
 import { api } from '../api';
 import VerdictPanel from '../components/VerdictPanel';
 import ContributionXray from '../components/ContributionXray';
+import MemberWorkload from '../components/MemberWorkload';
+import MemberActivityChart from '../components/MemberActivityChart';
+import CopiedTextViewer from '../components/CopiedTextViewer';
 import PasteAnalysis from '../components/PasteAnalysis';
 import StatsBar from '../components/StatsBar';
 import EditDensity from '../components/EditDensity';
@@ -70,10 +73,20 @@ export default function Review() {
       )}
 
       {sections ? (
-        // Merged group: the X-Ray is the originality hub (per-member verdicts).
-        // The single-student panels below analyze the leader's merge session,
-        // which would be misleading here, so they're hidden.
-        <ContributionXray sections={sections} />
+        // Group submission: X-Ray (per-member verdicts) + workload + activity
+        // + copied-text inspector. Single-student panels would analyze only the
+        // leader's session, so they're hidden here. Insight panels need the
+        // realtime payload (legacy merged docs predate per-member tracking).
+        <>
+          <ContributionXray sections={sections} />
+          {data.realtime && data.insights && (
+            <>
+              <MemberWorkload insights={data.insights} members={sections} />
+              <MemberActivityChart insights={data.insights} members={sections} />
+              <CopiedTextViewer insights={data.insights} members={sections} />
+            </>
+          )}
+        </>
       ) : (
         <>
           <VerdictPanel verdict={verdict} loading={verdictLoading} />

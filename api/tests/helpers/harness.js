@@ -147,7 +147,7 @@ export async function startApi(overrides = {}) {
     collabUrl: `http://127.0.0.1:${overrides.collabPort || 0}`,
     ...overrides.config,
   };
-  const handle = await createApiServer({ port: overrides.port || 0, config: cfg });
+  const handle = await createApiServer({ port: overrides.port || 0, config: cfg, staticDir: overrides.staticDir });
   return handle;
 }
 

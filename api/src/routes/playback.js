@@ -1,6 +1,7 @@
 import { sendJson, sendError, guard, parseIdParam } from '../http.js';
 import { sectionPastedTexts } from '../authorship.js';
 import { round } from '../text.js';
+import { bucketActivity, pasteInventory, summarizeMember } from '../insights.js';
 
 function parseJsonObj(s) {
   if (s == null) return null;
@@ -91,11 +92,36 @@ export default async function playback(ctx) {
         memberChars[String(s.student_id)] = Number(contributions[String(s.student_id)] ?? 0);
       }
       const totalChars = Object.values(memberChars).reduce((a, b) => a + b, 0);
+      const insights = {};
       for (const row of sections) {
         const chars = memberChars[String(row.student_id)];
         row.surviving_chars = chars;
         row.share_pct = totalChars > 0 ? round((chars / totalChars) * 100, 1) : 0;
         row.pasted_texts = row.submission_id ? await sectionPastedTexts(ctx.pool, Number(row.submission_id)) : [];
+
+        // Per-member insight aggregates (activity, effort, paste inventory).
+        if (row.submission_id) {
+          const [memEvents] = await ctx.pool.query(
+            'SELECT type, data, steps_json, occurred_at, sequence FROM events WHERE submission_id = ? ORDER BY sequence ASC',
+            [row.submission_id],
+          );
+          const decoded = memEvents.map((e) => ({
+            type: e.type,
+            data: e.data,
+            steps: e.steps_json ? parseJsonObj(e.steps_json) : null,
+            occurred_at: Number(e.occurred_at),
+            sequence: e.sequence,
+          }));
+          const inv = pasteInventory(decoded).map((p) => ({
+            ...p,
+            text: p.text.length > 400 ? `${p.text.slice(0, 400)}…` : p.text,
+          }));
+          insights[String(row.student_id)] = {
+            summary: summarizeMember(decoded),
+            activity: bucketActivity(decoded),
+            pastes: inv,
+          };
+        }
       }
 
       let override = null;
@@ -117,6 +143,7 @@ export default async function playback(ctx) {
         events: [], // group-doc playback is a future subsystem
         stats,
         sections,
+        insights,
         override,
         done_vector: parseJsonObj(sub.done_vector) || [],
         frozen_at: snapshot.frozen_at,

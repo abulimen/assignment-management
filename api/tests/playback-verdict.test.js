@@ -77,6 +77,32 @@ describe('GET /api/submissions/:id/playback', () => {
     expect(json.realtime).toBe(true);
   });
 
+  it('includes per-member insight aggregates', async () => {
+    const { leader, anchorIds, submissionId } = await makeSubmittedGroup();
+    // Seed the leader's anchor with a small event history.
+    const now = Date.now() / 1000;
+    const events = [
+      { type: 'step', data: {}, steps_json: JSON.stringify([{ stepType: 'replace', from: 0, to: 0, slice: { content: [{ type: 'text', text: 'a' }] } }]), occurred_at: now, sequence: 1 },
+      { type: 'paste', data: { external_paste: true, pasted_text: 'https://example.com/source ' + 'x'.repeat(40), position: 1 }, steps_json: null, occurred_at: now + 5, sequence: 2 },
+      { type: 'focus', data: {}, steps_json: null, occurred_at: now, sequence: 3 },
+      { type: 'blur', data: {}, steps_json: null, occurred_at: now + 120, sequence: 4 },
+    ];
+    await apiCall(h.api, 'events', { method: 'POST', token: leader.token, body: { submission_id: anchorIds[leader.user.id], events } });
+
+    const { status, json } = await apiCall(h.api, `submissions/${submissionId}/playback`, { token: lecturer.token });
+    expect(status).toBe(200);
+    const mine = json.insights[String(leader.user.id)];
+    expect(mine).toBeTruthy();
+    expect(mine.summary.typed_chars).toBe(1);
+    expect(mine.summary.external_pastes).toBe(1);
+    expect(mine.summary.sessions).toBe(1);
+    expect(mine.activity.hourly).toHaveLength(24);
+    expect(mine.activity.totalEdits).toBe(2); // step + paste
+    expect(mine.pastes).toHaveLength(1);
+    expect(mine.pastes[0].links).toContain('https://example.com/source');
+    expect(mine.pastes[0].survived).toBe(true);
+  });
+
   it('404 for a missing submission', async () => {
     const { json } = await apiCall(h.api, 'submissions/999999/playback', { token: lecturer.token });
     expect(json.error).toBe('Submission not found');
