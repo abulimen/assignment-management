@@ -27,6 +27,7 @@ export const routes = [
   { method: 'POST', pattern: '/api/groups', handler: createGroup },
   { method: 'POST', pattern: '/api/groups/join', handler: joinGroup },
   { method: 'GET', pattern: '/api/groups/:id', handler: group },
+  { method: 'GET', pattern: '/api/submissions', handler: submissions },
   { method: 'POST', pattern: '/api/submissions', handler: submissions },
   { method: 'GET', pattern: '/api/submissions/:id', handler: submission },
   { method: 'PUT', pattern: '/api/submissions/:id', handler: submission },

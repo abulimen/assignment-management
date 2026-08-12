@@ -3,7 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
 import SubmissionList from '../components/SubmissionList';
-import { Clock, FileText, Edit3 } from 'lucide-react';
+import GroupRoster from '../components/GroupRoster';
+import { Clock, FileText, Edit3, Users } from 'lucide-react';
 
 export default function Assignment() {
   const { id } = useParams();
@@ -12,7 +13,7 @@ export default function Assignment() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get(`assignment.php/${id}`)
+    api.get(`assignments/${id}`)
       .then(d => setAssignment(d.assignment))
       .finally(() => setLoading(false));
   }, [id]);
@@ -32,6 +33,14 @@ export default function Assignment() {
 
       {user?.role === 'lecturer' ? (
         <div>
+          {assignment.is_group_work == 1 && (
+            <div className="mb-8">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Users className="w-5 h-5 text-primary-600" /> Groups & Members
+              </h2>
+              <GroupRoster assignmentId={assignment.id} />
+            </div>
+          )}
           <h2 className="text-lg font-semibold mb-4">Submissions ({assignment.submissions?.length || 0})</h2>
           <SubmissionList submissions={assignment.submissions} />
         </div>

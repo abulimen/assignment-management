@@ -7,7 +7,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.js'],
-    // The Node collab server has its own suite: `npm test --prefix collab`.
-    exclude: ['collab/**', 'node_modules/**'],
+    // Each Node service owns its suite: npm test --prefix collab|api|analyzer-node.
+    exclude: ['collab/**', 'api/**', 'analyzer-node/**', 'shared/**', 'node_modules/**'],
   },
 });

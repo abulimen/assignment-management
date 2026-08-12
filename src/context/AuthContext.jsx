@@ -24,7 +24,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (state.token) {
-      fetch('/api/assignments.php', {
+      fetch('/api/assignments', {
         headers: { Authorization: `Bearer ${state.token}` },
       })
         .then((r) => {

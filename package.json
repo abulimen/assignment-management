@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:collab": "npm test --prefix collab",
-    "test:all": "vitest run && npm test --prefix collab"
+    "test:all": "vitest run && npm test --prefix collab && npm test --prefix api && npm test --prefix analyzer-node"
   },
   "dependencies": {
     "@hocuspocus/provider": "^2.15.3",

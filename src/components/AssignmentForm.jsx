@@ -15,7 +15,7 @@ export default function AssignmentForm({ onClose, onCreated }) {
     setError('');
     setLoading(true);
     try {
-      const data = await api.post('assignments.php', {
+      const data = await api.post('assignments', {
         title, description,
         due_date: dueDate || null,
         is_group_work: isGroupWork,

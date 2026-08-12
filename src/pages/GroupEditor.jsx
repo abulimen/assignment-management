@@ -38,7 +38,7 @@ export default function GroupEditor() {
   // Group detail + status polling (MySQL is the source of truth for status).
   useEffect(() => {
     let stopped = false;
-    const load = () => api.get(`group.php/${groupId}`)
+    const load = () => api.get(`groups/${groupId}`)
       .then(d => { if (!stopped) setGroup(d.group); })
       .catch(() => {});
     load();
@@ -51,7 +51,7 @@ export default function GroupEditor() {
     if (!group || statusBusy) return;
     setStatusBusy(true);
     try {
-      const d = await api.post(`group_status.php/${group.id}/${action}`, {});
+      const d = await api.post(`groups/${group.id}/${action}`, {});
       const byId = Object.fromEntries((d.members || []).map(m => [String(m.student_id), m]));
       setGroup(g => g && ({
         ...g,
@@ -73,9 +73,9 @@ export default function GroupEditor() {
     if (!group || submitBusy) return;
     setSubmitBusy(true);
     try {
-      await api.post(`group_submit.php/${group.id}`, overrideReason ? { override_reason: overrideReason } : {});
+      await api.post(`groups/${group.id}/submit`, overrideReason ? { override_reason: overrideReason } : {});
       setSubmitDialog(null);
-      const d = await api.get(`group.php/${group.id}`);
+      const d = await api.get(`groups/${group.id}`);
       setGroup(d.group);
     } catch (err) {
       alert(err.message || 'Submission failed');
@@ -110,12 +110,12 @@ export default function GroupEditor() {
   useEffect(() => {
     if (!group) return;
     let cancelled = false;
-    api.get(`submissions.php?assignment_id=${group.assignment_id}`)
+    api.get(`submissions?assignment_id=${group.assignment_id}`)
       .then(d => {
         if (cancelled) return null;
         const mine = (d.submissions || [])[0];
         if (mine) { setAnchorId(mine.id); return null; }
-        return api.post('submissions.php', { assignment_id: group.assignment_id })
+        return api.post('submissions', { assignment_id: group.assignment_id })
           .then(r => { if (!cancelled) setAnchorId(r.submission.id); });
       })
       .catch(() => {});

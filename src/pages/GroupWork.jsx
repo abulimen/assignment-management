@@ -21,6 +21,7 @@ export default function GroupWork() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [joinCode, setJoinCode] = useState(code || '');
+  const [groupName, setGroupName] = useState('');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -39,7 +40,7 @@ export default function GroupWork() {
 
   useEffect(() => {
     if (!code) {
-      api.get(`groups.php?assignment_id=${id}`)
+      api.get(`assignments/${id}/groups`)
         .then(d => setGroups(d.groups || []))
         .finally(() => setLoading(false));
     } else {
@@ -49,7 +50,7 @@ export default function GroupWork() {
 
   useEffect(() => {
     if (groups.length > 0) {
-      api.get(`group.php/${groups[0].id}`)
+      api.get(`groups/${groups[0].id}`)
         .then(d => setGroup(d.group))
         .catch(() => {});
     }
@@ -58,7 +59,10 @@ export default function GroupWork() {
   async function handleCreateGroup() {
     setError('');
     try {
-      const d = await api.post('groups.php', { assignment_id: parseInt(id) });
+      const d = await api.post('groups', {
+        assignment_id: parseInt(id),
+        name: groupName.trim() || undefined,
+      });
       setGroup(d.group);
       setShowCreate(false);
     } catch (err) {
@@ -72,7 +76,7 @@ export default function GroupWork() {
     const joinValue = typeof codeToUse === 'string' ? codeToUse : joinCode;
     if (!joinValue) return;
     try {
-      const d = await api.post('group.php/join', { invite_code: joinValue });
+      const d = await api.post('groups/join', { invite_code: joinValue });
       setGroup(d.group);
       setJoinCode('');
       navigate(`/group/${d.group.assignment_id}`, { replace: true });
@@ -102,6 +106,9 @@ export default function GroupWork() {
               <h2 className="font-semibold">Create a Group</h2>
             </div>
             <p className="text-sm text-gray-500 mb-4">Create a new group and become the leader. You'll get an invite link to share with teammates.</p>
+            <input type="text" value={groupName} onChange={e => setGroupName(e.target.value)}
+              placeholder="Group name (e.g. Team Alpha)"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm mb-3" />
             <button onClick={handleCreateGroup}
               className="w-full bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700">
               Create Group

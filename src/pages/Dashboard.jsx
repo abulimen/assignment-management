@@ -13,7 +13,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('assignments.php')
+    api.get('assignments')
       .then(d => setAssignments(d.assignments))
       .finally(() => setLoading(false));
   }, []);

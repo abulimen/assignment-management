@@ -1,7 +1,8 @@
-import { useRef, useCallback, useMemo } from 'react';
+import { useRef, useCallback, useMemo, useEffect } from 'react';
 import { Plugin } from '@tiptap/pm/state';
 import { api } from '../api';
 import { isRemoteSyncTransaction } from '../utils/yjsMeta';
+import { trackingUrl } from '../collabConfig';
 
 // ProseMirror Step Replay tracker.
 // Captures raw ProseMirror transaction steps (serialized via Step.toJSON())
@@ -18,13 +19,44 @@ export function useTracker(submissionId, editorRef) {
   const timer = useRef(null);
   const enqueueRef = useRef(null);
   const snapshotRef = useRef(null);
+  const socketRef = useRef(null);
+
+  // Realtime intake socket (solo AND group work). The server stamps
+  // received_at with its own clock, which the analyzer cross-checks against
+  // the client-reported occurred_at.
+  const ensureSocket = useCallback(() => {
+    const existing = socketRef.current;
+    if (existing && (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)) {
+      return existing;
+    }
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return null;
+      const ws = new WebSocket(trackingUrl(token));
+      ws.addEventListener('error', () => {}); // flush falls back to HTTP per batch
+      socketRef.current = ws;
+      return ws;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  useEffect(() => () => {
+    try { socketRef.current?.close(); } catch { /* unmount cleanup */ }
+  }, []);
 
   const flush = useCallback(() => {
     if (buffer.current.length === 0) return;
     const events = [...buffer.current];
     buffer.current = [];
-    api.post('events.php', { submission_id: submissionId, events }).catch(() => {});
-  }, [submissionId]);
+    // ponytail: WS primary, HTTP fallback; both fire-and-forget as before.
+    const ws = ensureSocket();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'events', submission_id: submissionId, events }));
+    } else {
+      api.post('events', { submission_id: submissionId, events }).catch(() => {});
+    }
+  }, [submissionId, ensureSocket]);
 
   const enqueue = useCallback((type, data, stepsJson, selFrom, selTo) => {
     seq.current += 1;

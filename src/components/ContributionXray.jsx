@@ -44,7 +44,7 @@ export default function ContributionXray({ sections }) {
     if (!sections?.length) return;
     let cancelled = false;
     Promise.all(sections.map(s =>
-      api.get(`verdict.php/${s.submission_id}`)
+      api.get(`submissions/${s.submission_id}/verdict`)
         .then(v => [String(s.student_id), v])
         .catch(() => [String(s.student_id), null])
     )).then(entries => {

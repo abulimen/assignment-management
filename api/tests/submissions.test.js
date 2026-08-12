@@ -122,6 +122,42 @@ describe('POST /api/submissions/:id/submit', () => {
   });
 });
 
+describe('GET /api/submissions?assignment_id=', () => {
+  it('lists submissions for the assignment (lecturer sees all)', async () => {
+    const aid = await makeAssignment();
+    const other = await registerUser(h.api, { name: 'Sub Other' });
+    await apiCall(h.api, 'submissions', { method: 'POST', token: student.token, body: { assignment_id: aid } });
+    await apiCall(h.api, 'submissions', { method: 'POST', token: other.token, body: { assignment_id: aid } });
+    const { status, json } = await apiCall(h.api, `submissions?assignment_id=${aid}`, { token: lecturer.token });
+    expect(status).toBe(200);
+    expect(json.submissions.length).toBe(2);
+    expect(json.submissions[0]).toHaveProperty('student_name');
+  });
+
+  it('student sees only their own submission', async () => {
+    const aid = await makeAssignment();
+    const other = await registerUser(h.api, { name: 'Sub Other2' });
+    await apiCall(h.api, 'submissions', { method: 'POST', token: student.token, body: { assignment_id: aid } });
+    await apiCall(h.api, 'submissions', { method: 'POST', token: other.token, body: { assignment_id: aid } });
+    const { status, json } = await apiCall(h.api, `submissions?assignment_id=${aid}`, { token: student.token });
+    expect(status).toBe(200);
+    expect(json.submissions.length).toBe(1);
+    expect(json.submissions[0].student_id).toBe(student.user.id);
+  });
+
+  it('lecturer must own the assignment', async () => {
+    const aid = await makeAssignment();
+    const otherLecturer = await registerUser(h.api, { name: 'Sub Lecturer2', role: 'lecturer' });
+    const { status } = await apiCall(h.api, `submissions?assignment_id=${aid}`, { token: otherLecturer.token });
+    expect(status).toBe(403);
+  });
+
+  it('400 without assignment_id', async () => {
+    const { status } = await apiCall(h.api, 'submissions', { token: lecturer.token });
+    expect(status).toBe(400);
+  });
+});
+
 describe('PUT /api/submissions/:id', () => {
   it('updates draft content', async () => {
     const aid = await makeAssignment();

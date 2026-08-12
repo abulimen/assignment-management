@@ -34,10 +34,10 @@ export default function Submission() {
     // Check if this is a group section submission (via query params)
     const sectionSubId = searchParams.get('sub');
     if (sectionSubId) {
-      api.get(`submission.php/${sectionSubId}`).then(r => {
+      api.get(`submissions/${sectionSubId}`).then(r => {
         setSubmission(r.submission);
         setContent(normalizeForEditor(r.submission.content));
-        return api.get(`assignment.php/${id}`);
+        return api.get(`assignments/${id}`);
       }).then(d => {
         setAssignment(d.assignment);
       }).finally(() => setLoading(false));
@@ -45,16 +45,16 @@ export default function Submission() {
     }
 
     // Normal flow: find or create submission
-    api.get(`assignment.php/${id}`).then(d => {
+    api.get(`assignments/${id}`).then(d => {
       setAssignment(d.assignment);
       const sub = d.assignment.submissions?.find(s => s.student_id === user?.id);
       if (sub) {
-        return api.get(`submission.php/${sub.id}`).then(r => {
+        return api.get(`submissions/${sub.id}`).then(r => {
           setSubmission(r.submission);
           setContent(normalizeForEditor(r.submission.content));
         });
       } else {
-        return api.post('submissions.php', { assignment_id: parseInt(id) }).then(r => {
+        return api.post('submissions', { assignment_id: parseInt(id) }).then(r => {
           setSubmission(r.submission);
         });
       }
@@ -66,7 +66,7 @@ export default function Submission() {
     setSaving(true);
     setSavedMsg('');
     try {
-      await api.put(`submission.php/${submission.id}`, { content });
+      await api.put(`submissions/${submission.id}`, { content });
       setSavedMsg('Draft saved');
       setTimeout(() => setSavedMsg(''), 2000);
     } catch (err) {
@@ -80,7 +80,7 @@ export default function Submission() {
     if (!submission) return;
     setSaving(true);
     try {
-      await api.post(`submission.php/${submission.id}/submit`, { content });
+      await api.post(`submissions/${submission.id}/submit`, { content });
       navigate(`/assignments/${id}`);
     } catch (err) {
       alert(err.message);

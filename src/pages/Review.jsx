@@ -20,7 +20,7 @@ export default function Review() {
   const [verdictLoading, setVerdictLoading] = useState(true);
 
   useEffect(() => {
-    api.get(`playback.php/${id}`)
+    api.get(`submissions/${id}/playback`)
       .then(d => {
         setData(d);
         // Check if this is a merged group submission by looking for section data
@@ -31,7 +31,7 @@ export default function Review() {
 
   useEffect(() => {
     if (id) {
-      api.get(`verdict.php/${id}`)
+      api.get(`submissions/${id}/verdict`)
         .then(v => setVerdict(v))
         .catch(() => setVerdict({ error: 'Analyzer unavailable' }))
         .finally(() => setVerdictLoading(false));

@@ -6,3 +6,11 @@ export function collabUrl() {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
   return `${proto}://${window.location.host}/collab`;
 }
+
+// WebSocket URL of the event-tracking intake (collab service, :8005).
+// Dev: Vite proxies /track → ws://localhost:8005. Prod: VITE_TRACK_URL.
+export function trackingUrl(token) {
+  const base = import.meta.env.VITE_TRACK_URL
+    || `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/track`;
+  return `${base}?token=${encodeURIComponent(token)}`;
+}
