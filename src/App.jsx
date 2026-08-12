@@ -10,8 +10,6 @@ import Submission from './pages/Submission';
 import Review from './pages/Review';
 import GroupWork from './pages/GroupWork';
 import GroupEditor from './pages/GroupEditor';
-import SectionView from './pages/SectionView';
-import MergedEditor from './pages/MergedEditor';
 import NotFound from './pages/NotFound';
 
 function ProtectedRoute({ children }) {
@@ -41,8 +39,6 @@ export default function App() {
           <Route path="/review/:id" element={<ProtectedRoute><Layout><Review /></Layout></ProtectedRoute>} />
           <Route path="/group/:id" element={<ProtectedRoute><Layout><GroupWork /></Layout></ProtectedRoute>} />
           <Route path="/group/:groupId/edit" element={<ProtectedRoute><Layout><GroupEditor /></Layout></ProtectedRoute>} />
-          <Route path="/section/:submissionId" element={<ProtectedRoute><Layout><SectionView /></Layout></ProtectedRoute>} />
-          <Route path="/merged/:submissionId" element={<ProtectedRoute><Layout><MergedEditor /></Layout></ProtectedRoute>} />
           <Route path="/join/:code" element={<ProtectedRoute><GroupWork /></ProtectedRoute>} />
           <Route path="/" element={<Navigate to="/dashboard" />} />
           <Route path="*" element={<NotFound />} />

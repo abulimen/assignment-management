@@ -1,15 +1,21 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
-import GroupMerge from '../components/GroupMerge';
-import { Users, Plus, Link as LinkIcon, Copy, UserPlus, FileText, Send } from 'lucide-react';
+import { STATUS_LABEL } from '../utils/groupStatus';
+import { Users, Plus, Link as LinkIcon, Copy, UserPlus, FileText, Lock, CheckCircle2, Clock, Circle } from 'lucide-react';
+
+const STATUS_STYLE = {
+  not_started: 'bg-gray-100 text-gray-500',
+  in_progress: 'bg-amber-100 text-amber-700',
+  done: 'bg-green-100 text-green-700',
+};
+const STATUS_ICON = { not_started: Circle, in_progress: Clock, done: CheckCircle2 };
 
 export default function GroupWork() {
   const { id, code } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [group, setGroup] = useState(null);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -57,24 +63,13 @@ export default function GroupWork() {
   async function handleJoin(codeToUse) {
     setError('');
     // codeToUse might be a click event if called from onClick directly
-    const code = typeof codeToUse === 'string' ? codeToUse : joinCode;
-    if (!code) return;
+    const joinValue = typeof codeToUse === 'string' ? codeToUse : joinCode;
+    if (!joinValue) return;
     try {
-      const d = await api.post('group.php/join', { invite_code: code });
+      const d = await api.post('group.php/join', { invite_code: joinValue });
       setGroup(d.group);
       setJoinCode('');
-      // Navigate to the group page without the join code in URL
       navigate(`/group/${d.group.assignment_id}`, { replace: true });
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  async function handleCreateSection() {
-    if (!group) return;
-    try {
-      const d = await api.post(`group.php/${group.id}/create-section`, {});
-      navigate(`/submissions/${group.assignment_id}?section=${d.section_id}&sub=${d.submission_id}`);
     } catch (err) {
       setError(err.message);
     }
@@ -127,9 +122,9 @@ export default function GroupWork() {
     );
   }
 
-  // Has a group
-  const isLeader = parseInt(group.leader_id) === user?.id;
-  const mySection = group.sections?.find(s => parseInt(s.student_id) === user?.id);
+  // Has a group — realtime shared document
+  const frozen = !!group.frozen_at;
+  const doneCount = (group.members || []).filter(m => m.status === 'done').length;
 
   return (
     <div>
@@ -149,42 +144,41 @@ export default function GroupWork() {
 
       {error && <div className="bg-red-50 text-red-600 text-sm rounded-lg p-3 mb-4">{error}</div>}
 
-      {/* Members */}
+      {/* Members + live statuses */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Users className="w-4 h-4 text-gray-400" />
-          <h3 className="text-sm font-semibold text-gray-700">Members ({group.members?.length || 0})</h3>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-gray-400" />
+            <h3 className="text-sm font-semibold text-gray-700">Members ({group.members?.length || 0})</h3>
+          </div>
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${doneCount === (group.members?.length || 0) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+            {doneCount}/{group.members?.length || 0} complete
+          </span>
         </div>
         <div className="space-y-2">
-          {group.members?.map(m => (
-            <div key={m.student_id} className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-medium">
-                  {m.student_name?.charAt(0)}
+          {group.members?.map(m => {
+            const status = m.status || 'not_started';
+            const Icon = STATUS_ICON[status] || Circle;
+            return (
+              <div key={m.student_id} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-medium">
+                    {m.student_name?.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{m.student_name}</p>
+                    <p className="text-xs text-gray-400">{m.email}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium">{m.student_name}</p>
-                  <p className="text-xs text-gray-400">{m.email}</p>
+                <div className="flex items-center gap-2">
+                  {m.is_leader == 1 && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">Leader</span>}
+                  <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${STATUS_STYLE[status]}`}>
+                    <Icon className="w-3 h-3" /> {STATUS_LABEL[status]}
+                  </span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {m.is_leader == 1 && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">Leader</span>}
-                {group.sections?.find(s => parseInt(s.student_id) === m.student_id) ? (
-                  <>
-                    <span className="text-xs text-green-600">{group.sections.find(s => parseInt(s.student_id) === m.student_id).submission_status || 'draft'}</span>
-                    {parseInt(m.student_id) !== user?.id && (
-                      <button onClick={() => navigate(`/section/${group.sections.find(s => parseInt(s.student_id) === m.student_id).submission_id}`)}
-                        className="text-xs text-primary-600 hover:text-primary-700 underline">
-                        View
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <span className="text-xs text-gray-400">No section</span>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -193,60 +187,32 @@ export default function GroupWork() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-gray-400" />
-            <h3 className="text-sm font-semibold text-gray-700">Shared Document</h3>
+            <h3 className="text-sm font-semibold text-gray-700">
+              {frozen ? 'Submitted Document' : 'Shared Document'}
+            </h3>
           </div>
           <button onClick={() => navigate(`/group/${group.id}/edit`)}
             className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
-            <FileText className="w-4 h-4" /> Open Shared Editor
+            {frozen ? <Lock className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+            {frozen ? 'View Sealed Document' : 'Open Shared Editor'}
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-2">Everyone in the group works on one live document together.</p>
+        <p className="text-xs text-gray-400 mt-2">
+          {frozen
+            ? 'This group has submitted. The document is sealed and read-only.'
+            : 'Everyone in the group works on one live document together. Mark yourself Done when your contribution is finished.'}
+        </p>
       </div>
 
-      {/* My Section */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-gray-400" />
-            <h3 className="text-sm font-semibold text-gray-700">My Section</h3>
-          </div>
-          {mySection ? (
-            <button onClick={() => navigate(`/submissions/${group.assignment_id}?section=${mySection.id}&sub=${mySection.submission_id}`)}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
-              <FileText className="w-4 h-4" /> Edit My Section
-            </button>
-          ) : (
-            <button onClick={handleCreateSection}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
-              <Plus className="w-4 h-4" /> Create My Section
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Leader: Merge UI */}
-      {isLeader && group.sections?.length > 0 && !group.merged_submission_id && (
-        <GroupMerge group={group} onMerged={(subId) => navigate(`/merged/${subId}?group=${group.id}`)} />
-      )}
-
-      {/* Leader: Open merged editor after merge */}
-      {isLeader && group.merged_submission_id && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+      {/* After submission: link to review (leader/lecturer path) */}
+      {frozen && group.merged_submission_id && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-gray-400" />
-              <h3 className="text-sm font-semibold text-gray-700">Merged Document</h3>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => navigate(`/merged/${group.merged_submission_id}?group=${group.id}`)}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
-                <FileText className="w-4 h-4" /> Open Merged Editor
-              </button>
-              <button onClick={() => navigate(`/review/${group.merged_submission_id}`)}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
-                Review
-              </button>
-            </div>
+            <p className="text-sm font-medium text-green-800">Submitted — ready for review.</p>
+            <button onClick={() => navigate(`/review/${group.merged_submission_id}`)}
+              className="px-3 py-2 text-sm border border-green-300 text-green-800 rounded-lg hover:bg-green-100">
+              Open Review
+            </button>
           </div>
         </div>
       )}

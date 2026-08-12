@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # start.sh — Launch all Assignment Management services at once.
 # Usage: ./start.sh
-# Kills any existing instances first, then starts PHP, Python, Vite.
+# Kills any existing instances first, then starts PHP, Python, Collab, Vite.
 
 set -e
 
@@ -20,9 +20,12 @@ echo -e "${BLUE}=== Assignment Management — Starting all services ===${NC}"
 echo -e "${RED}Killing existing processes...${NC}"
 fuser -k 8001/tcp 2>/dev/null || true
 fuser -k 8002/tcp 2>/dev/null || true
+fuser -k 8003/tcp 2>/dev/null || true
+fuser -k 8004/tcp 2>/dev/null || true
 fuser -k 3000/tcp 2>/dev/null || true
 pkill -f "uvicorn main:app" 2>/dev/null || true
 pkill -f "php -S localhost:8001" 2>/dev/null || true
+pkill -f "collab/src/main.js" 2>/dev/null || true
 pkill -f "vite" 2>/dev/null || true
 sleep 1
 
@@ -36,6 +39,13 @@ echo -e "${GREEN}Starting Python analyzer on :8002...${NC}"
 cd "$PROJECT_DIR/analyzer"
 uvicorn main:app --port 8002 --host 0.0.0.0 > /tmp/analyzer-8002.log 2>&1 &
 PYTHON_PID=$!
+cd "$PROJECT_DIR"
+
+# Start realtime collaboration server (WS 8003, internal API 8004)
+echo -e "${GREEN}Starting collab server on :8003 (internal :8004)...${NC}"
+cd "$PROJECT_DIR/collab"
+COLLAB_WS_PORT=8003 COLLAB_INTERNAL_PORT=8004 node src/main.js > /tmp/collab-8003.log 2>&1 &
+COLLAB_PID=$!
 cd "$PROJECT_DIR"
 
 # Start Vite dev server (port 3000)
@@ -62,6 +72,12 @@ else
     echo -e "  ${RED}✗ Python analyzer failed${NC} — check /tmp/analyzer-8002.log"
 fi
 
+if curl -s -H 'X-Internal-Secret: local-dev-internal-secret' http://localhost:8004/health 2>/dev/null | grep -q 'ok'; then
+    echo -e "  ${GREEN}✓ Collab server:${NC} ws://localhost:8003 (internal :8004)"
+else
+    echo -e "  ${RED}✗ Collab server failed${NC} — check /tmp/collab-8003.log"
+fi
+
 if curl -s http://localhost:3000 2>/dev/null | grep -q 'root'; then
     echo -e "  ${GREEN}✓ Vite frontend:${NC} http://localhost:3000"
 else
@@ -73,14 +89,15 @@ echo -e "${GREEN}=== All services launched ===${NC}"
 echo -e "  Frontend:  ${BLUE}http://localhost:3000${NC}"
 echo -e "  PHP API:   ${BLUE}http://localhost:8001${NC}"
 echo -e "  Analyzer:  ${BLUE}http://localhost:8002${NC}"
+echo -e "  Collab:    ${BLUE}ws://localhost:8003${NC}"
 echo ""
-echo "  PIDs: PHP=$PHP_PID  Python=$PYTHON_PID  Vite=$VITE_PID"
-echo "  Logs: /tmp/php-8001.log  /tmp/analyzer-8002.log  /tmp/vite-3000.log"
+echo "  PIDs: PHP=$PHP_PID  Python=$PYTHON_PID  Collab=$COLLAB_PID  Vite=$VITE_PID"
+echo "  Logs: /tmp/php-8001.log  /tmp/analyzer-8002.log  /tmp/collab-8003.log  /tmp/vite-3000.log"
 echo ""
 echo "  Press Ctrl+C to stop all services."
 
 # Trap Ctrl+C and kill all children
-trap "echo ''; echo 'Stopping all services...'; kill $PHP_PID $PYTHON_PID $VITE_PID 2>/dev/null; exit 0" INT TERM
+trap "echo ''; echo 'Stopping all services...'; kill $PHP_PID $PYTHON_PID $COLLAB_PID $VITE_PID 2>/dev/null; exit 0" INT TERM
 
 # Keep script alive
 wait
