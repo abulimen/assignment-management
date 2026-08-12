@@ -56,6 +56,53 @@ describe('annotatePasted', () => {
     expect(t.marks).not.toContainEqual(PASTED);
   });
 
+  it('annotates text inside sections (doc > section > paragraph > text)', () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'section',
+          attrs: { id: 'sec-1' },
+          content: [
+            { type: 'sectionTitle' },
+            { type: 'paragraph', content: [textNode('Providing data on students writing process', author(9))] },
+            { type: 'paragraph', content: [textNode('typed words here', author(9))] },
+          ],
+        },
+      ],
+    };
+    const out = annotatePasted(doc, { 9: [LONG_PASTE] });
+    const paras = out.content[0].content.filter(n => n.type === 'paragraph');
+    expect(paras[0].content[0].marks).toContainEqual(PASTED);
+    expect(paras[1].content[0].marks ?? []).not.toContainEqual(PASTED);
+  });
+
+  it('annotates at any nesting depth (lists inside sections)', () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'section',
+          attrs: { id: 'sec-1' },
+          content: [
+            { type: 'sectionTitle' },
+            {
+              type: 'bulletList',
+              content: [
+                { type: 'listItem', content: [
+                  { type: 'paragraph', content: [textNode('Providing data on students writing process', author(9))] },
+                ] },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const out = annotatePasted(doc, { 9: [LONG_PASTE] });
+    const item = out.content[0].content[1].content[0];
+    expect(item.content[0].content[0].marks).toContainEqual(PASTED);
+  });
+
   it('only matches text authored by the same member', () => {
     const doc = {
       type: 'doc',

@@ -23,9 +23,26 @@ $stmt->execute([$id]);
 $sub = $stmt->fetch();
 if (!$sub) error_response('Submission not found', 404);
 
-// Lecturers can view any; students can only view their own
+// Lecturers can view any submission; students their own; group members can
+// view their group's submission — realtime via submissions.group_id, legacy
+// merged via groups.merged_submission_id.
 if ($user['role'] !== 'lecturer' && (int) $sub['student_id'] !== $user['sub']) {
-    error_response('Forbidden', 403);
+    $allowed = false;
+    if (!empty($sub['group_id'])) {
+        $stmt = $pdo->prepare('SELECT id FROM group_members WHERE group_id = ? AND student_id = ?');
+        $stmt->execute([$sub['group_id'], $user['sub']]);
+        $allowed = (bool) $stmt->fetch();
+    } else {
+        $stmt = $pdo->prepare('SELECT id FROM `groups` WHERE merged_submission_id = ?');
+        $stmt->execute([$id]);
+        $grp = $stmt->fetch();
+        if ($grp) {
+            $stmt = $pdo->prepare('SELECT id FROM group_members WHERE group_id = ? AND student_id = ?');
+            $stmt->execute([$grp['id'], $user['sub']]);
+            $allowed = (bool) $stmt->fetch();
+        }
+    }
+    if (!$allowed) error_response('Forbidden', 403);
 }
 
 $stmt = $pdo->prepare('SELECT type, data, steps_json, selection_from, selection_to, occurred_at, sequence FROM events WHERE submission_id = ? ORDER BY sequence ASC');

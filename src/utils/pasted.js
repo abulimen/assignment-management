@@ -5,20 +5,22 @@ export const MIN_PASTE_MATCH = 25;
 // Return a NEW doc JSON with a `pasted` mark on text spans that match the
 // given member's externally-pasted strings (pastedByAuthor: {authorId: [str]}).
 // Only text carrying that member's author mark is considered. Pure.
+// Walks to any depth (sectioned docs nest text several levels down).
 export function annotatePasted(docJson, pastedByAuthor) {
   if (!docJson || !docJson.content) return docJson;
   return {
     ...docJson,
-    content: docJson.content.map(node => annotateNode(node, pastedByAuthor)),
+    content: docJson.content.flatMap(node => annotateDeep(node, pastedByAuthor)),
   };
 }
 
-function annotateNode(node, pastedByAuthor) {
-  if (!node.content) return node;
-  return {
+function annotateDeep(node, pastedByAuthor) {
+  if (node.text !== undefined) return annotateText(node, pastedByAuthor);
+  if (!node.content) return [node];
+  return [{
     ...node,
-    content: node.content.flatMap(child => annotateText(child, pastedByAuthor)),
-  };
+    content: node.content.flatMap(child => annotateDeep(child, pastedByAuthor)),
+  }];
 }
 
 function annotateText(node, pastedByAuthor) {

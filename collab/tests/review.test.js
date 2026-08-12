@@ -152,6 +152,14 @@ describe('playback.php for sealed realtime submissions', () => {
     expect(res.status).toBe(403);
   });
 
+  it('teammates of the submitter CAN open their group review', async () => {
+    const { mate, submissionId } = await makeSubmittedGroup({ allDone: true });
+    const res = await apiCall(php, `playback.php/${submissionId}`, { token: mate.token });
+    expect(res.status).toBe(200);
+    expect(res.json.realtime).toBe(true);
+    expect(res.json.sections).toHaveLength(2);
+  });
+
   it('legacy merged submissions keep the old review shape (regression)', async () => {
     // Seed a legacy merged submission the old way: section rows + merged row.
     const leader = await registerUser(php, { name: 'Legacy Leader' });
