@@ -77,6 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Add creator as first member
     $pdo->prepare('INSERT INTO group_members (group_id, student_id) VALUES (?, ?)')
         ->execute([$groupId, $user['sub']]);
+    // Status row for the realtime workflow.
+    $pdo->prepare("INSERT IGNORE INTO group_member_status (group_id, student_id, status) VALUES (?, ?, 'not_started')")
+        ->execute([$groupId, $user['sub']]);
 
     // Fetch created group
     $stmt = $pdo->prepare('SELECT g.*, u.name AS leader_name FROM `groups` g JOIN users u ON u.id = g.leader_id WHERE g.id = ?');

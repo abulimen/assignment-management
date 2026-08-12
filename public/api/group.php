@@ -36,6 +36,9 @@ if (!$id) {
         // Add member
         $pdo->prepare('INSERT INTO group_members (group_id, student_id) VALUES (?, ?)')
             ->execute([$group['id'], $user['sub']]);
+        // Status row for the realtime workflow (idempotent).
+        $pdo->prepare("INSERT IGNORE INTO group_member_status (group_id, student_id, status) VALUES (?, ?, 'not_started')")
+            ->execute([$group['id'], $user['sub']]);
         json_response(['group' => $group, 'joined' => true]);
     }
     error_response('Group ID required', 400);
@@ -66,16 +69,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         if (!$a || (int) $a['lecturer_id'] !== $user['sub']) error_response('Forbidden', 403);
     }
 
-    // Get members
-    $stmt = $pdo->prepare('
+    // Get members (with realtime contribution status)
+    $stmt = $pdo->prepare("
         SELECT gm.student_id, u.name AS student_name, u.email, gm.joined_at,
-               (g.leader_id = gm.student_id) AS is_leader
+               (g.leader_id = gm.student_id) AS is_leader,
+               COALESCE(gms.status, 'not_started') AS status,
+               gms.done_at, gms.done_doc_sha, gms.last_activity_at
         FROM group_members gm
         JOIN `groups` g ON g.id = gm.group_id
         JOIN users u ON u.id = gm.student_id
+        LEFT JOIN group_member_status gms
+            ON gms.group_id = gm.group_id AND gms.student_id = gm.student_id
         WHERE gm.group_id = ?
         ORDER BY gm.joined_at ASC
-    ');
+    ");
     $stmt->execute([$id]);
     $group['members'] = $stmt->fetchAll();
 

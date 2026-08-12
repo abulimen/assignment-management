@@ -3,12 +3,13 @@ import { useParams, Link } from 'react-router-dom';
 import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
 import Editor from '../components/Editor';
+import GroupStatusPanel from '../components/GroupStatusPanel';
 import { AuthorOverride } from '../extensions/AuthorOverride';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
 import { collabUrl } from '../collabConfig';
 import { buildAuthorColorMap, AUTHOR_PALETTE } from '../utils/authorship';
-import { ArrowLeft, Users, Wifi, WifiOff, Lock } from 'lucide-react';
+import { ArrowLeft, Wifi, WifiOff, Lock } from 'lucide-react';
 
 // Realtime shared editor for a group assignment (Yjs + Hocuspocus).
 // Every member edits ONE document; authorship travels as `author` marks,
@@ -21,6 +22,7 @@ export default function GroupEditor() {
   const [connStatus, setConnStatus] = useState('connecting');
   const [anchorId, setAnchorId] = useState(null);
   const [collab, setCollab] = useState(null);
+  const [statusBusy, setStatusBusy] = useState(false);
 
   // Group detail + status polling (MySQL is the source of truth for status).
   useEffect(() => {
@@ -32,6 +34,28 @@ export default function GroupEditor() {
     const timer = setInterval(load, 5000);
     return () => { stopped = true; clearInterval(timer); };
   }, [groupId]);
+
+  // Mark Done / Reopen — merge fresh statuses straight from the response.
+  async function handleStatusAction(action) {
+    if (!group || statusBusy) return;
+    setStatusBusy(true);
+    try {
+      const d = await api.post(`group_status.php/${group.id}/${action}`, {});
+      const byId = Object.fromEntries((d.members || []).map(m => [String(m.student_id), m]));
+      setGroup(g => g && ({
+        ...g,
+        members: (g.members || []).map(m => {
+          const fresh = byId[String(m.student_id)];
+          return fresh ? { ...m, status: fresh.status, done_at: fresh.done_at, last_activity_at: fresh.last_activity_at } : m;
+        }),
+      }));
+    } catch (err) {
+      // Surface server errors (e.g. collab server down) to the member.
+      alert(err.message || 'Could not update your status');
+    } finally {
+      setStatusBusy(false);
+    }
+  }
 
   // Yjs provider lifecycle.
   useEffect(() => {
@@ -130,27 +154,14 @@ export default function GroupEditor() {
           )}
         </div>
 
-        <aside className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Users className="w-4 h-4 text-gray-400" />
-            <h3 className="text-sm font-semibold text-gray-700">Members ({group?.members?.length || 0})</h3>
-          </div>
-          <div className="space-y-2">
-            {group?.members?.map(m => (
-              <div key={m.student_id} className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium"
-                  style={{ background: AUTHOR_PALETTE[colorMap[m.student_id] || 0] }}>
-                  {m.student_name?.charAt(0)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{m.student_name}</p>
-                </div>
-                {m.is_leader == 1 && (
-                  <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-medium">Leader</span>
-                )}
-              </div>
-            ))}
-          </div>
+        <aside className="space-y-4">
+          <GroupStatusPanel
+            group={group}
+            currentUserId={user?.id}
+            onAction={handleStatusAction}
+            busy={statusBusy}
+            frozen={frozen}
+          />
         </aside>
       </div>
     </div>
