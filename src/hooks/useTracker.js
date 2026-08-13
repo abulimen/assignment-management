@@ -2,7 +2,7 @@ import { useRef, useCallback, useMemo, useEffect } from 'react';
 import { Plugin } from '@tiptap/pm/state';
 import { api } from '../api';
 import { isRemoteSyncTransaction } from '../utils/yjsMeta';
-import { trackingUrl } from '../collabConfig';
+import { trackingUrl, authToken } from '../collabConfig';
 
 // ProseMirror Step Replay tracker.
 // Captures raw ProseMirror transaction steps (serialized via Step.toJSON())
@@ -30,7 +30,7 @@ export function useTracker(submissionId, editorRef) {
       return existing;
     }
     try {
-      const token = localStorage.getItem('token');
+      const token = authToken(); // in-memory session store, never localStorage
       if (!token) return null;
       const ws = new WebSocket(trackingUrl(token));
       ws.addEventListener('error', () => {}); // flush falls back to HTTP per batch

@@ -11,7 +11,7 @@ import { AuthorOverride } from '../extensions/AuthorOverride';
 import { useAuth } from '../hooks/useAuth';
 import { useSectionPresence } from '../hooks/useSectionPresence';
 import { api } from '../api';
-import { collabUrl } from '../collabConfig';
+import { collabUrl, authToken } from '../collabConfig';
 import { buildAuthorColorMap, AUTHOR_PALETTE } from '../utils/authorship';
 import { statusSummary } from '../utils/groupStatus';
 import { ArrowLeft, Wifi, WifiOff, Lock, Send } from 'lucide-react';
@@ -91,7 +91,7 @@ export default function GroupEditor() {
       url: collabUrl(),
       name: `group:${groupId}`,
       document: ydoc,
-      token: localStorage.getItem('token') || '',
+      token: authToken() || '',
     });
     const onStatus = ({ status }) => setConnStatus(status);
     const onAuthFailed = () => setConnStatus('rejected');

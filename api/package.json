@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@am/core": "file:../shared/core",
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "mysql2": "^3.14.0"
   },

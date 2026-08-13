@@ -11,8 +11,8 @@ export function setCors(res, origin) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
 }
 
-export function sendJson(ctx, status, data) {
-  ctx.res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+export function sendJson(ctx, status, data, headers = {}) {
+  ctx.res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...headers });
   ctx.res.end(JSON.stringify(data));
 }
 

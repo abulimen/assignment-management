@@ -1,6 +1,13 @@
 // Route table: pattern → handler. :param segments capture path params.
 import register from './register.js';
 import login from './login.js';
+import me from './me.js';
+import refresh from './refresh.js';
+import logout from './logout.js';
+import verifyEmail from './verifyEmail.js';
+import resendVerification from './resendVerification.js';
+import forgotPassword from './forgotPassword.js';
+import resetPassword from './resetPassword.js';
 import assignments from './assignments.js';
 import assignment from './assignment.js';
 import assignGroups from './assignGroups.js';
@@ -18,6 +25,13 @@ import groupSubmit from './groupSubmit.js';
 export const routes = [
   { method: 'POST', pattern: '/api/register', handler: register },
   { method: 'POST', pattern: '/api/login', handler: login },
+  { method: 'GET', pattern: '/api/me', handler: me },
+  { method: 'POST', pattern: '/api/refresh', handler: refresh },
+  { method: 'POST', pattern: '/api/logout', handler: logout },
+  { method: 'GET', pattern: '/api/verify-email', handler: verifyEmail },
+  { method: 'POST', pattern: '/api/resend-verification', handler: resendVerification },
+  { method: 'POST', pattern: '/api/forgot-password', handler: forgotPassword },
+  { method: 'POST', pattern: '/api/reset-password', handler: resetPassword },
   { method: 'GET', pattern: '/api/assignments', handler: assignments },
   { method: 'POST', pattern: '/api/assignments', handler: assignments },
   { method: 'GET', pattern: '/api/assignments/:id', handler: assignment },

@@ -8,6 +8,7 @@ import http from 'node:http';
 import net from 'node:net';
 import mysql from 'mysql2/promise';
 import { createApiServer } from '../../src/index.js';
+import { rateLimiter } from '../../src/rateLimit.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -155,22 +156,55 @@ export async function startApi(overrides = {}) {
   return handle;
 }
 
-export async function apiCall(api, path, { method = 'GET', token, body } = {}) {
+export async function apiCall(api, path, { method = 'GET', token, body, cookies, origin, headers: extraHeaders } = {}) {
   const res = await fetch(`http://127.0.0.1:${api.port}/api/${path}`, {
     method,
     headers: {
+      // CSRF: cookie-authenticated requests must carry an allowed Origin.
+      Origin: origin || 'http://localhost:3000',
       ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(cookies ? { Cookie: cookies } : {}),
+      ...(extraHeaders || {}),
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   let json = null;
-  try { json = await res.json(); } catch { /* non-JSON */ }
-  return { status: res.status, json };
+  try { json = await res.json(); } catch { /* non-JSON (204 logout etc.) */ }
+  const setCookies = typeof res.headers.getSetCookie === 'function'
+    ? res.headers.getSetCookie()
+    : [];
+  return { status: res.status, json, cookies: setCookies, headers: res.headers };
+}
+
+// Cookie helpers (node fetch exposes Set-Cookie via headers.getSetCookie()).
+// firstCookiePair extracts the `name=value` part for replaying in requests.
+export function firstCookiePair(setCookies) {
+  if (!Array.isArray(setCookies) || !setCookies.length) return '';
+  return setCookies[0].split(';')[0].trim();
+}
+
+// Returns the value of a cookie attribute (HttpOnly, SameSite, ...) or null.
+export function cookieAttribute(setCookies, attr) {
+  for (const sc of setCookies || []) {
+    for (const part of sc.split(';')) {
+      const [k, ...rest] = part.trim().split('=');
+      if (k.toLowerCase() === attr.toLowerCase()) {
+        return rest.join('=') || true;
+      }
+    }
+  }
+  return null;
 }
 
 let emailSeq = 0;
-export async function registerUser(api, { name, role = 'student' }) {
+// Register an account and return a usable access token for it.
+// The new contract does NOT auto-login, so the helper verifies the email
+// (direct DB flag — the real verify endpoint is covered by auth.test.js) and
+// logs in. Rate limits are reset before each call so bulk test registrations
+// never trip the register/IP limit.
+export async function registerUser(api, { name, role = 'student' } = {}) {
+  rateLimiter.reset();
   emailSeq += 1;
   const email = `it_${Date.now()}_${emailSeq}_${Math.floor(Math.random() * 1e6)}@test.local`;
   const { status, json } = await apiCall(api, 'register', {
@@ -178,7 +212,12 @@ export async function registerUser(api, { name, role = 'student' }) {
     body: { email, password: 'password123', name, role },
   });
   if (status !== 201) throw new Error(`register failed: ${status} ${JSON.stringify(json)}`);
-  return { token: json.token, user: json.user };
+  await api.pool.query('UPDATE users SET email_verified = 1 WHERE id = ?', [json.user.id]);
+  const loginRes = await apiCall(api, 'login', { method: 'POST', body: { email, password: 'password123' } });
+  if (loginRes.status !== 200) {
+    throw new Error(`helper login failed: ${loginRes.status} ${JSON.stringify(loginRes.json)}`);
+  }
+  return { token: loginRes.json.accessToken, user: loginRes.json.user };
 }
 
 // Cached singleton: build DB once, start stubs + main API once.

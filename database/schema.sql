@@ -4,13 +4,55 @@ CREATE DATABASE IF NOT EXISTS assignment_mgmt
 
 USE assignment_mgmt;
 
+-- email_verified added by migration_auth_production.sql (idempotent); it is
+-- part of the authoritative schema and listed here for reference.
 CREATE TABLE users (
+    id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    email          VARCHAR(255) NOT NULL UNIQUE,
+    password       VARCHAR(255) NOT NULL,
+    name           VARCHAR(255) NOT NULL,
+    role           ENUM('lecturer','student') NOT NULL,
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ===========================================================================
+-- Auth tables (migration_auth_production.sql)
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT UNSIGNED NOT NULL,
+    family_id   CHAR(36) NOT NULL,
+    token_hash  CHAR(64) NOT NULL UNIQUE,
+    expires_at  DATETIME NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    used_at     DATETIME NULL,
+    revoked_at  DATETIME NULL,
+    INDEX idx_user (user_id),
+    INDEX idx_family (family_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS email_verifications (
     id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    email       VARCHAR(255) NOT NULL UNIQUE,
-    password    VARCHAR(255) NOT NULL,
-    name        VARCHAR(255) NOT NULL,
-    role        ENUM('lecturer','student') NOT NULL,
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    user_id     INT UNSIGNED NOT NULL,
+    token_hash  CHAR(64) NOT NULL UNIQUE,
+    expires_at  DATETIME NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    used_at     DATETIME NULL,
+    INDEX idx_user (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS password_resets (
+    id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT UNSIGNED NOT NULL,
+    token_hash  CHAR(64) NOT NULL UNIQUE,
+    expires_at  DATETIME NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    used_at     DATETIME NULL,
+    INDEX idx_user (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE assignments (

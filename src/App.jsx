@@ -4,6 +4,9 @@ import { useContext } from 'react';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyEmail from './pages/VerifyEmail';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Assignment from './pages/Assignment';
 import Submission from './pages/Submission';
@@ -33,6 +36,9 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
           <Route path="/assignments/:id" element={<ProtectedRoute><Layout><Assignment /></Layout></ProtectedRoute>} />
           <Route path="/submissions/:id" element={<ProtectedRoute><Layout><Submission /></Layout></ProtectedRoute>} />

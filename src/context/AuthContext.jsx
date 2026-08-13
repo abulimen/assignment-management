@@ -1,4 +1,6 @@
-import { createContext, useReducer, useEffect } from 'react';
+import { createContext, useReducer, useEffect, useCallback, useMemo } from 'react';
+import { api } from '../api';
+import { setAccessToken, clearAccessToken } from '../session';
 
 export const AuthContext = createContext(null);
 
@@ -18,48 +20,48 @@ function reducer(state, action) {
 export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, {
     user: null,
-    token: localStorage.getItem('token'),
+    token: null,
     loading: true,
   });
 
+  // Restore the session on boot: the HttpOnly refresh cookie is sent
+  // automatically (same-origin) → access token → /api/me → profile.
+  // On failure the user is anonymous; nothing is persisted client-side.
   useEffect(() => {
-    if (state.token) {
-      fetch('/api/assignments', {
-        headers: { Authorization: `Bearer ${state.token}` },
-      })
-        .then((r) => {
-          if (!r.ok) throw new Error('invalid');
-          return r.json();
-        })
-        .then(() => {
-          const payload = JSON.parse(atob(state.token.split('.')[1]));
-          dispatch({
-            type: 'LOGIN',
-            user: { id: payload.sub, role: payload.role, name: '', email: '' },
-            token: state.token,
-          });
-        })
-        .catch(() => {
-          localStorage.removeItem('token');
-          dispatch({ type: 'LOGOUT' });
-        });
-    } else {
-      dispatch({ type: 'SET_LOADING', loading: false });
-    }
+    let cancelled = false;
+    (async () => {
+      clearAccessToken();
+      try {
+        const data = await api.post('refresh');
+        if (cancelled) return;
+        const me = await api.get('me');
+        if (cancelled) return;
+        dispatch({ type: 'LOGIN', user: me.user, token: data.accessToken });
+      } catch {
+        clearAccessToken();
+        if (!cancelled) dispatch({ type: 'LOGOUT' });
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
-  const login = (token, user) => {
-    localStorage.setItem('token', token);
-    dispatch({ type: 'LOGIN', user, token });
-  };
+  // login(accessToken, user) — called after a successful /api/login.
+  const login = useCallback((accessToken, user) => {
+    setAccessToken(accessToken);
+    dispatch({ type: 'LOGIN', user, token: accessToken });
+  }, []);
 
-  const logout = () => {
-    localStorage.removeItem('token');
+  // logout() — revoke the refresh-token family at the server (best-effort),
+  // then drop the in-memory session.
+  const logout = useCallback(() => {
+    api.post('logout').catch(() => {});
+    clearAccessToken();
     dispatch({ type: 'LOGOUT' });
-  };
+  }, []);
 
+  const value = useMemo(() => ({ ...state, login, logout }), [state, login, logout]);
   return (
-    <AuthContext.Provider value={{ ...state, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
