@@ -6,7 +6,7 @@ import { CheckCircle2, AlertTriangle, RefreshCcw } from 'lucide-react';
 
 function FactorCard({ factor }) {
   const score = factor.score;
-  const scoreColor = score >= 80 ? 'text-green-600' : score >= 60 ? 'text-yellow-600' : score >= 40 ? 'text-orange-700' : 'text-red-600';
+  const scoreColor = score >= 80 ? 'text-green-700' : score >= 60 ? 'text-yellow-700' : score >= 40 ? 'text-orange-700' : 'text-red-600';
   const barColor = score >= 80 ? 'bg-green-500' : score >= 60 ? 'bg-yellow-500' : score >= 40 ? 'bg-orange-500' : 'bg-red-500';
 
   return (
@@ -55,7 +55,7 @@ export default function DecisionRecord({ record, factors }) {
 
       {factors && (
         <div>
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">How each signal scored</h4>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">How each signal scored</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {Object.entries(factors).map(([key, factor]) => (
               <FactorCard key={key} factor={factor} />
@@ -65,7 +65,7 @@ export default function DecisionRecord({ record, factors }) {
       )}
 
       {!hasConcerns && flip_conditions?.length > 0 && (
-        <p className="text-xs text-gray-400">No signals raised a concern for this submission.</p>
+        <p className="text-xs text-gray-600">No signals raised a concern for this submission.</p>
       )}
     </div>
   );
@@ -76,7 +76,7 @@ function DetailList({ icon, title, items, tone }) {
     <div>
       <div className="flex items-center gap-1.5 mb-1.5">
         {icon}
-        <h4 className={`text-sm font-semibold ${tone}`}>{title}</h4>
+        <h3 className={`text-sm font-semibold ${tone}`}>{title}</h3>
       </div>
       <ul className="space-y-1.5">
         {items.map((item, i) => (
