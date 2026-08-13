@@ -2,6 +2,10 @@
 # start.sh — Launch all Assignment Management services at once.
 # Usage: ./start.sh
 # Stack: React (Vite) + three independent Node services (API, Analyzer, Collab).
+#
+# Environment: if a root .env exists, it is sourced so the services pick up
+# DB_HOST/JWT_SECRET/RESEND_API_KEY/... without manual exporting. Set the
+# insecure defaults here when leaving them unset is not acceptable.
 
 set -e
 
@@ -12,6 +16,28 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
+
+# Load .env (if present) with `set -a` so every var is exported to the
+# children started below. Real values placed by the deployer win; anything
+# left unset falls back to the code defaults (some of which are dev-only and
+# must be overridden in production).
+if [ -f "$PROJECT_DIR/.env" ]; then
+    echo -e "${BLUE}Loading $PROJECT_DIR/.env ...${NC}"
+    set -a
+    # shellcheck disable=SC1091
+    . "$PROJECT_DIR/.env"
+    set +a
+fi
+
+# Production-hardening fallbacks: fail safe rather than boot with well-known
+# secrets. In local dev (.env absent) these stay unset and the code uses its
+# local-dev defaults, which is fine on a loopback-only host.
+if [ -z "${JWT_SECRET:-}" ] || [ "$JWT_SECRET" = "CHANGE_ME_IN_PRODUCTION" ]; then
+    echo -e "${RED}WARNING: JWT_SECRET is unset or the placeholder — requests will be rejected or insecure. Set a real JWT_SECRET in .env for any non-local deployment.${NC}"
+fi
+if [ -z "${INTERNAL_API_SECRET:-}" ] || [ "$INTERNAL_API_SECRET" = "local-dev-internal-secret" ]; then
+    echo -e "${RED}WARNING: INTERNAL_API_SECRET is unset or the placeholder — the collab internal API (/seal, /state) is unauthenticated-by-known-secret. Set a real value in .env for any non-local deployment.${NC}"
+fi
 
 echo -e "${BLUE}=== Assignment Management — Starting all services ===${NC}"
 
@@ -71,7 +97,11 @@ else
     echo -e "  ${RED}✗ Analyzer failed${NC} — check /tmp/analyzer-8002.log"
 fi
 
-if curl -s -H 'X-Internal-Secret: local-dev-internal-secret' http://localhost:8004/health 2>/dev/null | grep -q 'ok'; then
+# Probe the collab INTERNAL API (:8004) using the same shared secret the
+# services were launched with (sourced from .env above; falls back to the
+# placeholder default exactly like the code when .env is absent).
+HEALTH_SECRET="${INTERNAL_API_SECRET:-local-dev-internal-secret}"
+if curl -s -H "X-Internal-Secret: $HEALTH_SECRET" http://localhost:8004/health 2>/dev/null | grep -q 'ok'; then
     echo -e "  ${GREEN}✓ Collab server:${NC} ws://localhost:8003 (internal :8004, tracking :8005)"
 else
     echo -e "  ${RED}✗ Collab server failed${NC} — check /tmp/collab-8003.log"
