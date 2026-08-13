@@ -16,6 +16,9 @@ describe('static SPA serving', () => {
     fs.writeFileSync(path.join(dir, 'assets', 'index.html'), '<html>app shell</html>');
     fs.writeFileSync(path.join(dir, 'assets', 'app.js'), 'console.log(1);');
     fs.writeFileSync(path.join(dir, 'assets', 'style.css'), 'body{}');
+    fs.writeFileSync(path.join(dir, 'sw.js'), 'self.skipWaiting();');
+    fs.writeFileSync(path.join(dir, 'manifest.webmanifest'), JSON.stringify({ name: 'Assignment Manager', short_name: 'Assignment', start_url: '/', display: 'standalone' }));
+    fs.writeFileSync(path.join(dir, 'icon-192.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
     api = await startApi({ staticDir: dir });
   });
 
@@ -49,5 +52,24 @@ describe('static SPA serving', () => {
     const res = await fetch(`http://127.0.0.1:${api.port}/assets/../../etc/passwd`);
     expect(res.status).toBe(200);
     expect(await res.text()).toContain('app shell');
+  });
+
+  it('serves root-level PWA files with correct types and SW scope header', async () => {
+    const swRes = await fetch(`http://127.0.0.1:${api.port}/sw.js`);
+    expect(swRes.status).toBe(200);
+    expect(swRes.headers.get('content-type')).toContain('javascript');
+    expect(swRes.headers.get('service-worker-allowed')).toBe('/');
+    expect(await swRes.text()).toContain('self.skipWaiting');
+
+    const manifestRes = await fetch(`http://127.0.0.1:${api.port}/manifest.webmanifest`);
+    expect(manifestRes.status).toBe(200);
+    expect(manifestRes.headers.get('content-type')).toBe('application/manifest+json');
+    const manifest = await manifestRes.json();
+    expect(manifest.name).toBe('Assignment Manager');
+    expect(manifest.display).toBe('standalone');
+
+    const iconRes = await fetch(`http://127.0.0.1:${api.port}/icon-192.png`);
+    expect(iconRes.status).toBe(200);
+    expect(iconRes.headers.get('content-type')).toContain('image/png');
   });
 });

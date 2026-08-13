@@ -11,6 +11,7 @@ const MIME = {
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json',
+  '.webmanifest': 'application/manifest+json',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -19,6 +20,18 @@ const MIME = {
   '.woff2': 'font/woff2',
   '.map': 'application/json',
 };
+
+// Root-level files the SPA host also serves (PWA). Whitelisted basenames
+// only; join(publicDir, basename) with the single-segment guard keeps the
+// lookup path-safe. The service worker gets an explicit scope of "/" so it
+// can intercept navigations across the whole app.
+const SPA_ROOT_FILES = new Set([
+  'sw.js',
+  'manifest.webmanifest',
+  'icon-192.png',
+  'icon-512.png',
+  'icon-maskable-512.png',
+]);
 
 // createApiServer({ port, config, staticDir }) → Promise<{ port, close() }>
 // config: { db, jwtSecret, internalSecret, corsOrigin, analyzerUrl, collabUrl }
@@ -125,8 +138,9 @@ export function createApiServer({ port, config, staticDir = null }) {
         if (params) { matched = { r, params }; break; }
       }
       if (!matched) {
-        // Non-API paths are the SPA: serve /assets/* statically, fall back
-        // to the shell for client-side routes.
+        // Non-API paths are the SPA: serve /assets/* statically, serve the
+        // whitelisted root-level PWA files from public/, and fall back to
+        // the shell for client-side routes.
         if (!urlPath.startsWith('/api/') && req.method === 'GET') {
           if (urlPath.startsWith('/assets/')) {
             const file = nodePath.normalize(nodePath.join(publicDir, urlPath));
@@ -135,6 +149,20 @@ export function createApiServer({ port, config, staticDir = null }) {
               return fs.readFile(file, (err, data) => {
                 if (err) return serveSpa(res);
                 res.writeHead(200, { 'Content-Type': type });
+                res.end(data);
+              });
+            }
+          }
+          // Single-segment path → could be a root-level PWA file.
+          const base = urlPath.replace(/^\//, ''); // strip leading '/'
+          if (!base.includes('/') && SPA_ROOT_FILES.has(base)) {
+            const file = nodePath.join(publicDir, base);
+            if (fs.existsSync(file) && fs.statSync(file).isFile()) {
+              const headers = { 'Content-Type': MIME[nodePath.extname(file)] || 'application/octet-stream' };
+              if (base === 'sw.js') headers['Service-Worker-Allowed'] = '/';
+              return fs.readFile(file, (err, data) => {
+                if (err) return serveSpa(res);
+                res.writeHead(200, headers);
                 res.end(data);
               });
             }
