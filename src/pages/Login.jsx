@@ -81,10 +81,10 @@ export default function Login() {
         </form>
         <div className="text-center text-sm mt-4 space-y-1">
           <p className="text-gray-500">
-            <Link to="/forgot-password" className="text-primary-600 hover:underline">Forgot your password?</Link>
+            <Link to="/forgot-password" className="text-primary-600 underline underline-offset-2">Forgot your password?</Link>
           </p>
           <p className="text-gray-500">
-            Don't have an account? <Link to="/register" className="text-primary-600 hover:underline">Register</Link>
+            Don't have an account? <Link to="/register" className="text-primary-600 underline underline-offset-2">Register</Link>
           </p>
         </div>
       </div>

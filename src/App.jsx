@@ -14,6 +14,7 @@ import Review from './pages/Review';
 import GroupWork from './pages/GroupWork';
 import GroupEditor from './pages/GroupEditor';
 import NotFound from './pages/NotFound';
+import Landing from './pages/Landing';
 
 function ProtectedRoute({ children }) {
   const { token, loading } = useContext(AuthContext);
@@ -46,7 +47,7 @@ export default function App() {
           <Route path="/group/:id" element={<ProtectedRoute><Layout><GroupWork /></Layout></ProtectedRoute>} />
           <Route path="/group/:groupId/edit" element={<ProtectedRoute><Layout><GroupEditor /></Layout></ProtectedRoute>} />
           <Route path="/join/:code" element={<ProtectedRoute><GroupWork /></ProtectedRoute>} />
-          <Route path="/" element={<Navigate to="/dashboard" />} />
+          <Route path="/" element={<Landing />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AuthProvider>
