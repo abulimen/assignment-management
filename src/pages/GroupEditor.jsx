@@ -145,10 +145,10 @@ export default function GroupEditor() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
           <Link to={`/group/${group?.assignment_id || ''}`}
-            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+            className="inline-flex items-center gap-1 min-h-11 text-sm text-gray-500 hover:text-gray-700">
             <ArrowLeft className="w-4 h-4" /> Group
           </Link>
           <h1 className="text-lg font-semibold">{group?.name || 'Group document'}</h1>
@@ -158,9 +158,9 @@ export default function GroupEditor() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 min-h-11 text-xs">
           {connStatus === 'connected' ? (
-            <span className="flex items-center gap-1 text-green-600"><Wifi className="w-3.5 h-3.5" /> Live</span>
+            <span className="flex items-center gap-1 text-green-700"><Wifi className="w-3.5 h-3.5" /> Live</span>
           ) : (
             <span className="flex items-center gap-1 text-gray-400"><WifiOff className="w-3.5 h-3.5" /> {connStatus}</span>
           )}
@@ -168,7 +168,7 @@ export default function GroupEditor() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_250px] gap-4 items-start">
-        <div>
+        <div className="min-w-0">
           {collab && anchorId != null ? (
             <Editor
               submissionId={anchorId}
@@ -214,18 +214,18 @@ export default function GroupEditor() {
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Submit</h3>
               {summary.allDone ? (
                 <button onClick={() => setSubmitDialog('normal')}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+                  className="w-full flex items-center justify-center gap-1.5 min-h-11 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
                   <Send className="w-4 h-4" /> Submit — Everyone Complete
                 </button>
               ) : (
                 <>
                   <button disabled
-                    className="w-full px-3 py-2 text-sm bg-gray-100 text-gray-400 rounded-lg cursor-not-allowed mb-2"
+                    className="w-full min-h-11 px-3 py-2 text-sm bg-gray-100 text-gray-400 rounded-lg cursor-not-allowed mb-2"
                     title="Waiting for all members to mark Done">
                     Submit ({summary.doneCount}/{summary.total} complete)
                   </button>
                   <button onClick={() => setSubmitDialog('override')}
-                    className="w-full px-3 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600">
+                    className="w-full min-h-11 px-3 py-2 text-sm bg-amber-700 text-white rounded-lg hover:bg-amber-800">
                     Submit Anyway as Leader
                   </button>
                 </>

@@ -2,7 +2,7 @@ import { Users, CheckCircle2, Circle, Clock } from 'lucide-react';
 import { STATUS_LABEL, statusSummary } from '../utils/groupStatus';
 
 const STATUS_STYLE = {
-  not_started: 'bg-gray-100 text-gray-500',
+  not_started: 'bg-gray-100 text-gray-600',
   in_progress: 'bg-amber-100 text-amber-700',
   done: 'bg-green-100 text-green-700',
 };
@@ -25,7 +25,7 @@ export default function GroupStatusPanel({ group, currentUserId, onAction, busy 
           <Users className="w-4 h-4 text-gray-400" />
           <h3 className="text-sm font-semibold text-gray-700">Members ({summary.total})</h3>
         </div>
-        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${summary.allDone ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${summary.allDone ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
           {summary.doneCount}/{summary.total} complete
         </span>
       </div>
@@ -49,12 +49,12 @@ export default function GroupStatusPanel({ group, currentUserId, onAction, busy 
               {mine && !frozen && (
                 status === 'done' ? (
                   <button onClick={() => onAction('reopen')} disabled={busy}
-                    className="text-xs px-2 py-1 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+                    className="text-xs min-h-11 min-w-11 px-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50">
                     Reopen
                   </button>
                 ) : (
                   <button onClick={() => onAction('done')} disabled={busy}
-                    className="text-xs px-2 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
+                    className="text-xs min-h-11 min-w-11 px-3 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50">
                     Mark Done
                   </button>
                 )
@@ -64,7 +64,7 @@ export default function GroupStatusPanel({ group, currentUserId, onAction, busy 
         })}
       </div>
 
-      <p className="text-xs text-gray-400 mt-3">
+      <p className="text-xs text-gray-600 mt-3">
         Mark yourself Done when your contribution is finished. Editing afterwards reopens you automatically.
       </p>
     </div>

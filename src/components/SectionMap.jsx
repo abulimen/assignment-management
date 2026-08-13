@@ -47,11 +47,11 @@ export default function SectionMap({ editor, presence = {}, onAddSection }) {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <ListTree className="w-4 h-4 text-gray-400" />
-          <h3 className="text-sm font-semibold text-gray-700">Sections</h3>
+          <h2 className="text-sm font-semibold text-gray-700">Sections</h2>
         </div>
         {onAddSection && (
           <button onClick={onAddSection} title="Add a section"
-            className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium">
+            className="inline-flex items-center justify-center gap-1 min-h-11 min-w-11 px-2 text-xs text-primary-600 hover:text-primary-700 font-medium">
             <Plus className="w-3.5 h-3.5" /> Add
           </button>
         )}
@@ -61,10 +61,10 @@ export default function SectionMap({ editor, presence = {}, onAddSection }) {
           const users = presence[s.id] || [];
           return (
             <button key={s.id} onClick={() => jumpTo(s.id)}
-              className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
+              className="w-full flex flex-col justify-center text-left px-2 min-h-11 rounded-lg hover:bg-gray-50 transition-colors">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm text-gray-700 truncate">
-                  {i + 1}. {s.title || <span className="text-gray-400">Untitled section</span>}
+                  {i + 1}. {s.title || <span className="text-gray-600">Untitled section</span>}
                 </span>
                 {users.length > 0 && (
                   <span className="flex items-center gap-1 flex-shrink-0">

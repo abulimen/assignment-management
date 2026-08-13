@@ -93,25 +93,25 @@ export default function Submission() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
           <h1 className="text-xl font-bold">{assignment?.title}</h1>
           {submission && (
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="text-sm text-gray-600 mt-1">
               Status: <span className="font-medium text-gray-600">{submission.status}</span>
-              {savedMsg && <span className="text-green-500 ml-2">{savedMsg}</span>}
+              {savedMsg && <span className="text-green-700 ml-2">{savedMsg}</span>}
             </p>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {submission && submission.status !== 'submitted' && (
             <>
               <button onClick={handleSave} disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
+                className="flex items-center gap-2 min-h-11 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
                 <Save className="w-4 h-4" /> Save Draft
               </button>
               <button onClick={handleSubmit} disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50">
+                className="flex items-center gap-2 min-h-11 px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50">
                 <Send className="w-4 h-4" /> Submit
               </button>
             </>
