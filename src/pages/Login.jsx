@@ -33,7 +33,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
+    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <BookOpen className="w-12 h-12 text-primary-600 mx-auto mb-4" />
@@ -42,7 +42,7 @@ export default function Login() {
         </div>
         <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
           {error && (
-            <div role="alert" className="flex items-start gap-2 bg-red-50 text-red-600 text-sm rounded-lg p-3">
+            <div role="alert" className="flex items-start gap-2 bg-red-50 text-red-700 text-sm rounded-lg p-3">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
@@ -81,13 +81,13 @@ export default function Login() {
         </form>
         <div className="text-center text-sm mt-4 space-y-1">
           <p className="text-gray-500">
-            <Link to="/forgot-password" className="text-primary-600 underline underline-offset-2">Forgot your password?</Link>
+            <Link to="/forgot-password" className="inline-flex items-center min-h-11 px-1 text-primary-600 underline underline-offset-4">Forgot your password?</Link>
           </p>
           <p className="text-gray-500">
-            Don't have an account? <Link to="/register" className="text-primary-600 underline underline-offset-2">Register</Link>
+            Don't have an account? <Link to="/register" className="inline-flex items-center min-h-11 px-1 text-primary-600 underline underline-offset-4">Register</Link>
           </p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
 import { STATUS_LABEL } from '../utils/groupStatus';
-import { Users, Plus, Link as LinkIcon, Copy, UserPlus, FileText, Lock, CheckCircle2, Clock, Circle } from 'lucide-react';
+import { ArrowLeft, Users, Plus, Link as LinkIcon, Copy, UserPlus, FileText, Lock, CheckCircle2, Clock, Circle } from 'lucide-react';
 
 const STATUS_STYLE = {
-  not_started: 'bg-gray-100 text-gray-500',
+  not_started: 'bg-gray-100 text-gray-600',
   in_progress: 'bg-amber-100 text-amber-700',
   done: 'bg-green-100 text-green-700',
 };
@@ -96,11 +96,17 @@ export default function GroupWork() {
 
   // No group yet — show create/join options
   if (!group) {
-    return (
-      <div>
+    const content = (
+      <>
+        {!id && (
+          <Link to="/dashboard"
+            className="inline-flex items-center gap-1 min-h-11 mb-4 text-sm text-gray-500 hover:text-gray-700">
+            <ArrowLeft className="w-4 h-4" /> Back to dashboard
+          </Link>
+        )}
         <h1 className="text-2xl font-bold mb-6">Group Work</h1>
         <div className="grid md:grid-cols-2 gap-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 min-w-0">
             <div className="flex items-center gap-2 mb-3">
               <Plus className="w-5 h-5 text-primary-600" />
               <h2 className="font-semibold">Create a Group</h2>
@@ -108,31 +114,41 @@ export default function GroupWork() {
             <p className="text-sm text-gray-500 mb-4">Create a new group and become the leader. You'll get an invite link to share with teammates.</p>
             <input type="text" value={groupName} onChange={e => setGroupName(e.target.value)}
               placeholder="Group name (e.g. Team Alpha)"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm mb-3" />
+              className="w-full min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none mb-3" />
             <button onClick={handleCreateGroup}
-              className="w-full bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700">
+              className="w-full min-h-11 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
               Create Group
             </button>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 min-w-0">
             <div className="flex items-center gap-2 mb-3">
-              <UserPlus className="w-5 h-5 text-green-600" />
+              <UserPlus className="w-5 h-5 text-green-700" />
               <h2 className="font-semibold">Join a Group</h2>
             </div>
             <p className="text-sm text-gray-500 mb-4">Have an invite code from a teammate? Enter it here.</p>
             <div className="flex gap-2">
               <input type="text" value={joinCode} onChange={e => setJoinCode(e.target.value)} placeholder="ABC123"
-                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase" />
+                className="flex-1 min-w-0 min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" />
               <button onClick={() => handleJoin()} disabled={!joinCode}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
+                className="bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-800 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 min-h-11 shrink-0">
                 Join
               </button>
             </div>
           </div>
         </div>
-        {error && <div className="bg-red-50 text-red-600 text-sm rounded-lg p-3 mt-4">{error}</div>}
-      </div>
+        {error && <div className="bg-red-50 text-red-700 text-sm rounded-lg p-3 mt-4">{error}</div>}
+      </>
     );
+    // /join/:code renders without the app Layout — provide the main landmark
+    // and page chrome so the page is never a dead end or bare shell.
+    if (!id) {
+      return (
+        <main className="min-h-screen bg-gray-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{content}</div>
+        </main>
+      );
+    }
+    return <div>{content}</div>;
   }
 
   // Has a group — realtime shared document
@@ -141,30 +157,30 @@ export default function GroupWork() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold">{group.name}</h1>
-          <p className="text-sm text-gray-400 mt-1">{group.assignment_title}</p>
+          <p className="text-sm text-gray-600 mt-1">{group.assignment_title}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button onClick={copyInviteLink}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
+            className="flex items-center gap-1.5 min-h-11 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
             {copied ? <Copy className="w-4 h-4 text-green-600" /> : <LinkIcon className="w-4 h-4" />}
             {copied ? 'Copied!' : 'Invite Link'}
           </button>
         </div>
       </div>
 
-      {error && <div className="bg-red-50 text-red-600 text-sm rounded-lg p-3 mb-4">{error}</div>}
+      {error && <div className="bg-red-50 text-red-700 text-sm rounded-lg p-3 mb-4">{error}</div>}
 
       {/* Members + live statuses */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-gray-400" />
-            <h3 className="text-sm font-semibold text-gray-700">Members ({group.members?.length || 0})</h3>
+            <h2 className="text-sm font-semibold text-gray-700">Members ({group.members?.length || 0})</h2>
           </div>
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${doneCount === (group.members?.length || 0) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${doneCount === (group.members?.length || 0) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
             {doneCount}/{group.members?.length || 0} complete
           </span>
         </div>
@@ -173,17 +189,17 @@ export default function GroupWork() {
             const status = m.status || 'not_started';
             const Icon = STATUS_ICON[status] || Circle;
             return (
-              <div key={m.student_id} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-medium">
+              <div key={m.student_id} className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-medium shrink-0">
                     {m.student_name?.charAt(0)}
                   </div>
-                  <div>
-                    <p className="text-sm font-medium">{m.student_name}</p>
-                    <p className="text-xs text-gray-400">{m.email}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{m.student_name}</p>
+                    <p className="text-xs text-gray-600 truncate">{m.email}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   {m.is_leader == 1 && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">Leader</span>}
                   <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${STATUS_STYLE[status]}`}>
                     <Icon className="w-3 h-3" /> {STATUS_LABEL[status]}
@@ -197,20 +213,20 @@ export default function GroupWork() {
 
       {/* Shared realtime editor */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0">
             <FileText className="w-4 h-4 text-gray-400" />
-            <h3 className="text-sm font-semibold text-gray-700">
+            <h2 className="text-sm font-semibold text-gray-700">
               {frozen ? 'Submitted Document' : 'Shared Document'}
-            </h3>
+            </h2>
           </div>
           <button onClick={() => navigate(`/group/${group.id}/edit`)}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+            className="flex items-center gap-1.5 min-h-11 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
             {frozen ? <Lock className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
             {frozen ? 'View Sealed Document' : 'Open Shared Editor'}
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-2">
+        <p className="text-xs text-gray-600 mt-2">
           {frozen
             ? 'This group has submitted. The document is sealed and read-only.'
             : 'Everyone in the group works on one live document together. Mark yourself Done when your contribution is finished.'}
@@ -220,10 +236,10 @@ export default function GroupWork() {
       {/* After submission: link to review (leader/lecturer path) */}
       {frozen && group.merged_submission_id && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-sm font-medium text-green-800">Submitted — ready for review.</p>
             <button onClick={() => navigate(`/review/${group.merged_submission_id}`)}
-              className="px-3 py-2 text-sm border border-green-300 text-green-800 rounded-lg hover:bg-green-100">
+              className="min-h-11 px-3 py-2 text-sm border border-green-700 text-green-800 rounded-lg hover:bg-green-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
               Open Review
             </button>
           </div>

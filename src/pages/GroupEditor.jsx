@@ -162,7 +162,7 @@ export default function GroupEditor() {
           {connStatus === 'connected' ? (
             <span className="flex items-center gap-1 text-green-700"><Wifi className="w-3.5 h-3.5" /> Live</span>
           ) : (
-            <span className="flex items-center gap-1 text-gray-400"><WifiOff className="w-3.5 h-3.5" /> {connStatus}</span>
+            <span className="flex items-center gap-1 text-gray-600"><WifiOff className="w-3.5 h-3.5" /> {connStatus}</span>
           )}
         </div>
       </div>
@@ -178,7 +178,7 @@ export default function GroupEditor() {
               onReady={setEditor}
             />
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400 text-sm">
+            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-600 text-sm">
               Connecting to the shared document...
             </div>
           )}
