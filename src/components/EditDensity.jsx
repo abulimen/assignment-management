@@ -31,11 +31,14 @@ export default function EditDensity({ events, totalTimeMs }) {
   }, [events]);
 
   if (!buckets.length) return null;
+  const peakCount = buckets.reduce((m, b) => Math.max(m, b.count), 0);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
       <h3 className="text-sm font-semibold text-gray-700 mb-3">Activity Timeline</h3>
-      <div className="flex items-end gap-0.5 h-24">
+      <div className="flex items-end gap-0.5 h-24" role="img"
+        aria-label={`Bar chart of edit volume over time. ${buckets.length} time buckets; peak ${peakCount} events in a single bucket.`}>
+        <span className="sr-only">Peak {peakCount} edits in one bucket; {buckets[buckets.length - 1]?.count} in the last.</span>
         {buckets.map((b, i) => (
           <div key={i} className="flex-1 relative group" title={`${b.count} events`}>
             <div
@@ -48,7 +51,7 @@ export default function EditDensity({ events, totalTimeMs }) {
           </div>
         ))}
       </div>
-      <div className="flex justify-between text-xs text-gray-400 mt-1">
+      <div className="flex justify-between text-xs text-gray-600 mt-1">
         <span>{buckets[0] ? new Date(buckets[0].time * 1000).toLocaleTimeString() : ''}</span>
         <span>{buckets[buckets.length - 1] ? new Date(buckets[buckets.length - 1].time * 1000).toLocaleTimeString() : ''}</span>
       </div>

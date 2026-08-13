@@ -1,0 +1,129 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { api } from '../api';
+import Review from './Review';
+
+// jsdom has no ResizeObserver; recharts' ResponsiveContainer polls the
+// browser API when present (it also falls back), but a stub keeps the group
+// chart clean when the fold is opened under test.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
+vi.mock('../api', () => ({ api: { get: vi.fn() } }));
+// GroupFinalDoc mounts the full TipTap editor + tracker; a stub keeps the
+// fold test focused and free of websocket noise.
+vi.mock('../components/GroupFinalDoc', () => ({ default: () => <div>group-final-doc</div> }));
+
+const hourly = Array.from({ length: 24 }, (_, h) => ({ h, n: 0 }));
+const insights = {
+  11: {
+    summary: { typed_chars: 1200, pasted_chars: 0, sessions: 2, active_seconds: 900 },
+    pastes: [],
+    activity: { hourly, daily: [] },
+  },
+  12: {
+    summary: { typed_chars: 800, pasted_chars: 0, sessions: 1, active_seconds: 600 },
+    pastes: [],
+    activity: { hourly, daily: [] },
+  },
+};
+
+const sections = [
+  { student_id: 11, submission_id: 101, student_name: 'Alice', title: 'Intro', word_count: 300, keystroke_count: 4000, total_time_ms: 3_000_000, paste_ratio: 0.1, surviving_chars: 900 },
+  { student_id: 12, submission_id: 102, student_name: 'Bob', title: 'Body', word_count: 250, keystroke_count: 3000, total_time_ms: 2_000_000, paste_ratio: 0.05, surviving_chars: 700 },
+];
+
+const groupPlayback = {
+  id: 9,
+  content: JSON.stringify({ type: 'doc', content: [{ type: 'paragraph' }] }),
+  realtime: true,
+  sections,
+  insights,
+};
+
+const individualPlayback = {
+  id: 1,
+  content: JSON.stringify({ type: 'doc', content: [{ type: 'paragraph' }] }),
+  events: [],
+  stats: { word_count: 100 },
+};
+
+const verdict = {
+  overall_score: 82,
+  verdict: 'Likely Original',
+  confidence: 'high',
+  needs_review: false,
+  decision_record: {
+    summary: 'This looks like genuine, original writing — you can still inspect the evidence yourself.',
+    evidence_for_originality: [],
+    concerns: [],
+    flip_conditions: [],
+  },
+  factors: {},
+};
+
+function renderReview() {
+  return render(
+    <MemoryRouter initialEntries={['/review/9']}>
+      <Routes>
+        <Route path="/review/:id" element={<Review />} />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
+describe('Review (individual)', () => {
+  beforeEach(() => {
+    api.get.mockReset();
+    api.get.mockImplementation((path) =>
+      path.endsWith('/playback') ? Promise.resolve(individualPlayback) : Promise.resolve(verdict),
+    );
+  });
+
+  it('renders the verdict card and keeps detailed evidence folded by default', async () => {
+    renderReview();
+    const fold = await screen.findByRole('button', { name: /show detailed evidence/i });
+    expect(fold).toHaveAttribute('aria-expanded', 'false');
+    expect(fold).toHaveAttribute('aria-controls');
+    expect(screen.getByText('Submission Review')).toBeInTheDocument();
+    expect(screen.getByText(/no automated verdict/)).toBeInTheDocument();
+    expect(screen.queryByText('Paste Analysis')).not.toBeInTheDocument();
+
+    fireEvent.click(fold);
+    expect(await screen.findByRole('button', { name: /hide detailed evidence/i })).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByText('Paste Analysis')).toBeInTheDocument();
+  });
+});
+
+describe('Review (group)', () => {
+  beforeEach(() => {
+    api.get.mockReset();
+    api.get.mockImplementation((path) =>
+      path.endsWith('/playback') ? Promise.resolve(groupPlayback) : Promise.resolve(verdict),
+    );
+  });
+
+  it('shows the contribution summary and finally the document, with deep evidence behind the group fold', async () => {
+    renderReview();
+    // At-a-glance answer + final document are visible without any drilling.
+    expect(await screen.findByText('Contribution X-Ray')).toBeInTheDocument();
+    expect(screen.getByText('group-final-doc')).toBeInTheDocument();
+
+    const fold = await screen.findByRole('button', { name: /show detailed evidence/i });
+    expect(fold).toHaveAttribute('aria-expanded', 'false');
+    // Deep evidence is hidden initially.
+    expect(screen.queryByText('Member workload')).not.toBeInTheDocument();
+    expect(screen.queryByText('Copied text (')).not.toBeInTheDocument();
+
+    fireEvent.click(fold);
+    expect(await screen.findByText('Member workload')).toBeInTheDocument();
+    expect(await screen.findByText('Edits per member')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /hide detailed evidence/i })).toHaveAttribute('aria-expanded', 'true');
+  });
+});

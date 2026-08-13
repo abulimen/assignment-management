@@ -36,36 +36,35 @@ export default function EditTimeline({ events }) {
         <h3 className="text-sm font-semibold text-gray-700">Edit Activity Timeline</h3>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setView('daily')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
-              view === 'daily' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'
-            }`}
-          >
+            onClick={() => setView('daily')} aria-pressed={view === 'daily'}
+            className={`flex items-center gap-1.5 px-3 min-h-11 text-xs rounded-lg font-medium transition-colors ${view === 'daily' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600`}>
             <Calendar className="w-3.5 h-3.5" /> Daily
           </button>
           <button
-            onClick={() => setView('hourly')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
-              view === 'hourly' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'
-            }`}
-          >
+            onClick={() => setView('hourly')} aria-pressed={view === 'hourly'}
+            className={`flex items-center gap-1.5 px-3 min-h-11 text-xs rounded-lg font-medium transition-colors ${view === 'hourly' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600`}>
             <Clock className="w-3.5 h-3.5" /> Hourly
           </button>
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={220}>
+      <div role="img"
+        aria-label={`Bar chart of edit counts by ${view === 'daily' ? 'day' : 'hour'}. Peak ${maxCount} edits; ${data.length} ${view === 'daily' ? 'days' : 'hours'} active.`}>
+        <p className="sr-only">
+          Peak {maxCount} edits; {data.length} {view === 'daily' ? 'days' : 'hours'} active
+        </p>
+        <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 11, fill: '#9ca3af' }}
+            tick={{ fontSize: 11, fill: '#6b7280' }}
             interval={view === 'hourly' ? 1 : 0}
             angle={view === 'hourly' ? -45 : 0}
             textAnchor={view === 'hourly' ? 'end' : 'middle'}
             height={view === 'hourly' ? 50 : 30}
           />
-          <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} allowDecimals={false} />
+          <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} allowDecimals={false} />
           <Tooltip
             contentStyle={{
               backgroundColor: '#fff',
@@ -82,8 +81,9 @@ export default function EditTimeline({ events }) {
           </Bar>
         </BarChart>
       </ResponsiveContainer>
+      </div>
 
-      <div className="mt-3 flex items-center gap-4 text-xs text-gray-400">
+      <div className="mt-3 flex items-center gap-4 text-xs text-gray-600">
         <span>Peak: {maxCount} edits{view === 'daily' ? ' on busiest day' : ' in busiest hour'}</span>
         <span>·</span>
         <span>{data.length} {view === 'daily' ? 'days' : 'hours'} active</span>

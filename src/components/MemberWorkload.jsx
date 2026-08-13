@@ -15,10 +15,13 @@ export default function MemberWorkload({ insights, members }) {
         <h3 className="font-semibold">Member workload</h3>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" role="region" aria-label="Member workload table" tabIndex={0}>
         <table className="w-full text-sm">
+          <caption className="sr-only">
+            Member workload: typed characters, pasted characters, sessions, and active time for each member.
+          </caption>
           <thead>
-            <tr className="text-left text-xs text-gray-400 border-b border-gray-200">
+            <tr className="text-left text-xs text-gray-600 border-b border-gray-200">
               <th className="py-2 pr-3 font-medium">Member</th>
               <th className="py-2 px-3 font-medium">Typed</th>
               <th className="py-2 px-3 font-medium">Pasted</th>
@@ -64,16 +67,20 @@ export default function MemberWorkload({ insights, members }) {
       </div>
 
       <h4 className="text-sm font-semibold text-gray-700 mt-5 mb-2">When each member worked</h4>
-      <div className="space-y-1.5 overflow-x-auto">
+      <p className="sr-only">
+        Activity heatmap: how many edits each member made in each hour of the day. Columns are hours 00 to 23; each row is one member.
+      </p>
+      <div className="space-y-1.5 overflow-x-auto" role="img"
+        aria-label="Activity heatmap by hour for each member">
         {heat.members.map((name, i) => (
           <div key={name} className="flex items-center gap-2">
-            <span className="w-24 text-xs text-gray-500 flex-shrink-0 truncate">{name}</span>
-            <div className="flex gap-[3px]">
+            <span className="w-20 text-xs text-gray-500 flex-shrink-0 truncate">{name}</span>
+            <div className="flex gap-[1px]">
               {heat.cells[i].map((n, h) => {
                 const alpha = n === 0 ? 0.05 : 0.2 + 0.75 * (n / Math.max(heat.max, 1));
                 return (
                   <div key={h} title={`${name} — ${String(h).padStart(2, '0')}:00 · ${n} edit${n === 1 ? '' : 's'}`}
-                    className="w-[18px] h-[18px] rounded-[3px]"
+                    className="w-3 h-3 rounded-[2px]"
                     style={{ backgroundColor: `oklch(0.45 0.12 265 / ${alpha})` }} />
                 );
               })}
@@ -81,8 +88,8 @@ export default function MemberWorkload({ insights, members }) {
           </div>
         ))}
         <div className="flex items-center gap-2 mt-1">
-          <span className="w-24 flex-shrink-0" />
-          <div className="flex gap-[3px] text-[9px] text-gray-400 w-full justify-between pr-1">
+          <span className="w-20 flex-shrink-0" />
+          <div className="flex gap-[1px] text-[9px] text-gray-500 w-full justify-between pr-1">
             <span>00</span><span>06</span><span>12</span><span>18</span><span>23</span>
           </div>
         </div>

@@ -33,7 +33,7 @@ export default function VerdictPanel({ verdict, loading }) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
         <Header />
-        <p className="text-gray-400 text-center py-6">
+        <p className="text-gray-600 text-center py-6">
           {verdict?.error || 'No analysis available yet.'}
         </p>
       </div>
@@ -56,7 +56,7 @@ export default function VerdictPanel({ verdict, loading }) {
             {needsReview && <AlertTriangle className="w-3.5 h-3.5" />}
             {verdict.verdict}
           </span>
-          <p className="text-xs text-gray-400 mt-1 capitalize">Confidence: {verdict.confidence}</p>
+          <p className="text-xs text-gray-600 mt-1 capitalize">Confidence: {verdict.confidence}</p>
         </div>
       </div>
 
@@ -66,14 +66,16 @@ export default function VerdictPanel({ verdict, loading }) {
       {/* Progressive disclosure */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 mt-4"
+        aria-expanded={open}
+        aria-controls="verdict-details"
+        className="flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 mt-4 min-h-11 px-3 -ml-3 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
       >
         {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         {open ? 'Hide details' : 'Why this verdict'}
       </button>
 
       {open && (
-        <div className="mt-4 pt-4 border-t border-gray-100">
+        <div id="verdict-details" className="mt-4 pt-4 border-t border-gray-100">
           <DecisionRecord record={verdict.decision_record} factors={verdict.factors} />
         </div>
       )}

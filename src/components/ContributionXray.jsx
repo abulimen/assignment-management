@@ -17,7 +17,7 @@ const scoreBadge = s => s >= 80 ? 'bg-green-100 text-green-700'
   : s >= 60 ? 'bg-yellow-100 text-yellow-700'
   : s >= 40 ? 'bg-orange-100 text-orange-700'
   : 'bg-red-100 text-red-700';
-const scoreLabel = s => s >= 80 ? 'Original' : s >= 60 ? 'Likely original' : s >= 40 ? 'Needs review' : 'High risk';
+const scoreLabel = s => s >= 80 ? 'Original' : s >= 60 ? 'Likely original' : s >= 40 ? 'Needs review' : 'Below threshold';
 
 function FactorRow({ factor }) {
   const bar = factor.score >= 80 ? 'bg-green-500' : factor.score >= 60 ? 'bg-yellow-500' : factor.score >= 40 ? 'bg-orange-500' : 'bg-red-500';
@@ -94,7 +94,7 @@ export default function ContributionXray({ sections }) {
         <Users className="w-5 h-5 text-primary-600" />
         <h2 className="text-lg font-semibold">Contribution X-Ray</h2>
       </div>
-      <p className="text-xs text-gray-400 mb-4">Click a member to inspect their originality analysis.</p>
+      <p className="text-xs text-gray-600 mb-4">Click a member to inspect their originality analysis.</p>
 
       {/* Group summary */}
       {avgScore !== null && (
@@ -104,11 +104,11 @@ export default function ContributionXray({ sections }) {
           </span>
           {flagged.length > 0 && (
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-full bg-red-50 text-red-700 border border-red-200">
-              <ShieldAlert className="w-4 h-4" /> Flagged: {flagged.join(', ')}
+              <ShieldAlert className="w-4 h-4" /> Below threshold: {flagged.join(', ')}
             </span>
           )}
           {flagged.length === 0 && (
-            <span className="text-xs text-gray-400">No member below the 50-point threshold.</span>
+            <span className="text-xs text-gray-600">No member below the 50-point threshold.</span>
           )}
         </div>
       )}
@@ -148,11 +148,11 @@ export default function ContributionXray({ sections }) {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium">{c.name}</span>
                   <span className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400">{pct.toFixed(1)}%</span>
-                    {isOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                    <span className="text-xs text-gray-600">{pct.toFixed(1)}%</span>
+                    {isOpen ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
                   </span>
                 </div>
-                <p className="text-xs text-gray-400 mb-2">{c.title}</p>
+                <p className="text-xs text-gray-600 mb-2">{c.title}</p>
                 {c.survivingChars != null && (
                   <p className="text-xs text-gray-600 mb-2">
                     <strong>{pct.toFixed(1)}%</strong> of the final text survived ({c.survivingChars} chars)
@@ -171,7 +171,7 @@ export default function ContributionXray({ sections }) {
                     <span className="text-xs text-gray-500">Paste: {pastePct}</span>
                   </div>
                 ) : (
-                  <span className="text-xs text-gray-400">Originality: analyser unavailable</span>
+                  <span className="text-xs text-gray-600">Originality: analyser unavailable</span>
                 )}
               </button>
 

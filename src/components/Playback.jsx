@@ -449,54 +449,65 @@ export default function Playback({ events, finalContent }) {
   const hasEvents = stepEvents.length > 0;
 
   if (!hasEvents && !hasFinal) {
-    return <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">No data to display.</div>;
+    return <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-600">No data to display.</div>;
   }
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div className="border-b border-gray-200 bg-gray-50 p-3">
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
           <button onClick={() => setMode('playback')} disabled={!hasEvents}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${mode === 'playback' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'} ${!hasEvents ? 'opacity-40 cursor-not-allowed' : ''}`}>
+            className={`flex items-center gap-1.5 px-4 min-h-11 text-sm rounded-lg font-medium transition-colors ${mode === 'playback' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'} ${!hasEvents ? 'opacity-40 cursor-not-allowed' : ''} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600`}>
             <Film className="w-4 h-4" /> Playback
           </button>
           <button onClick={() => setMode('final')} disabled={!hasFinal}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${mode === 'final' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'} ${!hasFinal ? 'opacity-40 cursor-not-allowed' : ''}`}>
+            className={`flex items-center gap-1.5 px-4 min-h-11 text-sm rounded-lg font-medium transition-colors ${mode === 'final' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'} ${!hasFinal ? 'opacity-40 cursor-not-allowed' : ''} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600`}>
             <FileText className="w-4 h-4" /> Final Document
           </button>
         </div>
 
         {mode === 'playback' && hasEvents && (
           <>
-            <div className="flex items-center gap-2 mb-2">
-              <button onClick={() => { setPlaying(false); setCurrentIndex(0); }} className="p-1.5 rounded hover:bg-gray-200 text-gray-600"><SkipBack className="w-4 h-4" /></button>
-              <button onClick={() => setPlaying(!playing)} className="p-1.5 rounded hover:bg-gray-200 text-gray-600">
-                {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              </button>
-              <button onClick={() => { setPlaying(false); setCurrentIndex(stepEvents.length - 1); }} className="p-1.5 rounded hover:bg-gray-200 text-gray-600"><SkipForward className="w-4 h-4" /></button>
-              <div className="flex-1 mx-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-2">
+              <div className="flex items-center gap-1">
+                <button onClick={() => { setPlaying(false); setCurrentIndex(0); }} aria-label="Skip to start"
+                  className="p-1.5 min-h-11 min-w-11 flex items-center justify-center rounded hover:bg-gray-200 text-gray-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
+                  <SkipBack className="w-4 h-4" />
+                </button>
+                <button onClick={() => setPlaying(!playing)} aria-label={playing ? 'Pause playback' : 'Play'}
+                  className="p-1.5 min-h-11 min-w-11 flex items-center justify-center rounded hover:bg-gray-200 text-gray-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
+                  {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                </button>
+                <button onClick={() => { setPlaying(false); setCurrentIndex(stepEvents.length - 1); }} aria-label="Skip to end"
+                  className="p-1.5 min-h-11 min-w-11 flex items-center justify-center rounded hover:bg-gray-200 text-gray-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
+                  <SkipForward className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex flex-1 items-center min-h-11 min-w-[180px]">
                 <input type="range" min={0} max={Math.max(stepEvents.length - 1, 0)} value={currentIndex}
                   onChange={e => { setPlaying(false); setCurrentIndex(parseInt(e.target.value)); }}
-                  className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary-600" />
+                  aria-label="Replay progress"
+                  className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary-600" />
               </div>
               <div className="flex items-center gap-1">
                 {[1, 2, 4].map(s => (
                   <button key={s} onClick={() => setSpeed(s)}
-                    className={`px-2 py-1 text-xs rounded ${speed === s ? 'bg-primary-100 text-primary-700 font-medium' : 'text-gray-500 hover:bg-gray-100'}`}>
+                    className={`px-3 min-h-11 min-w-11 text-xs rounded font-medium ${speed === s ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600`}>
                     {s}x
                   </button>
                 ))}
               </div>
-              <div className="w-px h-5 bg-gray-300 mx-1" />
-              <button onClick={() => setHighlight(h => !h)}
-                className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-medium transition-colors ${highlight ? 'bg-yellow-100 text-yellow-700' : 'text-gray-500 hover:bg-gray-100'}`}>
-                <Highlighter className="w-3.5 h-3.5" />
-                {highlight ? 'On' : 'Off'}
-              </button>
+              <div className="flex items-center gap-1">
+                <div className="w-px h-5 bg-gray-300" />
+                <button onClick={() => setHighlight(h => !h)} aria-pressed={highlight}
+                  className={`flex items-center gap-1 px-3 min-h-11 text-xs rounded font-medium transition-colors ${highlight ? 'bg-yellow-100 text-yellow-700' : 'text-gray-500 hover:bg-gray-100'} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600`}>
+                  <Highlighter className="w-3.5 h-3.5" />
+                  {highlight ? 'On' : 'Off'}
+                </button>
+              </div>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 text-xs text-gray-500">
-                <span>Step {currentIndex + 1} of {stepEvents.length}</span>
+            <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+              <span>Step {currentIndex + 1} of {stepEvents.length}</span>
                 {(() => {
                   const e = stepEvents[currentIndex];
                   if (!e?.occurred_at) return null;
@@ -516,7 +527,6 @@ export default function Playback({ events, finalContent }) {
                     </>
                   );
                 })()}
-              </div>
               {highlight && (
                 <div className="flex items-center gap-3 text-xs">
                   <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-200 border border-green-400" /> Typed</span>

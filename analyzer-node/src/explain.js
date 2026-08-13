@@ -15,14 +15,14 @@ const int = (x) => Math.round(x).toLocaleString();
 export function explainPaste({ externalPastedChars, unmodifiedPasteChars, typedChars }) {
   if (!externalPastedChars) {
     return {
-      narrative: `No external paste detected — the ${int(typedChars)} characters appear to have been typed.`,
-      flip: 'This factor would only change if external paste were detected in the recording.',
+      narrative: `No external paste recorded — the ${int(typedChars)} characters appear to have been typed.`,
+      flip: 'This factor would only change if external paste appeared in the recording.',
     };
   }
   const unmodifiedRatio = unmodifiedPasteChars / Math.max(unmodifiedPasteChars + typedChars, 1);
   if (unmodifiedPasteChars > externalPastedChars * 0.5) {
     return {
-      narrative: `${int(unmodifiedPasteChars)} of ${int(externalPastedChars)} pasted characters remain unmodified (${pct(unmodifiedRatio)} of the text) — a large block of copied content was kept as-is.`,
+      narrative: `${int(unmodifiedPasteChars)} of ${int(externalPastedChars)} pasted characters remain unmodified (${pct(unmodifiedRatio)} of the text) — a large block of pasted text was kept as-is.`,
       flip: 'Would improve if the pasted passages were rewritten in the student’s own words; the more pasted text that gets edited, the lower this concern.',
     };
   }
@@ -44,7 +44,7 @@ export function explainNaturalness({ cv, burstRatio, keystrokeCount }) {
   const cvStr = cv.toFixed(2);
   if (cv < 0.12) {
     return {
-      narrative: `Typing is unnaturally regular (cadence variation ${cvStr}), closer to a machine or transcription than to a person${burstRatio > 0.3 ? ', with long sustained bursts and no thinking pauses' : ''}.`,
+      narrative: `Typing rhythm is extremely consistent (cadence variation ${cvStr}) — steadier than typical human composition${burstRatio > 0.3 ? ', with long sustained bursts and no thinking pauses' : ''}. A steady rhythm can be genuine, so weigh this as one line of evidence, not a conclusion.`,
       flip: 'Would change if the typing showed natural rhythm variation and ordinary pauses between thoughts.',
     };
   }
@@ -56,13 +56,13 @@ export function explainNaturalness({ cv, burstRatio, keystrokeCount }) {
   }
   if (cv <= 1.0) {
     return {
-      narrative: `Typing rhythm is naturally irregular (cadence variation ${cvStr}), consistent with human composition${burstRatio > 0.3 ? ', though some sustained bursts were detected' : ''}.`,
+      narrative: `Typing rhythm is naturally irregular (cadence variation ${cvStr}), consistent with human composition${burstRatio > 0.3 ? ', though some sustained typing bursts were recorded' : ''}.`,
       flip: 'No change needed — this rhythm supports original composition.',
     };
   }
   return {
     narrative: `Typing rhythm is extremely irregular (cadence variation ${cvStr}). This can be genuine bursty writing with long thinking pauses, but unusually extreme variation can also indicate artificial pauses.`,
-    flip: 'Would be reassuring if the long gaps line up with genuine thinking or research; suspicious if they look engineered.',
+    flip: 'Would be reassuring if the long gaps line up with genuine thinking or research; worth a closer look if they look artificially timed.',
   };
 }
 
@@ -171,13 +171,13 @@ export function buildDecisionRecord({ factors, overall, verdict, confidence, nee
 
   let summary;
   if (overall < 40) {
-    summary = 'Several writing patterns raise concern that this may not be original work.';
+    summary = 'Several writing patterns raise concern about this submission — review the evidence below; the final call is yours.';
   } else if (needsReview) {
-    summary = 'Mostly original, but one pattern raises a concern — worth a quick look.';
+    summary = 'Mostly original, but one pattern raises a concern — worth a quick look. The final call is yours.';
   } else if (overall < 60) {
-    summary = 'The evidence is mixed — several signals are weaker than expected.';
+    summary = 'The evidence is mixed — several signals are weaker than expected. The final call is yours.';
   } else if (red.length === 0 && overall >= 80) {
-    summary = 'This looks like genuine, original writing.';
+    summary = 'This looks like genuine, original writing — you can still inspect the evidence yourself.';
   } else {
     summary = 'The writing looks broadly original, though not every signal is strong.';
   }

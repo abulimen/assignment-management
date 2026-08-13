@@ -74,7 +74,7 @@ export default function PasteAnalysis({ events, finalContent }) {
           <Clipboard className="w-5 h-5 text-green-500" />
           <h2 className="text-lg font-semibold">Paste Analysis</h2>
         </div>
-        <p className="text-sm text-gray-400">No external pastes detected. All content appears to be typed manually.</p>
+        <p className="text-sm text-gray-600">No external pastes recorded — the content appears to be typed.</p>
       </div>
     );
   }
@@ -91,7 +91,8 @@ export default function PasteAnalysis({ events, finalContent }) {
         {hyperlinks.length > 0 && (
           <button
             onClick={() => setShowLinks(!showLinks)}
-            className="flex items-center gap-1.5 text-sm text-primary-600 hover:bg-primary-50 px-3 py-1.5 rounded-lg"
+            aria-expanded={showLinks}
+            className="flex items-center gap-1.5 text-sm text-primary-600 hover:bg-primary-50 px-3 min-h-11 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
           >
             <Link2 className="w-4 h-4" />
             {hyperlinks.length} hyperlink{hyperlinks.length > 1 ? 's' : ''} found
@@ -103,19 +104,19 @@ export default function PasteAnalysis({ events, finalContent }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <div className="bg-orange-50 rounded-lg p-3 text-center">
           <div className="text-2xl font-bold text-orange-600">{pastes.length}</div>
-          <div className="text-xs text-gray-500">External Pastes</div>
+          <div className="text-xs text-gray-600">External Pastes</div>
         </div>
         <div className="bg-blue-50 rounded-lg p-3 text-center">
           <div className="text-2xl font-bold text-blue-600">{survivalStats.totalPasted}</div>
-          <div className="text-xs text-gray-500">Chars Pasted</div>
+          <div className="text-xs text-gray-600">Chars Pasted</div>
         </div>
         <div className="bg-green-50 rounded-lg p-3 text-center">
           <div className="text-2xl font-bold text-green-600">{survivalStats.retained}</div>
-          <div className="text-xs text-gray-500">Retained Unmodified</div>
+          <div className="text-xs text-gray-600">Retained Unmodified</div>
         </div>
         <div className="bg-red-50 rounded-lg p-3 text-center">
           <div className="text-2xl font-bold text-red-600">{modifiedChars}</div>
-          <div className="text-xs text-gray-500">Modified / Removed</div>
+          <div className="text-xs text-gray-600">Modified / Removed</div>
         </div>
       </div>
 
@@ -145,15 +146,16 @@ export default function PasteAnalysis({ events, finalContent }) {
             <div key={paste.id} className="border border-gray-200 rounded-lg overflow-hidden">
               <button
                 onClick={() => setExpandedPastes(prev => ({ ...prev, [paste.id]: !prev[paste.id] }))}
-                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
+                aria-expanded={isExpanded}
+                className="w-full flex items-center justify-between p-3 min-h-11 hover:bg-gray-50 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
               >
                 <div className="flex items-center gap-2 text-left flex-1 min-w-0">
-                  <span className="text-xs font-mono text-gray-400">#{paste.id}</span>
+                  <span className="text-xs font-mono text-gray-600">#{paste.id}</span>
                   <span className="text-sm text-gray-700 truncate bg-yellow-100 px-1.5 py-0.5 rounded">
                     {preview}
                   </span>
                 </div>
-                <div className="flex items-center gap-3 text-xs text-gray-400 ml-2 flex-shrink-0">
+                <div className="flex items-center gap-3 text-xs text-gray-600 ml-2 flex-shrink-0">
                   <span>{paste.length} chars</span>
                   {paste.isHtml && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded">HTML</span>}
                   {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}

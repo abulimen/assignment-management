@@ -27,7 +27,7 @@ export default function StatsBar({ stats }) {
         <div key={item.label} className="bg-white rounded-xl border border-gray-200 px-3 py-3 flex items-center gap-3">
           <div className={`flex-shrink-0 ${item.warn ? 'text-orange-500' : 'text-gray-400'}`}>{item.icon}</div>
           <div className="min-w-0">
-            <div className={`text-base font-semibold leading-tight ${item.warn ? 'text-orange-600' : 'text-gray-900'}`}>{item.value}</div>
+            <div className={`text-base font-semibold leading-tight ${item.warn ? 'text-orange-700' : 'text-gray-900'}`}>{item.value}</div>
             <div className="text-xs text-gray-500 truncate">{item.label}</div>
           </div>
         </div>

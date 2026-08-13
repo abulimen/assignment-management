@@ -48,8 +48,9 @@ export default function CopiedTextViewer({ insights, members }) {
       </div>
 
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <select value={memberFilter} onChange={(e) => setMemberFilter(e.target.value)}
-          className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm">
+        <label htmlFor="member-filter" className="sr-only">Filter copied text by member</label>
+        <select id="member-filter" name="member-filter" value={memberFilter} onChange={(e) => setMemberFilter(e.target.value)}
+          className="rounded-lg border border-gray-300 px-2.5 min-h-11 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
           <option value="all">All members</option>
           {list.map((m) => (
             <option key={m.student_id} value={String(m.student_id)}>{m.student_name}</option>
@@ -58,8 +59,8 @@ export default function CopiedTextViewer({ insights, members }) {
 
         <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden text-sm">
           {[['all', 'All'], ['survived', 'Still there'], ['rewritten', 'Rewritten']].map(([v, label]) => (
-            <button key={v} onClick={() => setSurvival(v)}
-              className={`px-3 py-1.5 ${survival === v ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
+            <button key={v} onClick={() => setSurvival(v)} aria-pressed={survival === v}
+              className={`px-3 min-h-11 ${survival === v ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600`}>
               {label}
             </button>
           ))}
@@ -67,7 +68,7 @@ export default function CopiedTextViewer({ insights, members }) {
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-gray-400 py-6 text-center">
+        <p className="text-sm text-gray-600 py-6 text-center">
           {totalPastes === 0 ? 'No external pastes recorded.' : 'No pastes match the current filters.'}
         </p>
       ) : (
@@ -78,10 +79,10 @@ export default function CopiedTextViewer({ insights, members }) {
             return (
               <div key={key} className="border border-gray-200 rounded-lg overflow-hidden">
                 <button onClick={() => setExpanded(open ? null : key)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-gray-50">
+                  className="w-full flex items-center gap-3 px-3 py-2 min-h-11 text-left hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
                   <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
                   <span className="text-sm font-medium flex-shrink-0">{p.member.student_name}</span>
-                  <span className="flex-1 text-sm text-gray-500 truncate">{p.text}</span>
+                  <span className="flex-1 text-sm text-gray-500 truncate min-w-0">{p.text}</span>
                   {p.links.length > 0 && (
                     <span className="flex items-center gap-1 text-xs text-blue-600 flex-shrink-0">
                       <Link2 className="w-3.5 h-3.5" /> {p.links.length}

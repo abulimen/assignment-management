@@ -47,14 +47,15 @@ export default function Review() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Submission Review</h1>
-        <p className="text-sm text-gray-400 mt-1">Proof of Work Analysis</p>
+        <p className="text-sm text-gray-600 mt-1">Proof of Work Analysis</p>
+        <p className="text-xs text-gray-600 mt-1">Evidence is shown for your judgment — there is no automated verdict.</p>
       </div>
 
       {data.override?.used && (
         <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 mb-6">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-5 h-5 text-amber-600" />
-            <h3 className="font-semibold text-amber-800">Submitted via leader override</h3>
+            <h2 className="font-semibold text-amber-800">Submitted via leader override</h2>
           </div>
           <p className="text-sm text-amber-800 mb-2">
             <strong>{data.override.by_name}</strong> submitted even though these members had not marked themselves Done:
@@ -72,15 +73,13 @@ export default function Review() {
       )}
 
       {sections ? (
-        // Group submission: X-Ray + workload + activity + copied-text inspector.
+        // Group submission: the X-Ray is the at-a-glance contribution answer;
+        // workload, activity and the copied-text inspector stay behind a fold
+        // so the review starts as evidence-on-demand, not surveillance.
         <>
           <ContributionXray sections={sections} />
           {data.realtime && data.insights && (
-            <>
-              <MemberWorkload insights={data.insights} members={sections} />
-              <MemberActivityChart insights={data.insights} members={sections} />
-              <CopiedTextViewer insights={data.insights} members={sections} />
-            </>
+            <GroupEvidenceFold insights={data.insights} members={sections} />
           )}
           <h2 className="text-lg font-semibold mb-3 mt-6 flex items-center gap-2">
             <FileText className="w-5 h-5 text-primary-600" />
@@ -113,15 +112,8 @@ export default function Review() {
 function EvidenceFold({ events, finalContent, stats }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mt-6">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700"
-      >
-        <BarChart3 className="w-4 h-4" />
-        {open ? 'Hide detailed evidence' : 'Show detailed evidence'}
-        {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-      </button>
+    <div id="evidence-individual" className="mt-6">
+      <FoldToggle open={open} toggle={() => setOpen((o) => !o)} controlsId="evidence-individual" />
       {open && (
         <div className="mt-4">
           <PasteAnalysis events={events} finalContent={finalContent} />
@@ -130,5 +122,41 @@ function EvidenceFold({ events, finalContent, stats }) {
         </div>
       )}
     </div>
+  );
+}
+
+// Group deep evidence (workload → activity → copied-text inspector), behind
+// the same evidence-on-demand fold as the individual surface.
+function GroupEvidenceFold({ insights, members }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div id="evidence-group" className="mt-6">
+      <FoldToggle open={open} toggle={() => setOpen((o) => !o)} controlsId="evidence-group" />
+      {open && (
+        <div className="mt-4">
+          <MemberWorkload insights={insights} members={members} />
+          <MemberActivityChart insights={insights} members={members} />
+          <CopiedTextViewer insights={insights} members={members} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Shared fold button: ≥44px tall target, labelled chevron, wired for the
+// screen-reader disclosure contract.
+function FoldToggle({ open, toggle, controlsId }) {
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-expanded={open}
+      aria-controls={controlsId}
+      className="flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700 min-h-11 px-3 -ml-3 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+    >
+      <BarChart3 className="w-4 h-4" />
+      {open ? 'Hide detailed evidence' : 'Show detailed evidence'}
+      {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+    </button>
   );
 }

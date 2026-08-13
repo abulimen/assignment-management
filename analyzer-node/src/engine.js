@@ -189,7 +189,7 @@ export function computeVerdict(events, stats) {
   if (cls.pasteRanges.length === 0) {
     pasteScore = 100;
     pasteDetail = externalPastedChars === 0
-      ? 'No external paste detected'
+      ? 'No external paste recorded'
       : `${externalPastedChars} pasted chars without position data (legacy)`;
   } else {
     const denom = Math.max(typedChars + unmodifiedPasteChars, 1);
@@ -226,14 +226,14 @@ export function computeVerdict(events, stats) {
     const sortedAll = [...events].filter((e) => Number.isFinite(e.occurred_at)).sort((a, b) => a.occurred_at - b.occurred_at);
     const keySet = new Set(keystrokeEvents);
     let run = [];
-    let suspiciousChars = 0;
+    let metronomicChars = 0;
     const scoreRun = () => {
       if (run.length < 50) return;
       const ivs = intervalsOf(run);
       if (ivs.length < 10) return;
       const runCv = mean(ivs) > 0 ? stdev(ivs) / mean(ivs) : 0;
       const hasPause = run.some((e, i) => i > 0 && e.occurred_at - run[i - 1].occurred_at > 2);
-      if (runCv < 0.15 && !hasPause) suspiciousChars += run.length;
+      if (runCv < 0.15 && !hasPause) metronomicChars += run.length;
     };
     for (const e of sortedAll) {
       if (e.type === 'delete') { scoreRun(); run = []; }
@@ -241,7 +241,7 @@ export function computeVerdict(events, stats) {
     }
     scoreRun();
 
-    const burstRatio = typedChars > 0 ? suspiciousChars / typedChars : 0;
+    const burstRatio = typedChars > 0 ? metronomicChars / typedChars : 0;
     sig.burstRatio = burstRatio;
     if (burstRatio > 0) {
       naturalnessScore = Math.round(naturalnessScore * (1 - 0.7 * Math.min(1, burstRatio)));
@@ -253,7 +253,7 @@ export function computeVerdict(events, stats) {
     if (burstRatio > 0.5) {
       riskFlags.push({ level: 'critical', message: `Sustained metronomic typing bursts without pauses or corrections (${Math.round(burstRatio * 100)}% of typed chars)` });
     } else if (cv < 0.12) {
-      riskFlags.push({ level: 'critical', message: 'Near-constant typing rhythm (possible automated input)' });
+      riskFlags.push({ level: 'critical', message: 'Near-constant typing rhythm (uniform cadence, no pauses)' });
     }
 
     // A mountain of paste with almost no typing makes cadence near-meaningless.
@@ -326,7 +326,7 @@ export function computeVerdict(events, stats) {
     integrityScore = Math.round(100 * Math.pow(Math.max(0, trust), 0.7));
     integrityDetail = `${inconsistent}/${timed.length} events deviate from the median clock offset`;
     if (trust < 0.4) riskFlags.push({ level: 'critical', message: 'Widespread timestamp inconsistency — client-reported times are unreliable' });
-    else if (trust < 0.7) riskFlags.push({ level: 'warning', message: 'Client/server timestamp inconsistencies detected' });
+    else if (trust < 0.7) riskFlags.push({ level: 'warning', message: 'Client/server timestamp inconsistencies present' });
   }
 
   // ---- Aggregate (evidence-weighted) ----

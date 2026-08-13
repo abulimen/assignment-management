@@ -6,7 +6,7 @@ import { CheckCircle2, AlertTriangle, RefreshCcw } from 'lucide-react';
 
 function FactorCard({ factor }) {
   const score = factor.score;
-  const scoreColor = score >= 80 ? 'text-green-600' : score >= 60 ? 'text-yellow-600' : score >= 40 ? 'text-orange-600' : 'text-red-600';
+  const scoreColor = score >= 80 ? 'text-green-600' : score >= 60 ? 'text-yellow-600' : score >= 40 ? 'text-orange-700' : 'text-red-600';
   const barColor = score >= 80 ? 'bg-green-500' : score >= 60 ? 'bg-yellow-500' : score >= 40 ? 'bg-orange-500' : 'bg-red-500';
 
   return (
