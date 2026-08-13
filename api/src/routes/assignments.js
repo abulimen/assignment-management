@@ -7,10 +7,42 @@ export default async function assignments(ctx) {
 
   if (ctx.req.method === 'GET') {
     if (user.role === 'lecturer') {
-      const [rows] = await ctx.pool.query(
-        'SELECT id, title, description, rubric, due_date, is_group_work, created_at FROM assignments WHERE lecturer_id = ? ORDER BY created_at DESC',
-        [user.sub],
-      );
+      const [rows] = await ctx.pool.query(`
+        SELECT a.id, a.title, a.description, a.rubric, a.due_date, a.is_group_work, a.created_at,
+               COALESCE(g.group_count, 0)              AS group_count,
+               COALESCE(g.submitted_group_count, 0)    AS submitted_group_count,
+               COALESCE(g.flagged_group_count, 0)      AS flagged_group_count,
+               COALESCE(s.submitted_count, 0)          AS submitted_count
+        FROM assignments a
+        LEFT JOIN (
+          SELECT g.assignment_id,
+                 COUNT(*)                                            AS group_count,
+                 COUNT(CASE WHEN g.frozen_at IS NOT NULL THEN 1 END) AS submitted_group_count,
+                 COUNT(CASE WHEN g.frozen_at IS NOT NULL AND (
+                     EXISTS (
+                       SELECT 1
+                       FROM group_members gm
+                       LEFT JOIN group_member_status gms
+                         ON gms.group_id = gm.group_id AND gms.student_id = gm.student_id
+                       WHERE gm.group_id = g.id AND COALESCE(gms.status, 'not_started') != 'done'
+                     )
+                     OR EXISTS (
+                       SELECT 1 FROM submissions os
+                       WHERE os.group_id = g.id AND os.status = 'submitted' AND os.override_used = 1
+                     )
+                 ) THEN 1 END)                                       AS flagged_group_count
+          FROM \`groups\` g
+          GROUP BY g.assignment_id
+        ) g ON g.assignment_id = a.id
+        LEFT JOIN (
+          SELECT assignment_id, COUNT(*) AS submitted_count
+          FROM submissions
+          WHERE status = 'submitted' AND group_id IS NULL
+          GROUP BY assignment_id
+        ) s ON s.assignment_id = a.id
+        WHERE a.lecturer_id = ?
+        ORDER BY a.created_at DESC
+      `, [user.sub]);
       return sendJson(ctx, 200, { assignments: rows });
     }
     const [rows] = await ctx.pool.query(`

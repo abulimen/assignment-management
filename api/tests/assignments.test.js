@@ -44,6 +44,87 @@ describe('GET /api/assignments', () => {
     expect(a.submission_id).toBeTruthy();
     expect(a.submission_status).toBe('draft');
   });
+
+  it('lecturer sees aggregate counts for individual and group assignments', async () => {
+    // Seeded directly through the harness DB so the list aggregates have a
+    // deterministic shape: one individual assignment and one group assignment
+    // with mixed groups (fully-done, frozen-with-override, still in progress).
+    const ind = await createAssignment(lecturer.token, { title: 'Agg Ind', is_group_work: 0 });
+    const indId = ind.json.assignment.id;
+    const s1 = await registerUser(h.api, { name: 'Agg One' });
+    const s2 = await registerUser(h.api, { name: 'Agg Two' });
+    const s3 = await registerUser(h.api, { name: 'Agg Three' });
+    const s4 = await registerUser(h.api, { name: 'Agg Four' });
+    const s5 = await registerUser(h.api, { name: 'Agg Five' });
+
+    // Individual: two submitted, one draft (draft excluded from submitted_count).
+    for (const sid of [s1.user.id, s2.user.id]) {
+      await h.pool.query(
+        "INSERT INTO submissions (assignment_id, student_id, status, submitted_at) VALUES (?, ?, 'submitted', NOW())",
+        [indId, sid],
+      );
+    }
+    await h.pool.query(
+      "INSERT INTO submissions (assignment_id, student_id, content, status) VALUES (?, ?, ?, 'draft')",
+      [indId, s5.user.id, 'draft body'],
+    );
+
+    const grp = await createAssignment(lecturer.token, { title: 'Agg Group', is_group_work: 1 });
+    const grpId = grp.json.assignment.id;
+
+    let rnd = 1;
+    const insertGroup = async (name, leaderId) => {
+      const [r] = await h.pool.query(
+        'INSERT INTO `groups` (assignment_id, name, leader_id, invite_code) VALUES (?, ?, ?, ?)',
+        [grpId, name, leaderId, `AGG${Date.now()}${rnd}`],
+      );
+      rnd += 1;
+      return r.insertId;
+    };
+
+    // Group A: frozen, every member Done, no override -> submitted, not flagged.
+    const ga = await insertGroup('Team Complete', s1.user.id);
+    for (const sid of [s1.user.id, s2.user.id]) {
+      await h.pool.query('INSERT INTO group_members (group_id, student_id) VALUES (?, ?)', [ga, sid]);
+      await h.pool.query("INSERT INTO group_member_status (group_id, student_id, status, done_at) VALUES (?, ?, 'done', NOW())", [ga, sid]);
+    }
+    await h.pool.query('UPDATE `groups` SET frozen_at = NOW() WHERE id = ?', [ga]);
+    await h.pool.query(
+      "INSERT INTO submissions (assignment_id, student_id, status, group_id, override_used) VALUES (?, ?, 'submitted', ?, 0)",
+      [grpId, s1.user.id, ga],
+    );
+
+    // Group B: frozen with a member still in_progress + override record -> flagged.
+    const gb = await insertGroup('Team Override', s3.user.id);
+    for (const sid of [s3.user.id, s4.user.id]) {
+      await h.pool.query('INSERT INTO group_members (group_id, student_id) VALUES (?, ?)', [gb, sid]);
+    }
+    await h.pool.query("INSERT INTO group_member_status (group_id, student_id, status, done_at) VALUES (?, ?, 'done', NOW())", [gb, s3.user.id]);
+    await h.pool.query("INSERT INTO group_member_status (group_id, student_id, status) VALUES (?, ?, 'in_progress')", [gb, s4.user.id]);
+    await h.pool.query('UPDATE `groups` SET frozen_at = NOW() WHERE id = ?', [gb]);
+    await h.pool.query(
+      "INSERT INTO submissions (assignment_id, student_id, status, group_id, override_used, override_reason) VALUES (?, ?, 'submitted', ?, 1, 'member fell ill')",
+      [grpId, s3.user.id, gb],
+    );
+
+    // Group C: never frozen -> counted in group_count only.
+    await insertGroup('Team WIP', s2.user.id);
+
+    const { status, json } = await apiCall(h.api, 'assignments', { token: lecturer.token });
+    expect(status).toBe(200);
+
+    const indRow = json.assignments.find((x) => x.id === indId);
+    expect(indRow.group_count).toBe(0);
+    expect(indRow.submitted_group_count).toBe(0);
+    expect(indRow.flagged_group_count).toBe(0);
+    expect(indRow.submitted_count).toBe(2);
+
+    const grpRow = json.assignments.find((x) => x.id === grpId);
+    expect(grpRow.group_count).toBe(3);
+    expect(grpRow.submitted_group_count).toBe(2);
+    expect(grpRow.flagged_group_count).toBe(1);
+    expect(grpRow.submitted_count).toBe(0);
+  });
 });
 
 describe('POST /api/assignments', () => {
