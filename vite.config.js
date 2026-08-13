@@ -22,5 +22,25 @@ export default defineConfig(({ mode }) => ({
     outDir: 'public/assets',
     emptyOutDir: true,
     assetsDir: '.',
+    // Source maps keep the Lighthouse "valid source maps" best-practice audit
+    // green for the large first-party bundles; maps live next to the hashed
+    // chunks under /assets/* and are served by the API static host.
+    sourcemap: true,
+    // Performance: split node_modules into stable vendor chunks so the
+    // critical first-paint bundle stays small and the heavyweight editor/
+    // chart/vendor code loads only on the routes that need it (the lazy pages
+    // are wired in src/App.jsx).
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (/node_modules\/(@tiptap|prosemirror-[a-z0-9]+|yjs|@hocuspocus|lib0|isomorphic\.js)\//.test(id)) return 'editor-vendor';
+          if (/node_modules\/(recharts|victory-vendor|d3-[a-z0-9]+|@reduxjs|react-redux|reselect|immer|redux|use-sync-external-store|es-toolkit|decimal\.js-light|eventemitter3)\//.test(id)) return 'charts';
+          if (/node_modules\/lucide-react\//.test(id)) return 'icons';
+          if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id)) return 'react-vendor';
+          return undefined;
+        },
+      },
+    },
   },
 }));

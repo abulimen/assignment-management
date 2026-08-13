@@ -1,5 +1,25 @@
 @import './styles/word.css';
 
+/* Self-hosted fonts (latin subset, variable wght axes) — swapped from the
+   Google Fonts <link> so there is no render-blocking third-party CSS and no
+   extra TLS host on the critical path. font-display: swap paints text in the
+   system fallback immediately and swaps in Inter/JetBrains Mono when ready
+   (metrics are very close, so CLS impact is negligible). */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900; /* variable wght axis */
+  font-display: swap;
+  src: url('/fonts/inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400 800; /* variable wght axis */
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono-400.woff2') format('woff2');
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

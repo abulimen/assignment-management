@@ -11,6 +11,19 @@ export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60; // 15 min
 // Make the raw token's Max-Age match the DB expiry interval (30 days).
 export const REFRESH_COOKIE = 'refresh_token';
 
+// Non-HttpOnly session marker. NOT a security control — it only tells the SPA
+// whether a refresh cookie *might* exist so the boot sequence can skip the
+// /api/refresh probe (and its 401 console noise) for genuinely logged-out
+// anonymous visits. The auth decision still lives in the HttpOnly cookie.
+export const SESSION_MARKER_COOKIE = 'am_session';
+
+function addCookie(res, cookie) {
+  const existing = res.getHeader('Set-Cookie');
+  if (!existing) return res.setHeader('Set-Cookie', cookie);
+  if (Array.isArray(existing)) return res.setHeader('Set-Cookie', [...existing, cookie]);
+  return res.setHeader('Set-Cookie', [existing, cookie]);
+}
+
 export function randomToken(bytes = 32) {
   return crypto.randomBytes(bytes).toString('base64url');
 }
@@ -65,10 +78,22 @@ export function setRefreshCookie(res, raw) {
   ];
   if (cookieIsSecure()) parts.push('Secure');
   res.setHeader('Set-Cookie', parts.join('; '));
+  // Session marker rides along on every login/refresh (readable by JS so the
+  // SPA boot can skip the 401 refresh probe when there is no session at all).
+  setSessionMarker(res);
+}
+
+export function setSessionMarker(res) {
+  addCookie(res, `am_session=1; Path=/; SameSite=Lax; Max-Age=2592000`);
+}
+
+export function clearSessionMarker(res) {
+  addCookie(res, `am_session=; Path=/; SameSite=Lax; Max-Age=0`);
 }
 
 export function clearRefreshCookie(res) {
   res.setHeader('Set-Cookie', `${REFRESH_COOKIE}=; HttpOnly; SameSite=Lax; Path=/api; Max-Age=0`);
+  clearSessionMarker(res);
 }
 
 export function parseCookies(header) {

@@ -130,13 +130,18 @@ describe('POST /api/login', () => {
     expect(payload.sub).toBe(json.user.id);
     expect(Number(payload.exp) - Number(payload.iat)).toBe(15 * 60);
     // Refresh cookie: HttpOnly, SameSite=Lax, Path=/api, Max-Age 30d.
-    expect(cookies.length).toBe(1);
+    // Plus the non-HttpOnly am_session marker (boot fast-path, not a secret).
+    expect(cookies.length).toBe(2);
     const ck = cookies[0];
     expect(ck).toMatch(/^refresh_token=/);
     expect(cookieAttribute(cookies, 'HttpOnly')).toBe(true);
     expect(cookieAttribute(cookies, 'SameSite')).toBe('Lax');
     expect(cookieAttribute(cookies, 'Path')).toBe('/api');
     expect(cookieAttribute(cookies, 'Max-Age')).toBe('2592000');
+    const marker = cookies.find((c) => c.startsWith('am_session='));
+    expect(marker).toBeTruthy();
+    expect(marker).toContain('Path=/');
+    expect(marker).not.toContain('HttpOnly');
   });
 
   it('refuses login for an unverified account with 403 EMAIL_UNVERIFIED', async () => {

@@ -1,5 +1,6 @@
 import http from 'node:http';
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import nodePath from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPool } from '@am/core';
@@ -18,10 +19,11 @@ const MIME = {
   '.ico': 'image/x-icon',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
+  '.txt': 'text/plain; charset=utf-8',
   '.map': 'application/json',
 };
 
-// Root-level files the SPA host also serves (PWA). Whitelisted basenames
+// Root-level files the SPA host also serves (PWA + SEO). Whitelisted basenames
 // only; join(publicDir, basename) with the single-segment guard keeps the
 // lookup path-safe. The service worker gets an explicit scope of "/" so it
 // can intercept navigations across the whole app.
@@ -31,7 +33,39 @@ const SPA_ROOT_FILES = new Set([
   'icon-192.png',
   'icon-512.png',
   'icon-maskable-512.png',
+  'robots.txt',
 ]);
+
+// Cache-Control policy (headed for the Lighthouse performance/best-practices
+// gates): versioned build assets are immutable, fonts are long-lived static
+// files, and the HTML shell + service worker must NEVER be cached by the
+// browser (the SW has no HTTP cache to expire and needs fresh updates).
+const CACHE_IMMUTABLE = 'public, max-age=31536000, immutable'; // /assets/* hashed files
+const CACHE_FONTS = 'public, max-age=2592000'; // /fonts/* static (30d)
+const CACHE_NO_CACHE = 'no-cache'; // index.html shell, sw.js, robots.txt
+
+// Compression: gzip once per (path,mtime) and memoize the compressed Buffer so
+// repeated hits skip zlib entirely. woff2/png/jpg/ico are already compressed.
+const COMPRESSIBLE_EXT = new Set(['.html', '.js', '.css', '.json', '.svg', '.webmanifest', '.txt']);
+const gzCache = new Map(); // `${path}:${mtimeMs}` → gzipped Buffer
+
+function acceptsGzip(req) {
+  return /(^|,)\s*gzip(\s*,|$)/.test(req.headers['accept-encoding'] || '');
+}
+
+function gzipStatic(filePath, mtimeMs) {
+  const key = `${filePath}:${mtimeMs}`;
+  const hit = gzCache.get(key);
+  if (hit) return hit;
+  let gz = null;
+  try {
+    gz = zlib.gzipSync(fs.readFileSync(filePath), { level: 6 });
+  } catch {
+    gz = null;
+  }
+  if (gz) gzCache.set(key, gz);
+  return gz;
+}
 
 // createApiServer({ port, config, staticDir }) → Promise<{ port, close() }>
 // config: { db, jwtSecret, internalSecret, corsOrigin, analyzerUrl, collabUrl }
@@ -42,9 +76,9 @@ const SPA_ROOT_FILES = new Set([
 const CSP = [
   "default-src 'self'",
   "script-src 'self'",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
-  "font-src 'self' https://fonts.gstatic.com data:",
+  "font-src 'self' data:",
   "connect-src 'self' ws: wss:",
   "frame-ancestors 'none'",
   "base-uri 'self'",
@@ -81,15 +115,60 @@ export function createApiServer({ port, config, staticDir = null }) {
     'http://127.0.0.1:8001',
   ]);
 
-  const serveSpa = (res) => {
-    const shell = nodePath.join(publicDir, 'assets', 'index.html');
-    fs.readFile(shell, (err, data) => {
+  // Serve a static file from the SPA host with cache + gzip handling.
+  // When the file is missing it invokes onMissing (default: 404).
+  const serveStaticFile = (req, res, file, { cacheControl, extraHeaders = {}, onMissing } = {}) => {
+    let stat;
+    try {
+      stat = fs.statSync(file);
+    } catch {
+      if (onMissing) return onMissing();
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      return res.end('Not found');
+    }
+    if (!stat.isFile()) {
+      if (onMissing) return onMissing();
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      return res.end('Not found');
+    }
+
+    const ext = nodePath.extname(file);
+    const headers = {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      ...extraHeaders,
+    };
+    if (cacheControl) headers['Cache-Control'] = cacheControl;
+
+    const gz = acceptsGzip(req) && COMPRESSIBLE_EXT.has(ext)
+      ? gzipStatic(file, stat.mtimeMs)
+      : null;
+    if (gz) {
+      headers['Content-Encoding'] = 'gzip';
+      headers['Vary'] = 'Accept-Encoding';
+      res.writeHead(200, headers);
+      return res.end(gz);
+    }
+    fs.readFile(file, (err, data) => {
       if (err) {
+        if (onMissing) return onMissing();
         res.writeHead(404, { 'Content-Type': 'text/plain' });
-        return res.end('SPA not built (run: npm run build)');
+        return res.end('Not found');
       }
-      res.writeHead(200, { 'Content-Type': MIME['.html'] });
+      res.writeHead(200, headers);
       res.end(data);
+    });
+    return undefined;
+  };
+
+  const serveSpa = (req, res) => {
+    const shell = nodePath.join(publicDir, 'assets', 'index.html');
+    return serveStaticFile(req, res, shell, {
+      cacheControl: CACHE_NO_CACHE,
+      onMissing: () => {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('SPA not built (run: npm run build)');
+        return undefined;
+      },
     });
   };
 
@@ -142,32 +221,41 @@ export function createApiServer({ port, config, staticDir = null }) {
         // whitelisted root-level PWA files from public/, and fall back to
         // the shell for client-side routes.
         if (!urlPath.startsWith('/api/') && req.method === 'GET') {
-          if (urlPath.startsWith('/assets/')) {
+          // Shared static-directory guard: normalized join must stay inside
+          // publicDir, and the target must be a real file.
+          const safeFile = (urlPath) => {
             const file = nodePath.normalize(nodePath.join(publicDir, urlPath));
-            if (file.startsWith(publicDir + nodePath.sep) && fs.existsSync(file) && fs.statSync(file).isFile()) {
-              const type = MIME[nodePath.extname(file)] || 'application/octet-stream';
-              return fs.readFile(file, (err, data) => {
-                if (err) return serveSpa(res);
-                res.writeHead(200, { 'Content-Type': type });
-                res.end(data);
-              });
+            if (!file.startsWith(publicDir + nodePath.sep)) return null;
+            return file;
+          };
+          if (urlPath.startsWith('/assets/')) {
+            const file = safeFile(urlPath);
+            if (file && fs.existsSync(file) && fs.statSync(file).isFile()) {
+              return serveStaticFile(req, res, file, { cacheControl: CACHE_IMMUTABLE });
             }
+            return serveSpa(req, res);
           }
-          // Single-segment path → could be a root-level PWA file.
+          if (urlPath.startsWith('/fonts/')) {
+            const file = safeFile(urlPath);
+            if (file && fs.existsSync(file) && fs.statSync(file).isFile()) {
+              return serveStaticFile(req, res, file, { cacheControl: CACHE_FONTS });
+            }
+            return serveSpa(req, res);
+          }
+          // Single-segment path → could be a root-level PWA/SEO file.
           const base = urlPath.replace(/^\//, ''); // strip leading '/'
           if (!base.includes('/') && SPA_ROOT_FILES.has(base)) {
             const file = nodePath.join(publicDir, base);
             if (fs.existsSync(file) && fs.statSync(file).isFile()) {
-              const headers = { 'Content-Type': MIME[nodePath.extname(file)] || 'application/octet-stream' };
-              if (base === 'sw.js') headers['Service-Worker-Allowed'] = '/';
-              return fs.readFile(file, (err, data) => {
-                if (err) return serveSpa(res);
-                res.writeHead(200, headers);
-                res.end(data);
-              });
+              const extraHeaders = {};
+              if (base === 'sw.js') extraHeaders['Service-Worker-Allowed'] = '/';
+              const cacheControl = base === 'sw.js' || base === 'manifest.webmanifest' || base === 'robots.txt'
+                ? CACHE_NO_CACHE
+                : CACHE_FONTS;
+              return serveStaticFile(req, res, file, { cacheControl, extraHeaders });
             }
           }
-          return serveSpa(res);
+          return serveSpa(req, res);
         }
         return sendJson(ctx, 404, { error: 'Not found' });
       }

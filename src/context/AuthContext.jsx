@@ -31,8 +31,20 @@ export function AuthProvider({ children }) {
   // rotating refresh token is never presented twice in parallel, which
   // would trip reuse-detection and revoke the whole family.
   // On failure the user is anonymous; nothing is persisted client-side.
+  //
+  // Fast-path for genuinely anonymous boots: when the API's plain `am_session`
+  // marker cookie is absent there is no refresh cookie worth probing, so skip
+  // the /api/refresh round-trip entirely. This kills the 401 console error
+  // (Lighthouse best-practices "browser errors logged to console") and speeds
+  // up every logged-out first paint.
   useEffect(() => {
     let cancelled = false;
+    const hasSession = document.cookie.split(';').some((c) => c.trim().startsWith('am_session=1'));
+    if (!hasSession) {
+      clearAccessToken();
+      dispatch({ type: 'LOGOUT' });
+      return;
+    }
     (async () => {
       clearAccessToken();
       try {

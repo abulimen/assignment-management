@@ -65,8 +65,10 @@ describe('security headers on every response', () => {
     expect(directive("default-src")).toContain("'self'");
     expect(directive('script-src')).toContain("'self'");
     expect(directive('style-src')).toContain("'unsafe-inline'"); // TipTap/Recharts style attrs
-    expect(directive('style-src')).toContain('https://fonts.googleapis.com');
-    expect(directive('font-src')).toContain('https://fonts.gstatic.com');
+    // Fonts are self-hosted now (no third-party hosts on the critical path).
+    expect(directive('style-src')).not.toContain('fonts.googleapis.com');
+    expect(directive('font-src')).toContain("'self'");
+    expect(directive('font-src')).not.toContain('fonts.gstatic.com');
     expect(directive('img-src')).toContain('blob:'); // TipTap images
     expect(directive('connect-src')).toContain('ws:'); // Yjs collab + tracking WS
     expect(directive('connect-src')).toContain('wss:');
