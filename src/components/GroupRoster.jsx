@@ -17,6 +17,7 @@ export default function GroupRoster({ assignmentId }) {
   useEffect(() => {
     api.get(`assignments/${assignmentId}/groups`)
       .then(d => setGroups(d.groups || []))
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [assignmentId]);
 

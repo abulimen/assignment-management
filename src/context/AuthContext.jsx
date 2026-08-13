@@ -1,5 +1,5 @@
 import { createContext, useReducer, useEffect, useCallback, useMemo } from 'react';
-import { api } from '../api';
+import { api, refreshSession } from '../api';
 import { setAccessToken, clearAccessToken } from '../session';
 
 export const AuthContext = createContext(null);
@@ -26,17 +26,22 @@ export function AuthProvider({ children }) {
 
   // Restore the session on boot: the HttpOnly refresh cookie is sent
   // automatically (same-origin) → access token → /api/me → profile.
+  // refreshSession() is single-flight, so even a StrictMode double-mount
+  // (or a concurrent 401 retry) shares ONE /api/refresh request — the
+  // rotating refresh token is never presented twice in parallel, which
+  // would trip reuse-detection and revoke the whole family.
   // On failure the user is anonymous; nothing is persisted client-side.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       clearAccessToken();
       try {
-        const data = await api.post('refresh');
+        const accessToken = await refreshSession();
         if (cancelled) return;
+        setAccessToken(accessToken);
         const me = await api.get('me');
         if (cancelled) return;
-        dispatch({ type: 'LOGIN', user: me.user, token: data.accessToken });
+        dispatch({ type: 'LOGIN', user: me.user, token: accessToken });
       } catch {
         clearAccessToken();
         if (!cancelled) dispatch({ type: 'LOGOUT' });
