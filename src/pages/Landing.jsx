@@ -70,7 +70,7 @@ export default function Landing() {
           <Link
             to="/"
             aria-label="Assignment Management — home"
-            className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2"
+            className="-m-2.5 flex items-center gap-2 rounded-md p-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2"
           >
             <BookOpen className="h-6 w-6 shrink-0 text-primary-600" aria-hidden="true" />
             <span className="hidden text-[15px] font-semibold tracking-tight text-gray-900 sm:inline">
@@ -161,7 +161,7 @@ export default function Landing() {
               </ul>
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-gray-100 px-6">
                 <p className="text-sm text-gray-500">Submitted Aug 13, 2026</p>
-                <a href="#evidence" className={sectionLink}>
+                <a href="#evidence" className={`${sectionLink} inline-flex min-h-11 items-center`}>
                   View evidence <span aria-hidden="true">&rarr;</span>
                 </a>
               </div>
@@ -382,7 +382,7 @@ export default function Landing() {
               </ul>
             </nav>
           </div>
-          <p className="mt-12 text-xs text-gray-400">&copy; 2026 Assignment Management</p>
+          <p className="mt-12 text-xs text-gray-500">&copy; 2026 Assignment Management</p>
         </div>
       </footer>
     </div>
