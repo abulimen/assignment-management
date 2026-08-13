@@ -1,20 +1,25 @@
 // Mailer abstraction for auth emails (verification + password reset).
 //
-// Default transport (local dev): logs the message to the server console and
-// APPENDS the full verification/reset URL to /tmp/mailer.log so developers can
-// click it without running an email server.
+// Two transports, chosen at call time from the environment:
+//   - RESEND_API_KEY set  → Resend HTTP API (POST /v0/emails over fetch).
+//     TLS is the provider's job, so this is a dependency-free one-request
+//     transport. Requires a verified sender domain on the Resend side.
+//   - no key (dev)        → logs the message to the server console and
+//     APPENDS the full verification/reset URL to /tmp/mailer.log so developers
+//     can click it without running an email server.
 //
-// SMTP transport: enabled when MAIL_HOST (+ MAIL_PORT) is set, with
-// MAIL_USER / MAIL_PASS / MAIL_FROM. A small dependency-free SMTP client is
-// used (was avoided pulling nodemailer into the api service).
+// Delivery failure NEVER throws: auth endpoints must keep their no-enumeration
+// 200/201 responses even when the provider is down, but the failure is logged
+// loudly (RESEND FAILED) so an operator can spot silent mail loss.
 //
 // Every sent message is also captured in an in-memory list so tests can read
-// the raw token (clearSentMails / sentMails).
+// the raw token (clearSentMails / sentMails / lastMail).
 
 import fs from 'node:fs';
-import net from 'node:net';
 
 const MAIL_LOG = process.env.MAIL_LOG || '/tmp/mailer.log';
+const RESEND_URL = 'https://api.resend.com/emails';
+const DEFAULT_FROM = 'Assignment Manager <no-reply@assignment-mgmt.local>';
 const sent = [];
 
 function appendLog(line) {
@@ -27,80 +32,21 @@ function appendLog(line) {
   }
 }
 
-// --- SMTP client (raw, minimal) -------------------------------------------
-function smtpSend({ from, to, subject, text }) {
-  return new Promise((resolve, reject) => {
-    const host = process.env.MAIL_HOST;
-    const port = Number(process.env.MAIL_PORT || 25);
-    const user = process.env.MAIL_USER;
-    const pass = process.env.MAIL_PASS;
-    const sock = net.connect(port, host);
-    let buffer = '';
-    let step = 0;
-
-    const sendLine = (line) => sock.write(`${line}\r\n`);
-
-    const data = [
-      `From: ${from}`,
-      `To: ${to}`,
-      `Subject: ${subject}`,
-      'Content-Type: text/plain; charset=utf-8',
-      'MIME-Version: 1.0',
-      '',
-      text,
-      '.',
-    ].join('\r\n');
-
-    const fail = (err) => { sock.destroy(); reject(err); };
-
-    sock.setTimeout(15000, () => fail(new Error('SMTP timeout')));
-
-    sock.on('data', (chunk) => {
-      buffer += chunk.toString('utf8');
-      const lines = buffer.split('\r\n');
-      if (lines.length < 2 || !lines[lines.length - 2]) return; // incomplete reply
-      const reply = lines[lines.length - 2];
-      buffer = lines[lines.length - 1] || '';
-      const code = Number(reply.slice(0, 3));
-      if (step !== 4 && code >= 400) return fail(new Error(`SMTP ${code}: ${reply}`));
-
-      if (step === 0) { // EHLO
-        step = 1;
-        sendLine(`EHLO ${host || 'localhost'}`);
-      } else if (step === 1) { // AUTH or skip
-        if (user && pass) {
-          step = 2;
-          sendLine('AUTH LOGIN');
-        } else {
-          step = 3;
-          sendLine(`MAIL FROM:<${from}>`);
-        }
-      } else if (step === 2) { // AUTH credentials
-        step = 3;
-        // rfc: first USER then PASS (server replies 334 to each)
-        // The AUTH LOGIN flow: 334 VXNlcm5hbWU6 -> user, 334 UGFzc3dvcmQ6 -> pass
-        const authStep = reply.includes('UGFzc3dvcmQ6') ? 'pass' : 'user';
-        sendLine(authStep === 'user'
-          ? Buffer.from(user).toString('base64')
-          : Buffer.from(pass).toString('base64'));
-        if (authStep === 'pass') { step = 3; sendLine(`MAIL FROM:<${from}>`); }
-      } else if (step === 3) {
-        step = 4;
-        sendLine(`RCPT TO:<${to}>`);
-      } else if (step === 4) {
-        step = 5;
-        sendLine('DATA');
-      } else if (step === 5) {
-        step = 6;
-        sendLine(data);
-      } else if (step === 6) {
-        sock.write('QUIT\r\n');
-        sock.destroy();
-        resolve();
-      }
-    });
-    sock.on('error', reject);
+// --- Resend transport (HTTP API) ------------------------------------------
+async function resendSend({ from, to, subject, text, html }) {
+  const res = await fetch(RESEND_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from, to, subject, text, html }),
   });
+  if (!res.ok) {
+    let detail = '';
+    try { detail = await res.text(); } catch { /* ignore body read failure */ }
+    throw new Error(`Resend ${res.status}: ${detail.slice(0, 300)}`);
+  }
 }
 
 export function sendMail({ to, subject, text, html, token, url }) {
@@ -111,12 +57,14 @@ export function sendMail({ to, subject, text, html, token, url }) {
   console.log(`[mailer] ${line}`);
   appendLog(line);
 
-  if (process.env.MAIL_HOST) {
-    const from = process.env.MAIL_FROM || 'no-reply@assignment-mgmt.local';
-    return smtpSend({ from, to, subject, text: text || '' }).catch((err) => {
-      // eslint-disable-next-line no-console
-      console.error('[mailer] SMTP delivery failed:', err.message);
-    });
+  if (process.env.RESEND_API_KEY) {
+    const from = process.env.MAIL_FROM || DEFAULT_FROM;
+    return resendSend({ from, to, subject, text: text || '', html })
+      .catch((err) => {
+        // Red-flag, never throw — auth endpoints answer generically regardless.
+        // eslint-disable-next-line no-console
+        console.error(`[mailer] RESEND DELIVERY FAILED (to=${to}, subject=${subject}): ${err.message}`);
+      });
   }
   return Promise.resolve();
 }
