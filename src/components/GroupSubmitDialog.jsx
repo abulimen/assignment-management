@@ -40,7 +40,7 @@ export default function GroupSubmitDialog({ summary, isOverride, busy, onClose, 
               {summary.notDone.map((m) => (
                 <div key={m.student_id} className="flex items-center justify-between gap-2 text-sm">
                   <span className="font-medium text-amber-800 min-w-0 truncate">{m.student_name}</span>
-                  <span className="text-xs text-amber-600 shrink-0">{STATUS_LABEL[m.status] || 'Not Started'}</span>
+                  <span className="text-xs text-amber-700 shrink-0">{STATUS_LABEL[m.status] || 'Not Started'}</span>
                 </div>
               ))}
             </div>
