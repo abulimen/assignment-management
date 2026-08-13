@@ -483,11 +483,12 @@ export default function Playback({ events, finalContent }) {
                   <SkipForward className="w-4 h-4" />
                 </button>
               </div>
-              <div className="flex flex-1 items-center min-h-11 min-w-[180px]">
+              <div className="relative flex flex-1 items-center min-h-11 min-w-[180px]">
+                <div aria-hidden="true" className="pointer-events-none absolute left-0 right-0 h-1.5 rounded-full bg-gray-200" />
                 <input type="range" min={0} max={Math.max(stepEvents.length - 1, 0)} value={currentIndex}
                   onChange={e => { setPlaying(false); setCurrentIndex(parseInt(e.target.value)); }}
                   aria-label="Replay progress"
-                  className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary-600" />
+                  className="relative w-full h-11 appearance-none bg-transparent cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary-600 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-primary-600" />
               </div>
               <div className="flex items-center gap-1">
                 {[1, 2, 4].map(s => (

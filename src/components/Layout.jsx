@@ -29,7 +29,7 @@ export default function Layout({ children }) {
                 type="button"
                 aria-label="Log out"
                 onClick={() => { logout(); navigate('/login'); }}
-                className="inline-flex items-center gap-2 min-h-11 px-3 rounded-md text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+                className="inline-flex items-center justify-center gap-2 min-h-11 min-w-11 px-3 rounded-md text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
               >
                 <LogOut className="w-4 h-4" aria-hidden="true" />
                 <span className="hidden sm:inline">Log out</span>

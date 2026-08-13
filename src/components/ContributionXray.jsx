@@ -142,7 +142,7 @@ export default function ContributionXray({ sections }) {
             ? `${(c.pasteRatio * 100).toFixed(1)}%` : '—';
           return (
             <div key={c.id}>
-              <button onClick={() => setExpanded(isOpen ? null : c.id)}
+              <button onClick={() => setExpanded(isOpen ? null : c.id)} aria-expanded={isOpen} aria-controls={`xray-detail-${c.id}`}
                 className={`w-full text-left border border-gray-200 rounded-lg p-3 transition-colors ${isOpen ? 'ring-2 ring-primary-200' : 'hover:bg-gray-50'}`}
                 style={{ borderLeft: `4px solid ${c.color.replace('0.35', '1')}` }}>
                 <div className="flex items-center justify-between mb-2">
@@ -176,7 +176,7 @@ export default function ContributionXray({ sections }) {
               </button>
 
               {isOpen && v && typeof v.overall_score === 'number' && (
-                <div className="mt-2 space-y-2">
+                <div id={`xray-detail-${c.id}`} className="mt-2 space-y-2">
                   {v.risk_flags?.length > 0 && (
                     <div className="space-y-1.5">
                       {v.risk_flags.map((flag, i) => (

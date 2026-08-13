@@ -40,9 +40,9 @@ export default function CopiedTextViewer({ insights, members }) {
           <h3 className="font-semibold">Copied text ({rows.length}{rows.length !== totalPastes ? ` of ${totalPastes}` : ''})</h3>
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+        <label className="flex min-h-11 items-center gap-2 py-2 text-sm text-gray-600 cursor-pointer select-none">
           <input type="checkbox" checked={hideLinkOnly} onChange={(e) => setHideLinkOnly(e.target.checked)}
-            className="rounded border-gray-300" />
+            className="h-5 w-5 rounded border-gray-300 accent-primary-600" />
           Hide link-only pastes
         </label>
       </div>
@@ -60,7 +60,7 @@ export default function CopiedTextViewer({ insights, members }) {
         <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden text-sm">
           {[['all', 'All'], ['survived', 'Still there'], ['rewritten', 'Rewritten']].map(([v, label]) => (
             <button key={v} onClick={() => setSurvival(v)} aria-pressed={survival === v}
-              className={`px-3 min-h-11 ${survival === v ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600`}>
+              className={`min-w-11 px-3 min-h-11 ${survival === v ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600`}>
               {label}
             </button>
           ))}
