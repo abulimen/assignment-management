@@ -12,20 +12,46 @@ function renderLanding() {
 }
 
 describe('Landing page (flight recorder)', () => {
-  it('renders exactly one h1 with the primary pitch', () => {
+  it('renders exactly one h1 with the workspace-first pitch', () => {
     renderLanding();
     const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
-    expect(h1s[0]).toHaveTextContent('Stop grading blind.');
+    expect(h1s[0]).toHaveTextContent('See the work behind the submission.');
   });
 
-  it('shows both individual and group modes', () => {
+  it('explains the workflow before the telemetry (how it works)', () => {
+    renderLanding();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'How Draftly works' })
+    ).toBeInTheDocument();
+    for (const step of ['Create', 'Work', 'Submit', 'Review']) {
+      expect(
+        screen.getByRole('heading', { level: 3, name: step })
+      ).toBeInTheDocument();
+    }
+  });
+
+  it('shows both individual and group modes with equal weight', () => {
     renderLanding();
     expect(
       screen.getByRole('heading', { level: 3, name: 'Individual assignments' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { level: 3, name: 'Group assignments' })
+    ).toBeInTheDocument();
+  });
+
+  it('speaks to students, not only lecturers', () => {
+    renderLanding();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Your work has a history.' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the lecturer hook for the beta call to action', () => {
+    renderLanding();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Stop grading blind.' })
     ).toBeInTheDocument();
   });
 
