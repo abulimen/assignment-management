@@ -53,10 +53,10 @@ export default function VerifyEmail() {
 
   if (state === 'verifying') {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-canvas px-4">
+      <main className="flex min-h-screen items-center justify-center bg-graphite-900 px-4 font-instrument [color-scheme:dark]">
         <div className="w-full max-w-md text-center">
-          <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-primary-600" />
-          <h1 className="font-serif text-2xl font-semibold tracking-tight text-gray-900">
+          <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-signal" />
+          <h1 className="font-instrument text-2xl font-bold tracking-tight text-sheet">
             Verifying your email&hellip;
           </h1>
         </div>
@@ -87,7 +87,7 @@ export default function VerifyEmail() {
         )}
         <form onSubmit={handleResend} className="space-y-4">
           <div>
-            <label htmlFor="verify-email" className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+            <label htmlFor="verify-email" className="mb-1 block text-sm font-medium text-graphite-300">Email</label>
             <input
               id="verify-email"
               type="email"
@@ -104,9 +104,9 @@ export default function VerifyEmail() {
             {resending ? 'Sending…' : 'Resend verification email'}
           </button>
         </form>
-        {resendMsg && <p className="text-sm text-green-700">{resendMsg}</p>}
+        {resendMsg && <p className="text-sm text-ok-fg">{resendMsg}</p>}
       </div>
-      <p className="mt-4 text-center text-sm text-gray-500">
+      <p className="mt-4 text-center text-sm text-graphite-400">
         Already verified? <Link to="/login" className={authLink}>Sign in</Link>
       </p>
     </AuthShell>

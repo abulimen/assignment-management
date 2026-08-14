@@ -43,7 +43,7 @@ export default function Login() {
           </div>
         )}
         <div>
-          <label htmlFor="login-email" className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+          <label htmlFor="login-email" className="mb-1 block text-sm font-medium text-graphite-300">Email</label>
           <input
             id="login-email"
             type="email"
@@ -57,7 +57,7 @@ export default function Login() {
           />
         </div>
         <div>
-          <label htmlFor="login-password" className="mb-1 block text-sm font-medium text-gray-700">Password</label>
+          <label htmlFor="login-password" className="mb-1 block text-sm font-medium text-graphite-300">Password</label>
           <input
             id="login-password"
             type="password"
@@ -73,7 +73,7 @@ export default function Login() {
           {loading ? 'Signing in...' : 'Sign in'}
         </button>
       </form>
-      <div className="mt-4 space-y-1 text-center text-sm text-gray-500">
+      <div className="mt-4 space-y-1 text-center text-sm text-graphite-400">
         <p>
           <Link to="/forgot-password" className={authLink}>Forgot your password?</Link>
         </p>

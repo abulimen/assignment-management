@@ -38,7 +38,7 @@ export default function Register() {
         title="Check your inbox"
         message={
           <>
-            We sent a verification link to <span className="font-medium text-gray-900">{done.email}</span>.
+            We sent a verification link to <span className="font-medium text-sheet">{done.email}</span>.
             Click it to activate your account, then sign in.
           </>
         }
@@ -49,7 +49,7 @@ export default function Register() {
         >
           Resend verification email
         </button>
-        <Link to="/login" className="inline-flex min-h-11 items-center pt-1 text-sm text-gray-600 hover:text-gray-800">
+        <Link to="/login" className="inline-flex min-h-11 items-center pt-1 text-sm text-graphite-400 transition-colors hover:text-graphite-200">
           Already verified? Sign in
         </Link>
       </AuthSuccess>
@@ -66,7 +66,7 @@ export default function Register() {
           </div>
         )}
         <div>
-          <label htmlFor="reg-name" className="mb-1 block text-sm font-medium text-gray-700">Full name</label>
+          <label htmlFor="reg-name" className="mb-1 block text-sm font-medium text-graphite-300">Full name</label>
           <input
             id="reg-name"
             type="text"
@@ -79,7 +79,7 @@ export default function Register() {
           />
         </div>
         <div>
-          <label htmlFor="reg-email" className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+          <label htmlFor="reg-email" className="mb-1 block text-sm font-medium text-graphite-300">Email</label>
           <input
             id="reg-email"
             type="email"
@@ -93,7 +93,7 @@ export default function Register() {
           />
         </div>
         <div>
-          <label htmlFor="reg-password" className="mb-1 block text-sm font-medium text-gray-700">Password</label>
+          <label htmlFor="reg-password" className="mb-1 block text-sm font-medium text-graphite-300">Password</label>
           <input
             id="reg-password"
             type="password"
@@ -106,10 +106,10 @@ export default function Register() {
             aria-describedby="reg-password-hint"
             className={authInput}
           />
-          <p id="reg-password-hint" className="mt-1 text-xs text-gray-500">At least 8 characters.</p>
+          <p id="reg-password-hint" className="mt-1 text-xs text-graphite-400">At least 8 characters.</p>
         </div>
         <div>
-          <label htmlFor="reg-role" className="mb-1 block text-sm font-medium text-gray-700">I am a</label>
+          <label htmlFor="reg-role" className="mb-1 block text-sm font-medium text-graphite-300">I am a</label>
           <select
             id="reg-role"
             value={form.role}
@@ -124,7 +124,7 @@ export default function Register() {
           {loading ? 'Creating account...' : 'Create account'}
         </button>
       </form>
-      <p className="mt-4 text-center text-sm text-gray-500">
+      <p className="mt-4 text-center text-sm text-graphite-400">
         Already have an account? <Link to="/login" className={authLink}>Sign in</Link>
       </p>
     </AuthShell>

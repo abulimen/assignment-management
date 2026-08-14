@@ -65,7 +65,7 @@ export default function ResetPassword() {
           </div>
         )}
         <div>
-          <label htmlFor="reset-password" className="mb-1 block text-sm font-medium text-gray-700">New password</label>
+          <label htmlFor="reset-password" className="mb-1 block text-sm font-medium text-graphite-300">New password</label>
           <input
             id="reset-password"
             type="password"
@@ -79,7 +79,7 @@ export default function ResetPassword() {
           />
         </div>
         <div>
-          <label htmlFor="reset-confirm" className="mb-1 block text-sm font-medium text-gray-700">Confirm password</label>
+          <label htmlFor="reset-confirm" className="mb-1 block text-sm font-medium text-graphite-300">Confirm password</label>
           <input
             id="reset-confirm"
             type="password"
@@ -96,7 +96,7 @@ export default function ResetPassword() {
           {loading ? 'Updating…' : 'Reset password'}
         </button>
       </form>
-      <p className="mt-4 text-center text-sm text-gray-500">
+      <p className="mt-4 text-center text-sm text-graphite-400">
         <Link to="/login" className={authLink}>Back to sign in</Link>
       </p>
     </AuthShell>

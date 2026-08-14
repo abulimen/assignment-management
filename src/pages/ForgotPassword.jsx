@@ -51,7 +51,7 @@ export default function ForgotPassword() {
           </div>
         )}
         <div>
-          <label htmlFor="forgot-email" className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+          <label htmlFor="forgot-email" className="mb-1 block text-sm font-medium text-graphite-300">Email</label>
           <input
             id="forgot-email"
             type="email"
@@ -68,7 +68,7 @@ export default function ForgotPassword() {
           {loading ? 'Sending…' : 'Send reset link'}
         </button>
       </form>
-      <p className="mt-4 text-center text-sm text-gray-500">
+      <p className="mt-4 text-center text-sm text-graphite-400">
         Remembered it? <Link to="/login" className={authLink}>Sign in</Link>
       </p>
     </AuthShell>

@@ -1,3 +1,4 @@
+@import '@fontsource-variable/archivo/wdth.css';
 @import './styles/word.css';
 
 /* Self-hosted fonts (latin subset, variable wght axes) — swapped from the
@@ -151,3 +152,31 @@
 .hl-tooltip-typed { background: #16a34a; }
 .hl-tooltip-pasted { background: #dc2626; }
 .hl-tooltip-edited { background: #f97316; }
+
+/* Flight Recorder motion (landing + auth) — one orchestrated page load.
+   CSS-only on purpose: jsdom renders the pages without running animations,
+   and reduced-motion handling lives in the media query, not in JS. */
+@keyframes fr-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fr-trace {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes fr-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.fr-rise {
+  opacity: 0;
+  animation: fr-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+/* Pair with pathLength={1} + strokeDasharray="1" on the SVG element. */
+.fr-trace { animation: fr-trace 1.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.fr-pulse { animation: fr-pulse 2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .fr-rise { animation: none; opacity: 1; }
+  .fr-trace { animation: none; stroke-dashoffset: 0; }
+  .fr-pulse { animation: none; }
+}
