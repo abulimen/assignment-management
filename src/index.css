@@ -153,6 +153,11 @@
 .hl-tooltip-pasted { background: #dc2626; }
 .hl-tooltip-edited { background: #f97316; }
 
+/* Flight Recorder page chrome: dark selection tint + dark native widgets on
+   the graphite surfaces (the app interior keeps the plum selection). */
+.fr-page { color-scheme: dark; }
+.fr-page ::selection { background: rgba(92, 232, 242, 0.28); }
+
 /* Flight Recorder motion (landing + auth) — one orchestrated page load.
    CSS-only on purpose: jsdom renders the pages without running animations,
    and reduced-motion handling lives in the media query, not in JS. */

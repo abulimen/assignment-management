@@ -11,13 +11,12 @@ function renderLanding() {
   );
 }
 
-describe('Landing page (marketing root)', () => {
+describe('Landing page (flight recorder)', () => {
   it('renders exactly one h1 with the primary pitch', () => {
     renderLanding();
     const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
-    expect(h1s[0]).toHaveTextContent('See the work behind the grade.');
-    expect(screen.getByText('See the work behind the grade.')).toBeInTheDocument();
+    expect(h1s[0]).toHaveTextContent('Stop grading blind.');
   });
 
   it('shows both individual and group modes', () => {
@@ -25,16 +24,18 @@ describe('Landing page (marketing root)', () => {
     expect(
       screen.getByRole('heading', { level: 3, name: 'Individual assignments' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: 'Group assignments' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'Group assignments' })
+    ).toBeInTheDocument();
   });
 
-  it('makes both CTAs point at /register and /login', () => {
+  it('routes every beta CTA to /register and every sign-in to /login', () => {
     renderLanding();
-    const getStarted = screen.getAllByRole('link', { name: 'Get started' });
+    const beta = screen.getAllByRole('link', { name: 'Join the beta' });
     const signIn = screen.getAllByRole('link', { name: 'Sign in' });
-    expect(getStarted.length).toBeGreaterThan(0);
+    expect(beta.length).toBeGreaterThan(1);
     expect(signIn.length).toBeGreaterThan(0);
-    for (const link of getStarted) {
+    for (const link of beta) {
       expect(link.getAttribute('href')).toBe('/register');
     }
     for (const link of signIn) {
