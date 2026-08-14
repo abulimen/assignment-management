@@ -99,14 +99,14 @@ describe('mailer — Resend transport (RESEND_API_KEY set)', () => {
     expect(mail.url).toBe('http://x/y');
   });
 
-  it('defaults from to no-reply@assignment-mgmt.local when MAIL_FROM is unset', async () => {
+  it('defaults from to Draftly <no-reply@draftly.local> when MAIL_FROM is unset', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 200 })));
     setEnv('RESEND_API_KEY', KEY);
 
     await sendMail({ to: 'a@test.local', subject: 'S', text: 't' });
 
     const body = JSON.parse(fetch.mock.calls[0][1].body);
-    expect(body.from).toBe('Assignment Manager <no-reply@assignment-mgmt.local>');
+    expect(body.from).toBe('Draftly <no-reply@draftly.local>');
   });
 
   it('logs a delivery failure but still resolves (auth UX must not break)', async () => {

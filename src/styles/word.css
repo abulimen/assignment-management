@@ -1,20 +1,22 @@
 /* Word document design system — tokens and anatomy documented in DESIGN.md */
 
 :root {
-  --canvas: oklch(0.94 0.006 255);
-  --surface: oklch(0.988 0.002 95);
-  --sheet: oklch(0.997 0.002 95);
-  --ink: oklch(0.26 0.02 260);
-  --ink-muted: oklch(0.55 0.015 260);
-  --ink-faint: oklch(0.72 0.012 260);
-  --line: oklch(0.88 0.008 255);
-  --accent: oklch(0.45 0.12 265);
-  --accent-ink: oklch(0.985 0.005 265);
-  --accent-tint: oklch(0.93 0.04 260);
-  --heading: oklch(0.46 0.13 270);
+  /* Draftly Plum Ink tokens (see DESIGN.md). Warm paper chrome; aubergine
+     accent; neutrals tinted toward the 285deg plum hue. */
+  --canvas: oklch(0.955 0.01 85);
+  --surface: oklch(0.985 0.007 85);
+  --sheet: oklch(0.992 0.005 88);
+  --ink: oklch(0.27 0.02 285);
+  --ink-muted: oklch(0.52 0.02 285);
+  --ink-faint: oklch(0.7 0.015 285);
+  --line: oklch(0.89 0.012 85);
+  --accent: oklch(0.44 0.13 295);
+  --accent-ink: oklch(0.99 0.004 295);
+  --accent-tint: oklch(0.94 0.03 295);
+  --heading: oklch(0.42 0.09 295);
   --ok: oklch(0.6 0.13 155);
-  --warn: oklch(0.65 0.13 75);
-  --danger: oklch(0.55 0.17 25);
+  --warn: oklch(0.63 0.13 65);
+  --danger: oklch(0.56 0.18 25);
   --font-ui: 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-doc: Calibri, Carlito, 'Segoe UI', sans-serif;
 }
@@ -135,7 +137,7 @@
   cursor: pointer;
   transition: background 150ms cubic-bezier(0.25, 1, 0.5, 1);
 }
-.word-btn:hover { background: oklch(0.95 0.006 255); }
+.word-btn:hover { background: oklch(0.958 0.01 85); }
 .word-btn.active { background: var(--accent-tint); color: var(--accent); }
 .word-btn:disabled { opacity: 0.4; cursor: default; }
 .word-btn:disabled:hover { background: transparent; }
@@ -156,7 +158,7 @@
   font-family: var(--font-doc);
   transition: background 150ms cubic-bezier(0.25, 1, 0.5, 1);
 }
-.word-style-btn:hover { background: oklch(0.95 0.006 255); }
+.word-style-btn:hover { background: oklch(0.958 0.01 85); }
 .word-style-btn.active { border-color: var(--accent); background: var(--accent-tint); }
 .word-style-btn .preview { line-height: 1.1; color: var(--ink); }
 .word-style-btn .preview-normal { font-size: 12px; }
@@ -180,7 +182,7 @@
   cursor: pointer;
   transition: background 150ms cubic-bezier(0.25, 1, 0.5, 1);
 }
-.word-new-section:hover { background: oklch(0.4 0.12 265); }
+.word-new-section:hover { background: oklch(0.38 0.12 295); }
 
 /* ----------------------------------------------------------- status bar */
 
@@ -215,8 +217,8 @@
   background: var(--sheet);
   border: 1px solid var(--line);
   box-shadow:
-    0 1px 2px oklch(0.3 0.03 260 / 0.1),
-    0 4px 14px oklch(0.3 0.03 260 / 0.08);
+    0 1px 2px oklch(0.3 0.03 295 / 0.1),
+    0 4px 14px oklch(0.3 0.03 295 / 0.08);
   min-height: 1056px;
   counter-increment: page;
 }
@@ -266,7 +268,7 @@
 }
 .word-document section:hover .section-drag-handle { opacity: 1; }
 .section-drag-handle:hover {
-  background: oklch(0.95 0.006 255);
+  background: oklch(0.958 0.01 85);
   color: var(--ink-muted);
 }
 .word-editor-readonly .section-drag-handle { display: none; }
@@ -289,7 +291,7 @@
   line-height: 1;
   padding: 3px 8px 4px;
   border-radius: 999px;
-  color: oklch(0.985 0.005 265);
+  color: oklch(0.99 0.004 295);
   white-space: nowrap;
 }
 
@@ -376,7 +378,7 @@
 }
 .word-document a { color: var(--accent); text-decoration: underline; }
 .word-document code {
-  background: oklch(0.95 0.005 255);
+  background: oklch(0.958 0.01 85);
   padding: 1px 5px;
   border-radius: 3px;
   font-size: 0.88em;
@@ -410,7 +412,7 @@
   line-height: 1;
   padding: 2px 5px 3px;
   border-radius: 3px 3px 3px 0;
-  color: oklch(0.985 0.005 265);
+  color: oklch(0.99 0.004 295);
   background-color: currentColor;
   user-select: none;
   white-space: nowrap;

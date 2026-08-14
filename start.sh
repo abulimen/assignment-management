@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# start.sh — Launch all Assignment Management services at once.
+# start.sh — Launch all Draftly services at once.
 # Usage: ./start.sh
 # Stack: React (Vite) + three independent Node services (API, Analyzer, Collab).
 #
@@ -39,7 +39,7 @@ if [ -z "${INTERNAL_API_SECRET:-}" ] || [ "$INTERNAL_API_SECRET" = "local-dev-in
     echo -e "${RED}WARNING: INTERNAL_API_SECRET is unset or the placeholder — the collab internal API (/seal, /state) is unauthenticated-by-known-secret. Set a real value in .env for any non-local deployment.${NC}"
 fi
 
-echo -e "${BLUE}=== Assignment Management — Starting all services ===${NC}"
+echo -e "${BLUE}=== Draftly — Starting all services ===${NC}"
 
 echo -e "${RED}Killing existing processes...${NC}"
 fuser -k 8001/tcp 2>/dev/null || true

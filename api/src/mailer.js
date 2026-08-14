@@ -19,7 +19,7 @@ import fs from 'node:fs';
 
 const MAIL_LOG = process.env.MAIL_LOG || '/tmp/mailer.log';
 const RESEND_URL = 'https://api.resend.com/emails';
-const DEFAULT_FROM = 'Assignment Manager <no-reply@assignment-mgmt.local>';
+const DEFAULT_FROM = 'Draftly <no-reply@draftly.local>';
 const sent = [];
 
 function appendLog(line) {
@@ -76,8 +76,8 @@ export function sendVerificationEmail({ to, name, url }) {
   const token = match ? match[1] : null;
   return sendMail({
     to,
-    subject: 'Verify your Assignment Manager email',
-    text: `Hi ${name || 'there'},\n\nPlease verify your email address to finish creating your account:\n\n${url}\n\nThis link expires in 24 hours.\n\n— Assignment Manager`,
+    subject: 'Verify your Draftly email',
+    text: `Hi ${name || 'there'},\n\nPlease verify your email address to finish creating your account:\n\n${url}\n\nThis link expires in 24 hours.\n\n— Draftly`,
     html: `<p>Hi ${name || 'there'},</p><p>Please verify your email address:</p><p><a href="${url}">Verify my email</a></p><p>This link expires in 24 hours.</p>`,
     token,
     url,
@@ -89,8 +89,8 @@ export function sendPasswordResetEmail({ to, name, url }) {
   const token = match ? match[1] : null;
   return sendMail({
     to,
-    subject: 'Reset your Assignment Manager password',
-    text: `Hi ${name || 'there'},\n\nA password reset was requested for your account. If that wasn't you, you can safely ignore this email.\n\n${url}\n\nThis link expires in 1 hour.\n\n— Assignment Manager`,
+    subject: 'Reset your Draftly password',
+    text: `Hi ${name || 'there'},\n\nA password reset was requested for your account. If that wasn't you, you can safely ignore this email.\n\n${url}\n\nThis link expires in 1 hour.\n\n— Draftly`,
     html: `<p>Hi ${name || 'there'},</p><p>Reset your password:</p><p><a href="${url}">Reset my password</a></p><p>This link expires in 1 hour.</p>`,
     token,
     url,

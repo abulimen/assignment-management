@@ -1,7 +1,7 @@
-/* Assignment Management — app shell service worker.
+/* Draftly — app shell service worker.
  * Hand-rolled: network-first navigations (offline shell), stale-while-
  * revalidate for same-origin static assets. API JSON is never cached. */
-const CACHE = 'am-shell-v1';
+const CACHE = 'draftly-shell-v1';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

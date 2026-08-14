@@ -1,12 +1,12 @@
 {
-  "name": "Assignment Manager",
-  "short_name": "Assignment",
+  "name": "Draftly",
+  "short_name": "Draftly",
   "description": "See the work behind the grade — an evidence-based record of who actually contributed to individual and group assignments.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f9fafb",
-  "theme_color": "#ffffff",
+  "background_color": "#f3f0e9",
+  "theme_color": "#593f91",
   "lang": "en",
   "icons": [
     {

@@ -17,7 +17,7 @@ describe('static SPA serving', () => {
     fs.writeFileSync(path.join(dir, 'assets', 'app.js'), 'console.log(1);');
     fs.writeFileSync(path.join(dir, 'assets', 'style.css'), 'body{}');
     fs.writeFileSync(path.join(dir, 'sw.js'), 'self.skipWaiting();');
-    fs.writeFileSync(path.join(dir, 'manifest.webmanifest'), JSON.stringify({ name: 'Assignment Manager', short_name: 'Assignment', start_url: '/', display: 'standalone' }));
+    fs.writeFileSync(path.join(dir, 'manifest.webmanifest'), JSON.stringify({ name: 'Draftly', short_name: 'Draftly', start_url: '/', display: 'standalone' }));
     fs.writeFileSync(path.join(dir, 'icon-192.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
     fs.writeFileSync(path.join(dir, 'robots.txt'), 'User-agent: *\nAllow: /');
     api = await startApi({ staticDir: dir });
@@ -111,7 +111,7 @@ describe('static SPA serving', () => {
     expect(manifestRes.status).toBe(200);
     expect(manifestRes.headers.get('content-type')).toBe('application/manifest+json');
     const manifest = await manifestRes.json();
-    expect(manifest.name).toBe('Assignment Manager');
+    expect(manifest.name).toBe('Draftly');
     expect(manifest.display).toBe('standalone');
 
     const iconRes = await fetch(`http://127.0.0.1:${api.port}/icon-192.png`);

@@ -4,3 +4,5 @@ node_modules/
 *.log
 public/assets/
 __pycache__/
+# harness session artifacts
+.zcode/plans/

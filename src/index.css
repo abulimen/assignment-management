@@ -27,7 +27,24 @@
 @layer base {
   body {
     @apply min-h-screen;
+    color: #252530;          /* plum-charcoal ink, never #000 */
+    background-color: #f3f0e9; /* warm oat canvas, never flat gray */
+    -webkit-font-smoothing: antialiased;
   }
+  ::selection {
+    background-color: #ece8fe; /* plum-100 tint */
+  }
+}
+
+/* Generic content skeleton (plum-tinted pulse) */
+.skeleton {
+  background: linear-gradient(90deg, #ece9e2 25%, #f7f4ee 50%, #ece9e2 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 /* Legacy TipTap editor styles — used by the Playback replay editor.
@@ -45,7 +62,7 @@
 .ProseMirror:not(.word-document) code { @apply bg-gray-100 rounded px-1 py-0.5 text-sm font-mono; }
 .ProseMirror:not(.word-document) pre { @apply bg-gray-900 text-gray-100 rounded-lg p-4 my-2 overflow-x-auto; }
 .ProseMirror:not(.word-document) pre code { @apply bg-transparent p-0; }
-.ProseMirror:not(.word-document) a { @apply text-blue-600 underline; }
+.ProseMirror:not(.word-document) a { @apply text-primary-600 underline; }
 .ProseMirror:not(.word-document) img { @apply max-w-full rounded-lg my-2; }
 .ProseMirror:not(.word-document) table { @apply w-full border-collapse my-2; }
 .ProseMirror:not(.word-document) th { @apply border border-gray-300 bg-gray-50 px-3 py-2 text-left font-semibold; }
@@ -60,7 +77,7 @@
   display: inline-block;
   width: 2px;
   height: 1.2em;
-  background: #2563eb;
+  background: #593f91; /* Draftly aubergine */
   vertical-align: text-bottom;
   margin-left: -1px;
   animation: playback-blink 0.8s step-end infinite;
@@ -73,7 +90,7 @@
 
 /* Playback selection highlight */
 .playback-selection {
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(89, 63, 145, 0.2);
 }
 
 /* Source highlighting overlays — Grammarly-style transparent backgrounds */
