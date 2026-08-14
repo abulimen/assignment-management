@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { api } from '../api';
-import { KeyRound, AlertCircle, CircleCheckBig } from 'lucide-react';
+import { AlertCircle, CircleCheckBig } from 'lucide-react';
+import {
+  AuthShell, AuthSuccess, authCard, authInput, authBtn, authLink, authError,
+} from '../components/AuthShell';
 
 // Password reset. token arrives as ?token=<raw> from the emailed link.
 export default function ResetPassword() {
@@ -42,72 +45,60 @@ export default function ResetPassword() {
 
   if (done) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
-        <div className="w-full max-w-md text-center">
-          <CircleCheckBig className="w-12 h-12 text-green-600 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Password updated</h1>
-          <p className="text-gray-600 text-sm mb-6">You can now sign in with your new password.</p>
-          <Link to="/login"
-            className="inline-flex items-center justify-center w-full min-h-[44px] bg-primary-600 text-white rounded-lg px-3 py-2 text-sm font-medium hover:bg-primary-700 transition-colors">
-            Go to sign in
-          </Link>
-        </div>
-      </main>
+      <AuthSuccess
+        icon={<CircleCheckBig className="h-7 w-7" aria-hidden="true" />}
+        title="Password updated"
+        message="You can now sign in with your new password."
+      >
+        <Link to="/login" className={`${authBtn} w-full`}>Go to sign in</Link>
+      </AuthSuccess>
     );
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <KeyRound className="w-12 h-12 text-primary-600 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900">Choose a new password</h1>
-          <p className="text-gray-500 mt-2">It must be at least 8 characters long.</p>
+    <AuthShell title="Choose a new password" subtitle="It must be at least 8 characters long.">
+      <form onSubmit={handleSubmit} className={authCard}>
+        {error && (
+          <div role="alert" className={authError}>
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+        <div>
+          <label htmlFor="reset-password" className="mb-1 block text-sm font-medium text-gray-700">New password</label>
+          <input
+            id="reset-password"
+            type="password"
+            name="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+            className={authInput}
+          />
         </div>
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
-          {error && (
-            <div role="alert" className="flex items-start gap-2 bg-red-50 text-red-700 text-sm rounded-lg p-3">
-              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-          <div>
-            <label htmlFor="reset-password" className="block text-sm font-medium text-gray-700 mb-1">New password</label>
-            <input
-              id="reset-password"
-              type="password"
-              name="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              className="w-full min-h-[44px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-            />
-          </div>
-          <div>
-            <label htmlFor="reset-confirm" className="block text-sm font-medium text-gray-700 mb-1">Confirm password</label>
-            <input
-              id="reset-confirm"
-              type="password"
-              name="confirm"
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-              minLength={8}
-              className="w-full min-h-[44px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-            />
-          </div>
-          <button type="submit" disabled={loading}
-            className="w-full min-h-[44px] bg-primary-600 text-white rounded-lg py-2 px-3 text-sm font-medium hover:bg-primary-700 disabled:opacity-50 transition-colors">
-            {loading ? 'Updating…' : 'Reset password'}
-          </button>
-        </form>
-        <p className="text-center text-sm text-gray-500 mt-4">
-          <Link to="/login" className="inline-flex items-center min-h-11 px-1 text-primary-600 underline underline-offset-4">Back to sign in</Link>
-        </p>
-      </div>
-    </main>
+        <div>
+          <label htmlFor="reset-confirm" className="mb-1 block text-sm font-medium text-gray-700">Confirm password</label>
+          <input
+            id="reset-confirm"
+            type="password"
+            name="confirm"
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            required
+            minLength={8}
+            className={authInput}
+          />
+        </div>
+        <button type="submit" disabled={loading} className={authBtn}>
+          {loading ? 'Updating…' : 'Reset password'}
+        </button>
+      </form>
+      <p className="mt-4 text-center text-sm text-gray-500">
+        <Link to="/login" className={authLink}>Back to sign in</Link>
+      </p>
+    </AuthShell>
   );
 }

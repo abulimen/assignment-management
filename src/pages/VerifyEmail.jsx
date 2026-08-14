@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useLocation, Link } from 'react-router-dom';
 import { api } from '../api';
 import { MailCheck, AlertCircle, Loader2 } from 'lucide-react';
+import {
+  AuthShell, AuthSuccess, authCard, authInput, authBtn, authLink, authError,
+} from '../components/AuthShell';
 
 // Email-verification screen.
 // - With ?token= (clicked in the emailed link): verifies and shows the result.
@@ -50,10 +53,12 @@ export default function VerifyEmail() {
 
   if (state === 'verifying') {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <main className="flex min-h-screen items-center justify-center bg-canvas px-4">
         <div className="w-full max-w-md text-center">
-          <Loader2 className="w-10 h-10 text-primary-600 mx-auto mb-4 animate-spin" />
-          <h1 className="text-xl font-semibold text-gray-900">Verifying your email…</h1>
+          <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-primary-600" />
+          <h1 className="font-serif text-2xl font-semibold tracking-tight text-gray-900">
+            Verifying your email&hellip;
+          </h1>
         </div>
       </main>
     );
@@ -61,63 +66,49 @@ export default function VerifyEmail() {
 
   if (state === 'success') {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
-        <div className="w-full max-w-md text-center">
-          <MailCheck className="w-12 h-12 text-green-600 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Email verified!</h1>
-          <p className="text-gray-600 text-sm mb-6">Your account is active. You can now sign in.</p>
-          <Link to="/login"
-            className="inline-flex items-center justify-center w-full min-h-[44px] bg-primary-600 text-white rounded-lg px-3 py-2 text-sm font-medium hover:bg-primary-700 transition-colors">
-            Go to sign in
-          </Link>
-        </div>
-      </main>
+      <AuthSuccess
+        icon={<MailCheck className="h-7 w-7" aria-hidden="true" />}
+        title="Email verified!"
+        message="Your account is active. You can now sign in."
+      >
+        <Link to="/login" className={`${authBtn} w-full`}>Go to sign in</Link>
+      </AuthSuccess>
     );
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <MailCheck className="w-12 h-12 text-primary-600 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900">Verify your email</h1>
-          <p className="text-gray-500 mt-2">
-            We'll email you a link to activate your account.
-          </p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
-          {state === 'error' && (
-            <div role="alert" className="flex items-start gap-2 bg-red-50 text-red-700 text-sm rounded-lg p-3">
-              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-          <form onSubmit={handleResend} className="space-y-4">
-            <div>
-              <label htmlFor="verify-email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input
-                id="verify-email"
-                type="email"
-                name="email"
-                autoComplete="email"
-                inputMode="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full min-h-[44px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-              />
-            </div>
-            <button type="submit" disabled={resending}
-              className="w-full min-h-[44px] bg-primary-600 text-white rounded-lg py-2 px-3 text-sm font-medium hover:bg-primary-700 disabled:opacity-50 transition-colors">
-              {resending ? 'Sending…' : 'Resend verification email'}
-            </button>
-          </form>
-          {resendMsg && <p className="text-sm text-green-700">{resendMsg}</p>}
-        </div>
-        <p className="text-center text-sm text-gray-500 mt-4">
-          Already verified? <Link to="/login" className="inline-flex items-center min-h-11 px-1 text-primary-600 underline underline-offset-4">Sign in</Link>
-        </p>
+    <AuthShell title="Verify your email" subtitle="We'll email you a link to activate your account.">
+      <div className={authCard}>
+        {state === 'error' && (
+          <div role="alert" className={authError}>
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+        <form onSubmit={handleResend} className="space-y-4">
+          <div>
+            <label htmlFor="verify-email" className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+            <input
+              id="verify-email"
+              type="email"
+              name="email"
+              autoComplete="email"
+              inputMode="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className={authInput}
+            />
+          </div>
+          <button type="submit" disabled={resending} className={authBtn}>
+            {resending ? 'Sending…' : 'Resend verification email'}
+          </button>
+        </form>
+        {resendMsg && <p className="text-sm text-green-700">{resendMsg}</p>}
       </div>
-    </main>
+      <p className="mt-4 text-center text-sm text-gray-500">
+        Already verified? <Link to="/login" className={authLink}>Sign in</Link>
+      </p>
+    </AuthShell>
   );
 }
