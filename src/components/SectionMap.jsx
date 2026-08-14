@@ -43,7 +43,7 @@ export default function SectionMap({ editor, presence = {}, onAddSection }) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
+    <div className="bg-surface rounded-xl border border-line p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <ListTree className="w-4 h-4 text-gray-400" />

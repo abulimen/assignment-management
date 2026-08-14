@@ -33,7 +33,7 @@ export default function CopiedTextViewer({ insights, members }) {
   );
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+    <div className="bg-surface rounded-xl border border-line p-5 mb-6">
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <ClipboardPaste className="w-4 h-4 text-red-500" />
@@ -98,7 +98,7 @@ export default function CopiedTextViewer({ insights, members }) {
 
                 {open && (
                   <div className="px-4 pb-3 pt-1 border-t border-gray-100">
-                    <pre className="text-sm text-gray-700 whitespace-pre-wrap break-words bg-gray-50 rounded-lg p-3 font-sans">{p.text}</pre>
+                    <pre className="text-sm text-gray-700 whitespace-pre-wrap break-words bg-canvas rounded-lg p-3 font-sans">{p.text}</pre>
                     <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 flex-wrap">
                       <span>{p.len} chars pasted</span>
                       <span>{p.deleted} chars later deleted</span>

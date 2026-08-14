@@ -34,7 +34,7 @@ export default function EditDensity({ events, totalTimeMs }) {
   const peakCount = buckets.reduce((m, b) => Math.max(m, b.count), 0);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+    <div className="bg-surface rounded-xl border border-line p-4 mb-6">
       <h3 className="text-sm font-semibold text-gray-700 mb-3">Activity Timeline</h3>
       <div className="flex items-end gap-0.5 h-24" role="img"
         aria-label={`Bar chart of edit volume over time. ${buckets.length} time buckets; peak ${peakCount} events in a single bucket.`}>

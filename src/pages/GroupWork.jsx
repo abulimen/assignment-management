@@ -128,7 +128,7 @@ export default function GroupWork() {
               Create Group
             </button>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-6 min-w-0">
+          <div className="bg-surface rounded-xl border border-line p-6 min-w-0">
             <div className="flex items-center gap-2 mb-3">
               <UserPlus className="w-5 h-5 text-primary-600" />
               <h2 className="font-semibold">Join a Group</h2>

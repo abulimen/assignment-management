@@ -31,7 +31,7 @@ export default function EditTimeline({ events }) {
   const maxCount = Math.max(...data.map(d => d.count), 1);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+    <div className="bg-surface rounded-xl border border-line p-4 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-gray-700">Edit Activity Timeline</h3>
         <div className="flex items-center gap-1">

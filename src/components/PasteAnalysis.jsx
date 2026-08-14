@@ -69,7 +69,7 @@ export default function PasteAnalysis({ events, finalContent }) {
 
   if (pastes.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+      <div className="bg-surface rounded-xl border border-line p-6 mb-6">
         <div className="flex items-center gap-2 mb-2">
           <Clipboard className="w-5 h-5 text-green-500" />
           <h2 className="text-lg font-semibold">Paste Analysis</h2>
@@ -82,7 +82,7 @@ export default function PasteAnalysis({ events, finalContent }) {
   const modifiedChars = survivalStats.totalPasted - survivalStats.retained;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+    <div className="bg-surface rounded-xl border border-line p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Clipboard className="w-5 h-5 text-orange-500" />
@@ -122,7 +122,7 @@ export default function PasteAnalysis({ events, finalContent }) {
 
       {/* Hyperlinks */}
       {showLinks && hyperlinks.length > 0 && (
-        <div className="mb-4 bg-gray-50 rounded-lg p-4">
+        <div className="mb-4 bg-canvas rounded-lg p-4">
           <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1">
             <ExternalLink className="w-4 h-4" /> Hyperlinks in Pasted Content
           </h3>

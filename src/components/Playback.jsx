@@ -449,12 +449,12 @@ export default function Playback({ events, finalContent }) {
   const hasEvents = stepEvents.length > 0;
 
   if (!hasEvents && !hasFinal) {
-    return <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-600">No data to display.</div>;
+    return <div className="bg-surface rounded-xl border border-line p-8 text-center text-gray-600">No data to display.</div>;
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="border-b border-gray-200 bg-gray-50 p-3">
+    <div className="bg-surface rounded-xl border border-line overflow-hidden">
+      <div className="border-b border-gray-200 bg-canvas p-3">
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <button onClick={() => setMode('playback')} disabled={!hasEvents}
             className={`flex items-center gap-1.5 px-4 min-h-11 text-sm rounded-lg font-medium transition-colors ${mode === 'playback' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'} ${!hasEvents ? 'opacity-40 cursor-not-allowed' : ''} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600`}>

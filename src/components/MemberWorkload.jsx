@@ -9,7 +9,7 @@ export default function MemberWorkload({ insights, members }) {
   const heat = useMemo(() => heatmapMatrix(insights, list), [insights, list]);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+    <div className="bg-surface rounded-xl border border-line p-5 mb-6">
       <div className="flex items-center gap-2 mb-4">
         <Users className="w-4 h-4 text-primary-600" />
         <h3 className="font-semibold">Member workload</h3>

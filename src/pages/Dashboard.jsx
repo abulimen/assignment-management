@@ -110,7 +110,7 @@ export default function Dashboard() {
       )}
 
       {assignments.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+        <div className="text-center py-12 bg-surface rounded-xl border border-line">
           <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" aria-hidden="true" />
           {emptyState}
         </div>

@@ -58,7 +58,7 @@ export default function AssignmentForm({ onClose, onCreated }) {
             <input id="new-assignment-due" type="datetime-local" value={dueDate} onChange={e => setDueDate(e.target.value)}
               className="w-full min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" />
           </div>
-          <label htmlFor="groupWork" className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg cursor-pointer min-h-11">
+          <label htmlFor="groupWork" className="flex items-center gap-2 p-3 bg-canvas rounded-lg cursor-pointer min-h-11">
             <input type="checkbox" id="groupWork" checked={isGroupWork} onChange={e => setIsGroupWork(e.target.checked)}
               className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 shrink-0" />
             <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700">

@@ -36,7 +36,7 @@ export default function MemberActivityChart({ insights, members }) {
   }, [rows, list, view, hasData]);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+    <div className="bg-surface rounded-xl border border-line p-5 mb-6">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <Activity className="w-4 h-4 text-primary-600" />
