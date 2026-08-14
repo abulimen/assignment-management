@@ -6,3 +6,4 @@ public/assets/
 __pycache__/
 # harness session artifacts
 .zcode/plans/
+gui-test-screenshots/

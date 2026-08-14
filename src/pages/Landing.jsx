@@ -24,12 +24,6 @@ const kicker =
 const h2style =
   'mt-5 font-instrument text-[clamp(1.9rem,3.6vw,2.9rem)] font-bold leading-[1.05] tracking-tight text-sheet [font-stretch:118%]';
 
-// Staggered entrance: fr-rise fills forwards to opacity 1; reduced-motion
-// handling lives in CSS.
-function rise(delay) {
-  return { animationDelay: `${delay}ms` };
-}
-
 /* ------------------------------------------------------ hero artifact */
 
 const READOUT_ROWS = [
@@ -107,11 +101,9 @@ function RecordedDocument() {
           <path
             d="M0 48 H46 L50 44 53 50 56 40 60 48 H118 L122 30 125 52 128 22 131 50 134 34 137 48 H246 L250 26 253 50 256 32 259 48 H318 L321 43 324 48 H400"
             fill="none"
-            className="fr-trace stroke-signal"
+            className="stroke-signal"
             strokeWidth="1.5"
             strokeLinejoin="round"
-            pathLength={1}
-            strokeDasharray="1"
           />
         </svg>
         <div className="flex justify-between font-mono text-[9px] tracking-[0.08em] text-graphite-600" aria-hidden="true">
@@ -269,27 +261,21 @@ export default function Landing() {
         <section id="top" aria-label="Stop grading blind">
           <div className="mx-auto grid max-w-6xl items-center gap-14 px-6 pt-16 pb-20 sm:pt-24 sm:pb-28 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
             <div>
-              <p className={`${kicker} fr-rise flex items-center gap-2.5`} style={rise(0)}>
+              <p className={`${kicker} flex items-center gap-2.5`}>
                 <span aria-hidden="true" className="fr-pulse h-2 w-2 rounded-full bg-signal" />
                 <span className="text-signal">REC</span>
                 <span aria-hidden="true">&middot;</span>
                 Assignment telemetry
               </p>
-              <h1
-                className="fr-rise mt-7 max-w-xl font-instrument text-[clamp(2.9rem,7.5vw,5rem)] font-extrabold leading-[0.98] tracking-[-0.03em] text-sheet [font-stretch:125%]"
-                style={rise(90)}
-              >
+              <h1 className="mt-7 max-w-xl font-instrument text-[clamp(2.9rem,7.5vw,5rem)] font-extrabold leading-[0.98] tracking-[-0.03em] text-sheet [font-stretch:125%]">
                 Stop grading blind.
               </h1>
-              <p
-                className="fr-rise mt-7 max-w-xl text-lg leading-8 text-graphite-300"
-                style={rise(180)}
-              >
+              <p className="mt-7 max-w-xl text-lg leading-8 text-graphite-300">
                 Students do the writing inside Draftly, alone or as a group, and the workspace
                 records how the work gets made: every draft, paste, and edit. When it is
                 submitted, you review the document and the record behind it.
               </p>
-              <div className="fr-rise mt-10 flex flex-col gap-3 sm:flex-row sm:gap-4" style={rise(270)}>
+              <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:gap-4">
                 <Link to="/register" className={`${primaryBtn} w-full sm:w-auto`}>
                   Join the beta
                 </Link>
@@ -297,14 +283,14 @@ export default function Landing() {
                   Sign in
                 </Link>
               </div>
-              <ul className="fr-rise mt-12 flex flex-wrap gap-x-8 gap-y-2 border-t border-graphite-800 pt-6 font-mono text-[10px] uppercase tracking-[0.18em] text-graphite-500" style={rise(360)}>
+              <ul className="mt-12 flex flex-wrap gap-x-8 gap-y-2 border-t border-graphite-800 pt-6 font-mono text-[10px] uppercase tracking-[0.18em] text-graphite-500">
                 <li>Every keystroke logged</li>
                 <li>Sealed on submit</li>
                 <li>Evidence, not verdicts</li>
               </ul>
             </div>
 
-            <div className="fr-rise lg:pl-2" style={rise(200)}>
+            <div className="lg:pl-2">
               <RecordedDocument />
             </div>
           </div>

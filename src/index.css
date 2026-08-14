@@ -158,30 +158,16 @@
 .fr-page { color-scheme: dark; }
 .fr-page ::selection { background: rgba(92, 232, 242, 0.28); }
 
-/* Flight Recorder motion (landing + auth) — one orchestrated page load.
-   CSS-only on purpose: jsdom renders the pages without running animations,
-   and reduced-motion handling lives in the media query, not in JS. */
-@keyframes fr-rise {
-  from { opacity: 0; transform: translateY(14px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes fr-trace {
-  from { stroke-dashoffset: 1; }
-  to { stroke-dashoffset: 0; }
-}
+/* Flight Recorder motion (landing + auth). The page itself is static and
+   composed; the only ambient motion is the REC pulse, whose base state is
+   fully visible so throttled webviews, print, and reduced-motion users all
+   see a complete page. Reduced-motion handling lives in the media query,
+   not in JS. */
 @keyframes fr-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
 }
-.fr-rise {
-  opacity: 0;
-  animation: fr-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-/* Pair with pathLength={1} + strokeDasharray="1" on the SVG element. */
-.fr-trace { animation: fr-trace 1.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 .fr-pulse { animation: fr-pulse 2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .fr-rise { animation: none; opacity: 1; }
-  .fr-trace { animation: none; stroke-dashoffset: 0; }
   .fr-pulse { animation: none; }
 }
