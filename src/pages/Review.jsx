@@ -40,14 +40,25 @@ export default function Review() {
     }
   }, [id]);
 
-  if (loading) return <div className="text-center py-12 text-gray-500">Loading review...</div>;
+  if (loading) {
+    return (
+      <div role="status" aria-label="Loading review">
+        <div className="skeleton mb-6 h-6 w-1/3 rounded" />
+        <div className="skeleton mb-4 h-36 rounded-xl" />
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {[1, 2, 3, 4, 5].map((i) => <div key={i} className="skeleton h-16 rounded-xl" />)}
+        </div>
+        <div className="skeleton h-72 rounded-xl" />
+      </div>
+    );
+  }
   if (!data) return <div className="text-center py-12 text-gray-500">Submission not found.</div>;
 
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Submission Review</h1>
-        <p className="text-sm text-gray-600 mt-1">Proof of Work Analysis</p>
+        <h1 className="font-serif text-3xl font-semibold tracking-tight text-gray-900">Submission Review</h1>
+        <p className="text-sm text-gray-600 mt-1">Contribution, effort, and originality evidence.</p>
         <p className="text-xs text-gray-600 mt-1">Evidence is shown for your judgment — there is no automated verdict.</p>
       </div>
 

@@ -84,7 +84,7 @@ export default function CopiedTextViewer({ insights, members }) {
                   <span className="text-sm font-medium flex-shrink-0">{p.member.student_name}</span>
                   <span className="flex-1 text-sm text-gray-500 truncate min-w-0">{p.text}</span>
                   {p.links.length > 0 && (
-                    <span className="flex items-center gap-1 text-xs text-blue-600 flex-shrink-0">
+                    <span className="flex items-center gap-1 text-xs text-primary-600 flex-shrink-0">
                       <Link2 className="w-3.5 h-3.5" /> {p.links.length}
                     </span>
                   )}
@@ -108,7 +108,7 @@ export default function CopiedTextViewer({ insights, members }) {
                       <div className="mt-2 space-y-1">
                         {p.links.map((l) => (
                           <a key={l} href={l} target="_blank" rel="noreferrer"
-                            className="block text-xs text-blue-600 underline truncate">{l}</a>
+                            className="block text-xs text-primary-600 underline truncate">{l}</a>
                         ))}
                       </div>
                     )}

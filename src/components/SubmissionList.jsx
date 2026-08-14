@@ -31,7 +31,7 @@ export default function SubmissionList({ submissions }) {
             )}
             <span className={`text-xs font-medium px-2 py-1 rounded-full ${
               s.status === 'submitted' ? 'bg-green-50 text-green-700' :
-              s.status === 'graded' ? 'bg-blue-50 text-blue-700' :
+              s.status === 'graded' ? 'bg-primary-50 text-primary-700' :
               'bg-yellow-50 text-yellow-700'
             }`}>
               <span className="flex items-center gap-1">

@@ -10,7 +10,7 @@ function FactorCard({ factor }) {
   const barColor = score >= 80 ? 'bg-green-500' : score >= 60 ? 'bg-yellow-500' : score >= 40 ? 'bg-orange-500' : 'bg-red-500';
 
   return (
-    <div className={`rounded-lg border p-3 ${score < 40 ? 'border-red-200 bg-red-50/40' : 'border-gray-200 bg-white'}`}>
+    <div className={`rounded-lg border p-3 ${score < 40 ? 'border-red-200 bg-red-50/40' : 'border-line bg-surface'}`}>
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-sm font-medium text-gray-700">{factor.label}</span>
         <span className={`text-sm font-bold ${scoreColor}`}>{score}</span>
@@ -20,7 +20,7 @@ function FactorCard({ factor }) {
       </div>
       <p className="text-xs text-gray-600 leading-snug">{factor.narrative || factor.detail}</p>
       {score < 40 && factor.flip && (
-        <p className="text-xs text-blue-700 mt-1.5 leading-snug">
+        <p className="text-xs text-primary-700 mt-1.5 leading-snug">
           <RefreshCcw className="w-3 h-3 inline mr-1" />{factor.flip}
         </p>
       )}

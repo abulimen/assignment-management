@@ -24,7 +24,7 @@ export default function StatsBar({ stats }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-6">
       {items.map(item => (
-        <div key={item.label} className="bg-white rounded-xl border border-gray-200 px-3 py-3 flex items-center gap-3">
+        <div key={item.label} className="flex items-center gap-3 rounded-xl border border-line bg-surface px-3 py-3">
           <div className={`flex-shrink-0 ${item.warn ? 'text-orange-500' : 'text-gray-400'}`}>{item.icon}</div>
           <div className="min-w-0">
             <div className={`text-base font-semibold leading-tight ${item.warn ? 'text-orange-700' : 'text-gray-900'}`}>{item.value}</div>

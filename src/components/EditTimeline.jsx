@@ -76,7 +76,7 @@ export default function EditTimeline({ events }) {
           />
           <Bar dataKey="count" radius={[4, 4, 0, 0]}>
             {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.count === maxCount ? '#3b82f6' : '#93c5fd'} />
+              <Cell key={`cell-${index}`} fill={entry.count === maxCount ? '#593f91' : '#bdb2e6'} />
             ))}
           </Bar>
         </BarChart>

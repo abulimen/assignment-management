@@ -3,14 +3,14 @@ import { api } from '../api';
 import { Users, Clock, Keyboard, FileText, ChevronDown, ChevronUp, ShieldCheck, ShieldAlert, XCircle, AlertTriangle } from 'lucide-react';
 
 const AUTHOR_COLORS = [
-  'rgba(59, 130, 246, 0.35)',  // blue
-  'rgba(34, 197, 94, 0.35)',   // green
-  'rgba(168, 85, 247, 0.35)',  // purple
-  'rgba(249, 115, 22, 0.35)',  // orange
-  'rgba(236, 72, 153, 0.35)',  // pink
-  'rgba(14, 165, 233, 0.35)',  // sky
-  'rgba(234, 179, 8, 0.35)',   // yellow
-  'rgba(239, 68, 68, 0.35)',   // red
+  'rgba(89, 63, 145, 0.35)',  // aubergine (Draftly accent)
+  'rgba(34, 197, 94, 0.35)',  // green
+  'rgba(168, 85, 247, 0.35)', // purple
+  'rgba(249, 115, 22, 0.35)', // orange
+  'rgba(236, 72, 153, 0.35)', // pink
+  'rgba(14, 165, 233, 0.35)', // sky
+  'rgba(234, 179, 8, 0.35)',  // yellow
+  'rgba(239, 68, 68, 0.35)',  // red
 ];
 
 const scoreBadge = s => s >= 80 ? 'bg-green-100 text-green-700'
@@ -89,7 +89,7 @@ export default function ContributionXray({ sections }) {
   if (contributors.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+    <div className="bg-surface rounded-xl border border-line p-6 mb-6">
       <div className="flex items-center gap-2 mb-1">
         <Users className="w-5 h-5 text-primary-600" />
         <h2 className="text-lg font-semibold">Contribution X-Ray</h2>
@@ -143,10 +143,16 @@ export default function ContributionXray({ sections }) {
           return (
             <div key={c.id}>
               <button onClick={() => setExpanded(isOpen ? null : c.id)} aria-expanded={isOpen} aria-controls={`xray-detail-${c.id}`}
-                className={`w-full text-left border border-gray-200 rounded-lg p-3 transition-colors ${isOpen ? 'ring-2 ring-primary-200' : 'hover:bg-gray-50'}`}
-                style={{ borderLeft: `4px solid ${c.color.replace('0.35', '1')}` }}>
+                className={`w-full text-left border border-line rounded-lg p-3 transition-colors ${isOpen ? 'ring-2 ring-primary-200' : 'hover:bg-canvas'}`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">{c.name}</span>
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <span
+                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: c.color.replace('0.35', '1') }}
+                      aria-hidden="true"
+                    />
+                    {c.name}
+                  </span>
                   <span className="flex items-center gap-2">
                     <span className="text-xs text-gray-600">{pct.toFixed(1)}%</span>
                     {isOpen ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}

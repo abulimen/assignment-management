@@ -106,8 +106,8 @@ export default function PasteAnalysis({ events, finalContent }) {
           <div className="text-2xl font-bold text-orange-600">{pastes.length}</div>
           <div className="text-xs text-gray-600">External Pastes</div>
         </div>
-        <div className="bg-blue-50 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-blue-600">{survivalStats.totalPasted}</div>
+        <div className="bg-primary-50 rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold text-primary-600">{survivalStats.totalPasted}</div>
           <div className="text-xs text-gray-600">Chars Pasted</div>
         </div>
         <div className="bg-green-50 rounded-lg p-3 text-center">
@@ -129,7 +129,7 @@ export default function PasteAnalysis({ events, finalContent }) {
           <div className="space-y-1">
             {hyperlinks.map((link, i) => (
               <a key={i} href={link.url} target="_blank" rel="noopener noreferrer"
-                className="block text-sm text-blue-600 hover:underline truncate">
+                className="block text-sm text-primary-600 hover:underline truncate">
                 {link.url}
               </a>
             ))}

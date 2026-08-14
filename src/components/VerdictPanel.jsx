@@ -8,18 +8,20 @@ import DecisionRecord from './DecisionRecord';
 
 const VERDICT_TONE = {
   'Likely Original': { pill: 'bg-green-100 text-green-700', score: 'text-green-600' },
-  'Mostly Consistent': { pill: 'bg-lime-100 text-lime-700', score: 'text-lime-600' },
+  'Mostly Consistent': { pill: 'bg-amber-100 text-amber-700', score: 'text-amber-600' },
   'Needs Review': { pill: 'bg-orange-100 text-orange-700', score: 'text-orange-600' },
   'Mixed Evidence': { pill: 'bg-orange-100 text-orange-700', score: 'text-orange-600' },
   'Significant Concerns': { pill: 'bg-red-100 text-red-700', score: 'text-red-600' },
 };
+
+const cardCls = 'bg-surface rounded-xl border border-line p-6 mb-6';
 
 export default function VerdictPanel({ verdict, loading }) {
   const [open, setOpen] = useState(false);
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+      <div className={cardCls}>
         <Header />
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
@@ -31,7 +33,7 @@ export default function VerdictPanel({ verdict, loading }) {
 
   if (!verdict || verdict.confidence === 'none') {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+      <div className={cardCls}>
         <Header />
         <p className="text-gray-600 text-center py-6">
           {verdict?.error || 'No analysis available yet.'}
@@ -45,7 +47,7 @@ export default function VerdictPanel({ verdict, loading }) {
   const summary = verdict.decision_record?.summary;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+    <div className={cardCls}>
       <Header />
 
       {/* At-a-glance verdict */}

@@ -3,14 +3,14 @@
 
 // 8 distinct colors for author highlighting (cycled by member index).
 export const AUTHOR_PALETTE = [
-  'rgba(59, 130, 246, 0.30)',  // blue
-  'rgba(34, 197, 94, 0.30)',   // green
-  'rgba(168, 85, 247, 0.30)',  // purple
-  'rgba(249, 115, 22, 0.30)',  // orange
-  'rgba(236, 72, 153, 0.30)',  // pink
-  'rgba(14, 165, 233, 0.30)',  // sky
-  'rgba(234, 179, 8, 0.30)',   // yellow
-  'rgba(20, 184, 166, 0.30)',  // teal
+  'rgba(89, 63, 145, 0.30)',  // aubergine (Draftly accent)
+  'rgba(34, 197, 94, 0.30)',  // green
+  'rgba(168, 85, 247, 0.30)', // purple
+  'rgba(249, 115, 22, 0.30)', // orange
+  'rgba(236, 72, 153, 0.30)', // pink
+  'rgba(14, 165, 233, 0.30)', // sky
+  'rgba(234, 179, 8, 0.30)',  // yellow
+  'rgba(20, 184, 166, 0.30)', // teal
 ];
 
 // Extract plain text from a TipTap doc JSON (walks content[].content[].text).
