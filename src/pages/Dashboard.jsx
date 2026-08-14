@@ -42,9 +42,9 @@ function Skeleton() {
     <div className="grid gap-3" aria-hidden="true" role="status">
       <div className="sr-only">Loading assignments</div>
       {[1, 2, 3].map((i) => (
-        <div key={i} className="bg-white rounded-xl border border-gray-200 px-4 py-4 animate-pulse">
-          <div className="h-4 w-2/3 bg-gray-200 rounded" />
-          <div className="mt-3 h-3 w-24 bg-gray-200 rounded" />
+        <div key={i} className="rounded-xl border border-line bg-surface px-4 py-4">
+          <div className="skeleton h-4 w-2/3 rounded" />
+          <div className="skeleton mt-3 h-3 w-24 rounded" />
         </div>
       ))}
     </div>
@@ -84,11 +84,11 @@ export default function Dashboard() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         {isLecturer ? (
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <h1 className="font-serif text-3xl font-semibold tracking-tight text-gray-900">Dashboard</h1>
             <p className="mt-1 text-sm text-gray-500">Submitted work and anything that needs your attention.</p>
           </div>
         ) : (
-          <h1 className="text-2xl font-bold text-gray-900">Welcome, {firstName}</h1>
+          <h1 className="font-serif text-3xl font-semibold tracking-tight text-gray-900">Welcome, {firstName}</h1>
         )}
         {isLecturer && (
           <button
@@ -129,7 +129,7 @@ export default function Dashboard() {
               <Link
                 key={a.id}
                 to={link}
-                className="block bg-white rounded-xl border border-gray-200 px-4 py-3 min-h-12 flex items-center gap-3 hover:border-primary-300 hover:shadow-sm transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+                className="block rounded-xl border border-line bg-surface px-4 py-3 min-h-12 flex items-center gap-3 hover:border-primary-300 hover:shadow-sm transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">

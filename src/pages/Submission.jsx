@@ -89,13 +89,28 @@ export default function Submission() {
     }
   }
 
-  if (loading) return <div className="text-center py-12 text-gray-500">Loading editor...</div>;
+  if (loading) {
+    return (
+      <div role="status" aria-label="Loading editor">
+        <div className="skeleton mb-4 h-6 w-1/3 rounded" />
+        <div className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="flex gap-1 border-b border-line px-3 py-2">
+            <div className="skeleton h-7 w-24 rounded" />
+            <div className="skeleton h-7 w-20 rounded" />
+          </div>
+          <div className="flex justify-center p-8">
+            <div className="skeleton h-[420px] w-full max-w-[640px] rounded-sm" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-xl font-bold">{assignment?.title}</h1>
+          <h1 className="font-serif text-2xl font-semibold tracking-tight text-gray-900">{assignment?.title}</h1>
           {submission && (
             <p className="text-sm text-gray-600 mt-1">
               Status: <span className="font-medium text-gray-600">{submission.status}</span>

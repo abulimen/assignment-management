@@ -21,7 +21,18 @@ export default function GroupRoster({ assignmentId }) {
       .finally(() => setLoading(false));
   }, [assignmentId]);
 
-  if (loading) return <div className="text-center py-6 text-gray-500">Loading groups...</div>;
+  if (loading) {
+    return (
+      <div role="status" aria-label="Loading groups" className="space-y-4">
+        {[1, 2].map((i) => (
+          <div key={i} className="rounded-xl border border-line bg-surface p-4">
+            <div className="skeleton mb-3 h-4 w-1/3 rounded" />
+            <div className="skeleton h-3 w-2/3 rounded" />
+          </div>
+        ))}
+      </div>
+    );
+  }
   if (groups.length === 0) {
     return <div className="text-sm text-gray-600 py-4">No groups have formed yet.</div>;
   }
@@ -29,7 +40,7 @@ export default function GroupRoster({ assignmentId }) {
   return (
     <div className="space-y-4">
       {groups.map(g => (
-        <div key={g.id} className="bg-white rounded-xl border border-gray-200 p-4">
+        <div key={g.id} className="rounded-xl border border-line bg-surface p-4">
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <Users className="w-4 h-4 text-primary-600 shrink-0" />

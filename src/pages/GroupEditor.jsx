@@ -151,7 +151,7 @@ export default function GroupEditor() {
             className="inline-flex items-center gap-1 min-h-11 text-sm text-gray-500 hover:text-gray-700">
             <ArrowLeft className="w-4 h-4" /> Group
           </Link>
-          <h1 className="text-lg font-semibold">{group?.name || 'Group document'}</h1>
+          <h1 className="font-serif text-xl font-semibold tracking-tight text-gray-900">{group?.name || 'Group document'}</h1>
           {frozen && (
             <span className="flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
               <Lock className="w-3 h-3" /> Submitted — read only
@@ -178,8 +178,14 @@ export default function GroupEditor() {
               onReady={setEditor}
             />
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-600 text-sm">
-              Connecting to the shared document...
+            <div role="status" aria-label="Connecting to shared document" className="overflow-hidden rounded-lg border border-line bg-surface">
+              <div className="flex gap-1 border-b border-line px-3 py-2">
+                <div className="skeleton h-7 w-24 rounded" />
+                <div className="skeleton h-7 w-20 rounded" />
+              </div>
+              <div className="flex justify-center p-8">
+                <div className="skeleton h-[420px] w-full max-w-[640px] rounded-sm" />
+              </div>
             </div>
           )}
         </div>
@@ -210,7 +216,7 @@ export default function GroupEditor() {
           )}
 
           {isLeader && !frozen && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="rounded-xl border border-line bg-surface p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Submit</h3>
               {summary.allDone ? (
                 <button onClick={() => setSubmitDialog('normal')}

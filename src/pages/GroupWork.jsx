@@ -92,7 +92,15 @@ export default function GroupWork() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  if (loading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
+  if (loading) {
+    return (
+      <div role="status" aria-label="Loading group">
+        <div className="skeleton mb-6 h-7 w-1/2 rounded" />
+        <div className="skeleton mb-4 h-40 rounded-xl" />
+        <div className="skeleton h-28 rounded-xl" />
+      </div>
+    );
+  }
 
   // No group yet — show create/join options
   if (!group) {
@@ -104,9 +112,9 @@ export default function GroupWork() {
             <ArrowLeft className="w-4 h-4" /> Back to dashboard
           </Link>
         )}
-        <h1 className="text-2xl font-bold mb-6">Group Work</h1>
+        <h1 className="font-serif text-3xl font-semibold tracking-tight text-gray-900 mb-6">Group Work</h1>
         <div className="grid md:grid-cols-2 gap-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-6 min-w-0">
+          <div className="rounded-xl border border-line bg-surface p-6 min-w-0">
             <div className="flex items-center gap-2 mb-3">
               <Plus className="w-5 h-5 text-primary-600" />
               <h2 className="font-semibold">Create a Group</h2>
@@ -122,7 +130,7 @@ export default function GroupWork() {
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-6 min-w-0">
             <div className="flex items-center gap-2 mb-3">
-              <UserPlus className="w-5 h-5 text-green-700" />
+              <UserPlus className="w-5 h-5 text-primary-600" />
               <h2 className="font-semibold">Join a Group</h2>
             </div>
             <p className="text-sm text-gray-500 mb-4">Have an invite code from a teammate? Enter it here.</p>
@@ -130,7 +138,7 @@ export default function GroupWork() {
               <input type="text" value={joinCode} onChange={e => setJoinCode(e.target.value)} placeholder="ABC123"
                 className="flex-1 min-w-0 min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" />
               <button onClick={() => handleJoin()} disabled={!joinCode}
-                className="bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-800 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 min-h-11 shrink-0">
+                className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 min-h-11 shrink-0">
                 Join
               </button>
             </div>
@@ -143,7 +151,7 @@ export default function GroupWork() {
     // and page chrome so the page is never a dead end or bare shell.
     if (!id) {
       return (
-        <main className="min-h-screen bg-gray-50">
+        <main className="min-h-screen bg-canvas">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{content}</div>
         </main>
       );
@@ -159,7 +167,7 @@ export default function GroupWork() {
     <div>
       <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold">{group.name}</h1>
+          <h1 className="font-serif text-3xl font-semibold tracking-tight text-gray-900">{group.name}</h1>
           <p className="text-sm text-gray-600 mt-1">{group.assignment_title}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -174,7 +182,7 @@ export default function GroupWork() {
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-lg p-3 mb-4">{error}</div>}
 
       {/* Members + live statuses */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+      <div className="rounded-xl border border-line bg-surface p-4 mb-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-gray-400" />
@@ -212,7 +220,7 @@ export default function GroupWork() {
       </div>
 
       {/* Shared realtime editor */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+      <div className="rounded-xl border border-line bg-surface p-4 mb-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 min-w-0">
             <FileText className="w-4 h-4 text-gray-400" />
