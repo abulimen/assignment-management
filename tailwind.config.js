@@ -1,7 +1,9 @@
 /** @type {import('tailwindcss').Config} */
-// Draftly design tokens. Two identities live side by side:
+// Draftly design tokens. Three identities live side by side:
 //  - Plum Ink (primary ramp + canvas/surface/line): the app interior.
-//  - Flight Recorder (graphite/sheet/cobalt/signal): landing + auth, OKLCH.
+//  - Flight Recorder (graphite/sheet/cobalt/signal): dark auth pages, OKLCH.
+//  - Modern Atmospheric (atmos): the light landing, per the 2026-08-14 brief.
+//    Luminous sheet, graphite ink, cobalt telemetry, electric cyan.
 // See DESIGN.md. Semantic ok/warn/danger intentionally sit far from the brand
 // hue so verdicts and flags never read as buttons.
 export default {
@@ -39,6 +41,15 @@ export default {
           600: 'oklch(0.485 0.185 266)',
         },
         signal: 'oklch(0.86 0.12 202)',
+        // Modern Atmospheric landing palette (hex pinned by the brief).
+        atmos: {
+          sheet: '#F7F9FB',  // luminous sheet, the page background
+          soft: '#EEF2F6',   // soft surface: blocks, tiles, quiet fills
+          line: '#DCE3EA',   // hairlines, borders, dividers
+          ink: '#11161D',    // primary graphite text
+          cobalt: '#3157D5', // telemetry accent: CTAs, labels, focus
+          cyan: '#18DDE8',   // electric cyan: highlights, glows, live dots
+        },
         // Dark-tinted semantics for the Flight Recorder surfaces.
         error: { bg: 'oklch(0.25 0.05 25)', fg: 'oklch(0.78 0.14 25)' },
         ok: { bg: 'oklch(0.27 0.045 155)', fg: 'oklch(0.80 0.13 155)' },
@@ -52,6 +63,10 @@ export default {
         // Flight Recorder voice: Archivo Variable (wght + wdth axes). Display
         // uses heavy weights stretched wide; body stays at normal width.
         instrument: ['"Archivo Variable"', 'Archivo', 'system-ui', 'sans-serif'],
+        // Modern Atmospheric voice: Lora serif for expressive headlines,
+        // Space Grotesk for navigation, labels, and telemetry accents.
+        lora: ['Lora', 'Georgia', 'serif'],
+        grotesk: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
       },
     },
   },

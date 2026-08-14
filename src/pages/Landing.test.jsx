@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Landing from './Landing';
 
@@ -11,12 +11,20 @@ function renderLanding() {
   );
 }
 
-describe('Landing page (flight recorder)', () => {
+// The landing carries the Modern Atmospheric identity (light luminous sheet,
+// Lora headlines, cobalt + electric cyan telemetry); the committed story
+// order and copy are locked by the assertions below.
+describe('Landing page (modern atmospheric)', () => {
   it('renders exactly one h1 with the workspace-first pitch', () => {
     renderLanding();
     const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
     expect(h1s[0]).toHaveTextContent('See the work behind the submission.');
+  });
+
+  it('renders the private beta status badge in the hero', () => {
+    renderLanding();
+    expect(screen.getByText('Private Beta')).toBeInTheDocument();
   });
 
   it('explains the workflow before the telemetry (how it works)', () => {
@@ -53,6 +61,44 @@ describe('Landing page (flight recorder)', () => {
     expect(
       screen.getByRole('heading', { level: 2, name: 'Stop grading blind.' })
     ).toBeInTheDocument();
+  });
+
+  it('renders the integration bar with both workspace halves', () => {
+    renderLanding();
+    expect(screen.getByText('Works with')).toBeInTheDocument();
+    expect(screen.getByText('Assignment workflow')).toBeInTheDocument();
+  });
+
+  it('exposes a scroll-spy navigation for the feature sections', () => {
+    renderLanding();
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    const hrefs = within(nav).getAllByRole('link').map((link) => link.getAttribute('href'));
+    for (const id of ['how', 'modes', 'record', 'evidence', 'students']) {
+      expect(hrefs).toContain(`#${id}`);
+    }
+  });
+
+  it('renders the masonry testimonial voices', () => {
+    renderLanding();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'What early users say.' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Course lead, Public Health')).toBeInTheDocument();
+  });
+
+  it('renders an accessible FAQ accordion that toggles on click', () => {
+    renderLanding();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Questions, answered.' })
+    ).toBeInTheDocument();
+    const button = screen.getByRole('button', {
+      name: /what exactly does draftly record/i,
+    });
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(button);
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    expect(button).toHaveAttribute('aria-controls', 'faq-panel-0');
+    expect(screen.getByText(/every draft, revision, paste, and edit/i)).toBeInTheDocument();
   });
 
   it('routes every beta CTA to /register and every sign-in to /login', () => {
