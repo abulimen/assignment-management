@@ -1,13 +1,15 @@
 /** @type {import('tailwindcss').Config} */
-// Draftly design tokens. Three identities live side by side:
+import tailwindcssAnimate from 'tailwindcss-animate';
+
+// Draftly design tokens. Two identities live side by side:
 //  - Plum Ink (primary ramp + canvas/surface/line): the app interior.
-//  - Flight Recorder (graphite/sheet/cobalt/signal): dark auth pages, OKLCH.
-//  - Modern Atmospheric (atmos): the light landing, per the 2026-08-14 brief.
-//    Luminous sheet, graphite ink, cobalt telemetry, electric cyan.
+//  - Light Geometric (paper #F9F8F6 / ink #1A1A1B / cobalt #0047FF, carried as
+//    arbitrary values in src/components/landing/* + AuthShell): public
+//    landing + auth. `brand` binds the public voice, Plus Jakarta Sans.
 // See DESIGN.md. Semantic ok/warn/danger intentionally sit far from the brand
 // hue so verdicts and flags never read as buttons.
 export default {
-  content: ['./index.html', './src/**/*.{js,jsx}'],
+  content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],
   theme: {
     extend: {
       colors: {
@@ -19,56 +21,21 @@ export default {
         canvas: '#f3f0e9',
         surface: '#fcfaf5',
         line: '#dedad2',
-        // Flight Recorder: dark graphite chassis (cool neutrals tinted toward
-        // the cobalt hue ~255deg), one luminous sheet, cobalt telemetry, and
-        // an electric cyan signal. `signal` is never text on a cobalt fill.
-        graphite: {
-          950: 'oklch(0.145 0.012 255)',
-          900: 'oklch(0.185 0.014 255)',
-          800: 'oklch(0.225 0.016 255)',
-          700: 'oklch(0.30 0.018 255)',
-          600: 'oklch(0.40 0.02 255)',
-          500: 'oklch(0.55 0.02 250)',
-          400: 'oklch(0.66 0.018 250)',
-          300: 'oklch(0.76 0.015 250)',
-          200: 'oklch(0.87 0.012 250)',
-        },
-        sheet: 'oklch(0.972 0.007 228)',
-        cobalt: {
-          300: 'oklch(0.72 0.12 262)',
-          400: 'oklch(0.62 0.16 262)',
-          500: 'oklch(0.545 0.18 266)',
-          600: 'oklch(0.485 0.185 266)',
-        },
-        signal: 'oklch(0.86 0.12 202)',
-        // Modern Atmospheric landing palette (hex pinned by the brief).
-        atmos: {
-          sheet: '#F7F9FB',  // luminous sheet, the page background
-          soft: '#EEF2F6',   // soft surface: blocks, tiles, quiet fills
-          line: '#DCE3EA',   // hairlines, borders, dividers
-          ink: '#11161D',    // primary graphite text
-          cobalt: '#3157D5', // telemetry accent: CTAs, labels, focus
-          cyan: '#18DDE8',   // electric cyan: highlights, glows, live dots
-        },
-        // Dark-tinted semantics for the Flight Recorder surfaces.
-        error: { bg: 'oklch(0.25 0.05 25)', fg: 'oklch(0.78 0.14 25)' },
-        ok: { bg: 'oklch(0.27 0.045 155)', fg: 'oklch(0.80 0.13 155)' },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        // Public surface voice (landing + auth): the AI Studio source sets
+        // font-sans to Plus Jakarta Sans in its @theme; mirrored here so the
+        // copied components render as authored.
+        sans: ['"Plus Jakarta Sans Variable"', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
-        // Display headings (hero, auth, page titles). System serifs only, so
+        // Display headings (interior page titles). System serifs only, so
         // the literary voice ships with no extra font files.
         serif: ['Georgia', 'Iowan Old Style', 'Times New Roman', 'serif'],
-        // Flight Recorder voice: Archivo Variable (wght + wdth axes). Display
-        // uses heavy weights stretched wide; body stays at normal width.
-        instrument: ['"Archivo Variable"', 'Archivo', 'system-ui', 'sans-serif'],
-        // Modern Atmospheric voice: Lora serif for expressive headlines,
-        // Space Grotesk for navigation, labels, and telemetry accents.
-        lora: ['Lora', 'Georgia', 'serif'],
-        grotesk: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
+        // Public surface voice (landing + auth): self-hosted variable
+        // Plus Jakarta Sans (@fontsource-variable/plus-jakarta-sans).
+        brand: ['"Plus Jakarta Sans Variable"', 'system-ui', 'sans-serif'],
       },
     },
   },
-  plugins: [],
+  plugins: [tailwindcssAnimate],
 };

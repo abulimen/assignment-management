@@ -1,4 +1,4 @@
-@import '@fontsource-variable/archivo/wdth.css';
+@import '@fontsource-variable/plus-jakarta-sans/index.css';
 @import './styles/word.css';
 
 /* Self-hosted fonts (latin subset, variable wght axes) — swapped from the
@@ -21,34 +21,26 @@
   src: url('/fonts/jetbrains-mono-400.woff2') format('woff2');
 }
 
-/* Modern Atmospheric landing voice (self-hosted, latin subset): Lora for
-   expressive serif headlines, Space Grotesk for labels and telemetry accents.
-   Both are variable along the wght axis in the single files below. */
-@font-face {
-  font-family: 'Lora';
-  font-style: normal;
-  font-weight: 400 700; /* variable wght axis */
-  font-display: swap;
-  src: url('/fonts/lora-400.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Lora';
-  font-style: italic;
-  font-weight: 400 700; /* variable wght axis */
-  font-display: swap;
-  src: url('/fonts/lora-italic-400.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Space Grotesk';
-  font-style: normal;
-  font-weight: 300 700; /* variable wght axis */
-  font-display: swap;
-  src: url('/fonts/space-grotesk-400.woff2') format('woff2');
-}
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Tailwind v4 compatibility shim. The landing components are copied
+   byte-identical from the AI Studio export (Tailwind v4); these few v4-only
+   utilities are defined here so they render under the app's Tailwind v3
+   without editing the copied files. Entrance motion (animate-in …) comes
+   from the tailwindcss-animate plugin. */
+.shadow-xs { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+.rounded-xs { border-radius: 0.125rem; }
+.backdrop-blur-xs { backdrop-filter: blur(4px); }
+.border-current\/20 { border-color: color-mix(in srgb, currentColor 20%, transparent); }
+.focus\:outline-hidden:focus { outline: 2px solid transparent; outline-offset: 2px; }
+
+/* The AI Studio shell sets scroll-smooth on <html>; mirrored for anchors. */
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
 
 @layer base {
   body {
@@ -177,89 +169,3 @@
 .hl-tooltip-typed { background: #16a34a; }
 .hl-tooltip-pasted { background: #dc2626; }
 .hl-tooltip-edited { background: #f97316; }
-
-/* Flight Recorder page chrome: dark selection tint + dark native widgets on
-   the graphite surfaces (the app interior keeps the plum selection). */
-.fr-page { color-scheme: dark; }
-.fr-page ::selection { background: rgba(92, 232, 242, 0.28); }
-
-/* Flight Recorder motion (landing + auth). The page itself is static and
-   composed; the only ambient motion is the REC pulse, whose base state is
-   fully visible so throttled webviews, print, and reduced-motion users all
-   see a complete page. Reduced-motion handling lives in the media query,
-   not in JS. */
-@keyframes fr-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-.fr-pulse { animation: fr-pulse 2s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) {
-  .fr-pulse { animation: none; }
-}
-
-/* ----------------------------------------------------------------------
-   Modern Atmospheric landing (light identity). Static and composed; the
-   only ambient motion is the typing caret and the icon marquee, both base
-   state fully visible and both disabled under reduced motion. */
-
-/* Blinking block caret that reads as a typing cursor ("typing cursor
-   animation on subheading text"). Solid cobalt, so a throttled webview or
-   reduced-motion session still sees the cursor. */
-.landing-caret {
-  display: inline-block;
-  width: 2px;
-  height: 1.05em;
-  margin-left: 4px;
-  vertical-align: -0.12em;
-  background: #3157D5; /* atmos cobalt */
-  animation: landing-caret-blink 1.1s step-end infinite;
-}
-@keyframes landing-caret-blink {
-  0%, 60% { opacity: 1; }
-  61%, 100% { opacity: 0; }
-}
-
-/* Subtle 1px graphite grid with a radial mask: hero atmosphere, faded at
-   the edges so it reads as a surface texture, not a chart. */
-.landing-grid {
-  background-image:
-    linear-gradient(to right, rgba(17, 22, 29, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(17, 22, 29, 0.05) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(ellipse 65% 55% at 50% 40%, black 25%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 65% 55% at 50% 40%, black 25%, transparent 75%);
-}
-
-/* Seamless icon marquee for the integration bar. The track holds two
-   identical copies and translates -50% on a loop; hover pauses. */
-.landing-marquee {
-  display: flex;
-  gap: 2.25rem;
-  width: max-content;
-  animation: landing-marquee-scroll 28s linear infinite;
-}
-.landing-marquee:hover { animation-play-state: paused; }
-@keyframes landing-marquee-scroll {
-  to { transform: translateX(-50%); }
-}
-
-/* Soft glass for the floating panels (nav capsule, integration bar).
-   Deliberate and bounded: glass lives only where the brief places it. */
-.landing-glass-soft {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(17, 22, 29, 0.08);
-}
-.landing-glass-strong {
-  background: rgba(247, 249, 251, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(17, 22, 29, 0.1);
-  box-shadow: 0 4px 30px rgba(17, 22, 29, 0.08);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .landing-caret { animation: none; }
-  .landing-marquee { animation: none; }
-}

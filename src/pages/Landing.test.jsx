@@ -1,20 +1,23 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import Landing from './Landing';
 
+// The landing components are the AI Studio export, kept byte-identical; its
+// Join/Sign-in actions are wired by the Landing glue to the real auth routes.
 function renderLanding() {
-  render(
-    <MemoryRouter>
-      <Landing />
+  return render(
+    <MemoryRouter initialEntries={['/']}>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/register" element={<div>REGISTER PROBE</div>} />
+        <Route path="/login" element={<div>LOGIN PROBE</div>} />
+      </Routes>
     </MemoryRouter>
   );
 }
 
-// The landing carries the Modern Atmospheric identity (light luminous sheet,
-// Lora headlines, cobalt + electric cyan telemetry); the committed story
-// order and copy are locked by the assertions below.
-describe('Landing page (modern atmospheric)', () => {
+describe('Landing page (AI Studio public surface)', () => {
   it('renders exactly one h1 with the workspace-first pitch', () => {
     renderLanding();
     const h1s = screen.getAllByRole('heading', { level: 1 });
@@ -22,97 +25,79 @@ describe('Landing page (modern atmospheric)', () => {
     expect(h1s[0]).toHaveTextContent('See the work behind the submission.');
   });
 
-  it('renders the private beta status badge in the hero', () => {
+  it('tells the full workspace story in sections', () => {
     renderLanding();
-    expect(screen.getByText('Private Beta')).toBeInTheDocument();
-  });
-
-  it('explains the workflow before the telemetry (how it works)', () => {
-    renderLanding();
-    expect(
-      screen.getByRole('heading', { level: 2, name: 'How Draftly works' })
-    ).toBeInTheDocument();
-    for (const step of ['Create', 'Work', 'Submit', 'Review']) {
+    for (const name of [
+      'How Draftly works',
+      'One workspace. Two modes.',
+      'Everything that happened, kept.',
+      'Evidence on demand. Not surveillance.',
+      'Your work speaks for itself.',
+      'Free for early lecturers and their courses.',
+    ]) {
       expect(
-        screen.getByRole('heading', { level: 3, name: step })
+        screen.getByRole('heading', { level: 2, name })
       ).toBeInTheDocument();
     }
   });
 
-  it('shows both individual and group modes with equal weight', () => {
+  it('navigates the page through the three section anchors', () => {
     renderLanding();
-    expect(
-      screen.getByRole('heading', { level: 3, name: 'Individual assignments' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { level: 3, name: 'Group assignments' })
-    ).toBeInTheDocument();
-  });
-
-  it('speaks to students, not only lecturers', () => {
-    renderLanding();
-    expect(
-      screen.getByRole('heading', { level: 2, name: 'Your work has a history.' })
-    ).toBeInTheDocument();
-  });
-
-  it('keeps the lecturer hook for the beta call to action', () => {
-    renderLanding();
-    expect(
-      screen.getByRole('heading', { level: 2, name: 'Stop grading blind.' })
-    ).toBeInTheDocument();
-  });
-
-  it('renders the integration bar with both workspace halves', () => {
-    renderLanding();
-    expect(screen.getByText('Works with')).toBeInTheDocument();
-    expect(screen.getByText('Assignment workflow')).toBeInTheDocument();
-  });
-
-  it('exposes a scroll-spy navigation for the feature sections', () => {
-    renderLanding();
-    const nav = screen.getByRole('navigation', { name: 'Sections' });
-    const hrefs = within(nav).getAllByRole('link').map((link) => link.getAttribute('href'));
-    for (const id of ['how', 'modes', 'record', 'evidence', 'students']) {
-      expect(hrefs).toContain(`#${id}`);
+    for (const [name, href] of [
+      ['The Workspace', '#workspace'],
+      ['How it Works', '#how-it-works'],
+      ['Evidence', '#evidence'],
+    ]) {
+      const links = screen.getAllByRole('link', { name });
+      expect(links.length).toBeGreaterThan(0);
+      for (const link of links) {
+        expect(link.getAttribute('href')).toBe(href);
+      }
     }
   });
 
-  it('renders the masonry testimonial voices', () => {
+  it('routes every Join the beta action to /register', () => {
     renderLanding();
-    expect(
-      screen.getByRole('heading', { level: 2, name: 'What early users say.' })
-    ).toBeInTheDocument();
-    expect(screen.getByText('Course lead, Public Health')).toBeInTheDocument();
+    const beta = screen.getAllByRole('button', { name: /join the beta/i });
+    expect(beta.length).toBeGreaterThan(2);
+    fireEvent.click(beta[0]);
+    expect(screen.getByText('REGISTER PROBE')).toBeInTheDocument();
   });
 
-  it('renders an accessible FAQ accordion that toggles on click', () => {
+  it('routes sign-in actions to /login', () => {
     renderLanding();
-    expect(
-      screen.getByRole('heading', { level: 2, name: 'Questions, answered.' })
-    ).toBeInTheDocument();
-    const button = screen.getByRole('button', {
-      name: /what exactly does draftly record/i,
-    });
-    expect(button).toHaveAttribute('aria-expanded', 'false');
-    fireEvent.click(button);
-    expect(button).toHaveAttribute('aria-expanded', 'true');
-    expect(button).toHaveAttribute('aria-controls', 'faq-panel-0');
-    expect(screen.getByText(/every draft, revision, paste, and edit/i)).toBeInTheDocument();
+    const signIn = screen.getAllByRole('button', { name: 'Sign in' });
+    expect(signIn.length).toBeGreaterThan(1);
+    fireEvent.click(signIn[0]);
+    expect(screen.getByText('LOGIN PROBE')).toBeInTheDocument();
   });
 
-  it('routes every beta CTA to /register and every sign-in to /login', () => {
+  it('reveals the same actions from the mobile menu', () => {
     renderLanding();
-    const beta = screen.getAllByRole('link', { name: 'Join the beta' });
-    const signIn = screen.getAllByRole('link', { name: 'Sign in' });
-    expect(beta.length).toBeGreaterThan(1);
-    expect(signIn.length).toBeGreaterThan(0);
-    for (const link of beta) {
-      expect(link.getAttribute('href')).toBe('/register');
-    }
-    for (const link of signIn) {
-      expect(link.getAttribute('href')).toBe('/login');
-    }
+    const before = screen.getAllByRole('button', { name: /join the beta/i }).length;
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle menu' }));
+    expect(
+      screen.getAllByRole('button', { name: /join the beta/i }).length
+    ).toBe(before + 1);
+  });
+
+  it('opens the evidence inspector from the group contribution card', () => {
+    renderLanding();
+    fireEvent.click(screen.getByRole('button', { name: /view evidence/i }));
+    expect(screen.getByText(/Provenance Record Verified/i)).toBeInTheDocument();
+  });
+
+  it('opens the privacy info modal from the footer', () => {
+    renderLanding();
+    fireEvent.click(screen.getByRole('button', { name: 'Privacy' }));
+    expect(
+      screen.getByRole('heading', { name: 'Privacy Policy' })
+    ).toBeInTheDocument();
+  });
+
+  it('carries no third-party studio credit in the footer', () => {
+    renderLanding();
+    expect(screen.queryByText(/xpansieve/i)).not.toBeInTheDocument();
   });
 
   it('renders landmarks: header, main, footer, and a skip link', () => {
@@ -121,12 +106,5 @@ describe('Landing page (modern atmospheric)', () => {
     expect(screen.getByRole('main')).toBeInTheDocument();
     expect(screen.getByRole('contentinfo')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /skip to main content/i })).toBeInTheDocument();
-  });
-
-  it('keeps the privacy position in the footer', () => {
-    renderLanding();
-    expect(
-      screen.getByText(/Evidence is recorded for the lecturer[’']s review, never for surveillance/i)
-    ).toBeInTheDocument();
   });
 });
