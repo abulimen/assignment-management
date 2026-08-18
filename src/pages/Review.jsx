@@ -10,6 +10,10 @@ import {
   PanelRightOpen,
   AlertTriangle,
   Layers,
+  Activity,
+  TrendingUp,
+  Clock,
+  Clipboard,
 } from 'lucide-react';
 import { api } from '../api';
 import { AuthContext } from '../context/AuthContext';
@@ -21,6 +25,11 @@ import GroupFinalDoc from '../components/GroupFinalDoc';
 import SubmissionRecord from '../components/SubmissionRecord';
 import ProcessTimeline from '../components/ProcessTimeline';
 import PasteAnalysis from '../components/PasteAnalysis';
+import WritingPatternSummary from '../components/WritingPatternSummary';
+import DocumentGrowthChart from '../components/DocumentGrowthChart';
+import WritingRhythmChart from '../components/WritingRhythmChart';
+import EditingActivity from '../components/EditingActivity';
+import SourcesAndLinks from '../components/SourcesAndLinks';
 import ContributionXray from '../components/ContributionXray';
 import MemberWorkload from '../components/MemberWorkload';
 import MemberActivityChart from '../components/MemberActivityChart';
@@ -42,6 +51,7 @@ export default function Review() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [highlightPasted, setHighlightPasted] = useState(false); // DEFAULT OFF (Level 0 clean document)
   const [seekStepIndex, setSeekStepIndex] = useState(null);
+  const [processTab, setProcessTab] = useState('timeline'); // 'timeline' | 'pattern' | 'sources'
 
   useEffect(() => {
     api.get(`submissions/${id}/playback`)
@@ -119,14 +129,21 @@ export default function Review() {
           <div className="skeleton h-8 w-64 rounded-xl" />
           <div className="skeleton h-6 w-24 rounded-full" />
         </div>
-        <div className="flex-1 flex overflow-hidden p-6 gap-6 justify-center">
-          <div className="flex-1 max-w-4xl bg-white rounded-2xl border border-gray-200 p-8 shadow-xs">
-            <div className="skeleton h-full w-full rounded-xl" />
+        <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex items-center justify-center p-8">
+            <div className="w-[800px] h-[90%] bg-white shadow-xl rounded-sm p-12 space-y-6">
+              <div className="skeleton h-8 w-3/4 rounded" />
+              <div className="space-y-3 pt-4">
+                <div className="skeleton h-4 w-full rounded" />
+                <div className="skeleton h-4 w-5/6 rounded" />
+                <div className="skeleton h-4 w-4/6 rounded" />
+              </div>
+            </div>
           </div>
-          <div className="w-88 bg-white rounded-2xl border border-gray-200 p-5 space-y-4 hidden lg:block">
-            <div className="skeleton h-6 w-3/4 rounded" />
-            <div className="skeleton h-24 w-full rounded-xl" />
-            <div className="skeleton h-40 w-full rounded-xl" />
+          <div className="w-80 border-l border-gray-200 bg-white p-6 space-y-6 shrink-0">
+            <div className="skeleton h-20 w-full rounded-2xl" />
+            <div className="skeleton h-32 w-full rounded-2xl" />
+            <div className="skeleton h-40 w-full rounded-2xl" />
           </div>
         </div>
       </div>
@@ -135,106 +152,107 @@ export default function Review() {
 
   if (!data) {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#ECEAE5] p-4 text-center">
-        <div className="max-w-md w-full bg-white rounded-2xl border border-gray-200 p-8 shadow-xl space-y-4">
-          <FileText className="w-10 h-10 text-gray-400 mx-auto" />
-          <h2 className="text-lg font-bold text-gray-900">Submission Record Not Found</h2>
-          <p className="text-xs text-gray-500">
-            The requested assignment submission could not be loaded or you do not have permission to view it.
-          </p>
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-lg shadow-xs transition-all"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Return to Dashboard</span>
-          </Link>
-        </div>
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#ECEAE5] p-6 text-center">
+        <h2 className="text-xl font-bold text-[#1A1A1B]">Submission Not Found</h2>
+        <p className="text-sm text-gray-600 mt-2 font-sans max-w-md">
+          The requested submission could not be loaded or you do not have permission to view it.
+        </p>
+        <Link
+          to="/dashboard"
+          className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0047FF] text-white font-semibold text-xs shadow-xs hover:bg-[#0038CC] transition-colors cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Return to Dashboard
+        </Link>
       </div>
     );
   }
 
-  const isGroup = !!sections;
+  const isGroup = !!(data.group_id || (Array.isArray(data.sections) && data.sections.length > 0));
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#ECEAE5] text-[#1A1A1B] overflow-hidden font-sans antialiased">
-      
-      {/* Top Workspace Bar */}
-      <header className="h-14 bg-white border-b border-gray-200 px-3 sm:px-6 flex items-center justify-between shrink-0 z-30 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-        {/* Left: Brand + Back Button + Title */}
-        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+    <div className="h-screen w-screen flex flex-col bg-[#ECEAE5] overflow-hidden select-none">
+      {/* Top Header: Clean Breadcrumb & Primary Mode Switch */}
+      <header className="h-14 bg-white border-b border-gray-200 px-4 sm:px-6 flex items-center justify-between shrink-0 z-20 shadow-2xs">
+        <div className="flex items-center gap-3 min-w-0">
           <Link
-            to="/dashboard"
-            className="flex items-center gap-1.5 text-xs font-bold text-gray-600 hover:text-[#0047FF] transition-colors pr-2 border-r border-gray-200 py-1 shrink-0"
-            title="Return to Dashboard"
+            to={`/assignments/${data.assignment_id}`}
+            className="p-1.5 rounded-lg text-gray-500 hover:text-[#1A1A1B] hover:bg-gray-100 transition-colors cursor-pointer"
+            title="Back to Assignment"
           >
-            <BrandMark className="w-5 h-5 text-[#0047FF]" />
-            <ArrowLeft className="w-3.5 h-3.5 ml-1" />
-            <span className="hidden md:inline">Dashboard</span>
+            <ArrowLeft className="w-4 h-4" />
           </Link>
-
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs sm:text-sm font-bold text-[#1A1A1B] truncate max-w-[160px] sm:max-w-xs md:max-w-sm">
-              Submission Review
+          <div className="h-4 w-px bg-gray-200" />
+          <BrandMark variant="wordmark" className="h-4" />
+          <div className="hidden sm:flex flex-col min-w-0">
+            <span className="text-xs font-bold text-[#1A1A1B] truncate max-w-xs">
+              {data.assignment_title || 'Submission Review'}
             </span>
-            <span className="hidden sm:inline-flex text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 items-center gap-1 shrink-0">
-              <Lock className="w-2.5 h-2.5 text-emerald-600" /> Sealed
+            <span className="text-[10px] text-gray-600 font-mono truncate">
+              {data.student_name || (isGroup ? 'Group Submission' : 'Student')} · Submission Review
             </span>
           </div>
         </div>
 
-        {/* Center: Mode Switcher (Document View vs Process Record) */}
-        <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200 shadow-2xs">
+        {/* Center Mode Switcher: Document View vs Process Record */}
+        <div className="flex items-center bg-[#F9F8F6] p-1 rounded-xl border border-gray-200 shadow-2xs">
           <button
             type="button"
-            onClick={() => setActiveMode('document')}
-            className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 text-xs rounded-lg font-bold transition-all cursor-pointer ${
+            aria-label="Document View"
+            onClick={() => {
+              setActiveMode('document');
+              setSeekStepIndex(null);
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeMode === 'document'
-                ? 'bg-white text-[#0047FF] shadow-xs'
+                ? 'bg-white text-[#0047FF] shadow-xs font-bold'
                 : 'text-gray-600 hover:text-[#1A1A1B]'
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>Document View</span>
+            <span>Document</span>
           </button>
+
           <button
             type="button"
+            aria-label="Process Record"
             onClick={() => {
               setActiveMode('replay');
-              setHighlightPasted(true); // When actively viewing replay, enable highlights
+              setHighlightPasted(true);
             }}
-            className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 text-xs rounded-lg font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeMode === 'replay'
-                ? 'bg-white text-[#0047FF] shadow-xs'
+                ? 'bg-[#0047FF] text-white shadow-xs font-bold'
                 : 'text-gray-600 hover:text-[#1A1A1B]'
             }`}
           >
             <Film className="w-3.5 h-3.5" />
-            <span>Process Record</span>
+            <span>Process Record & Replay</span>
           </button>
         </div>
 
-        {/* Right: On-Demand Highlights Toggle + Sidebar Visibility + Avatar */}
+        {/* Right Tools & Collapse Toggle */}
         <div className="flex items-center gap-2">
-          {/* Highlights Toggle (Evidence on Demand) */}
-          <button
-            type="button"
-            onClick={() => setHighlightPasted(!highlightPasted)}
-            aria-pressed={highlightPasted}
-            title="Toggle color highlights on paper"
-            className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer shadow-2xs ${
-              highlightPasted
-                ? 'bg-amber-50 text-amber-950 border-amber-300 ring-1 ring-amber-300/40'
-                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            <Highlighter className={`w-3.5 h-3.5 ${highlightPasted ? 'text-amber-700' : 'text-gray-500'}`} />
-            <span className="font-bold">
-              {highlightPasted ? 'Highlights: ON' : 'Highlights: OFF'}
-            </span>
-          </button>
+          {/* Highlight Toggle in Document View */}
+          {activeMode === 'document' && pastedStrings.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setHighlightPasted(!highlightPasted)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                highlightPasted
+                  ? 'bg-amber-50 text-amber-950 border-amber-300 ring-1 ring-amber-300/40'
+                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+              }`}
+              title={highlightPasted ? 'Hide Pasted Text Highlights' : 'Highlight Pasted Text'}
+            >
+              <Highlighter className="w-3.5 h-3.5 text-amber-700" />
+              <span className="hidden md:inline">
+                {highlightPasted ? 'Highlights: ON' : 'Highlights: OFF'}
+              </span>
+            </button>
+          )}
 
-          {/* Sidebar Toggle Button */}
+          {/* Sidebar Collapse Toggle */}
           <button
             type="button"
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -290,10 +308,10 @@ export default function Review() {
           )}
         </main>
 
-        {/* RIGHT COLLAPSIBLE SIDEBAR: Submission Record (Doc View) / Process Timeline (Replay View) */}
+        {/* RIGHT COLLAPSIBLE SIDEBAR: Submission Record (Doc View) / Process Record & Visualizations (Replay View) */}
         <aside
           className={`${
-            sidebarOpen ? 'w-80 sm:w-92' : 'w-0 hidden'
+            sidebarOpen ? 'w-84 sm:w-96' : 'w-0 hidden'
           } border-l border-gray-200 bg-[#F9F8F6] flex flex-col shrink-0 overflow-y-auto transition-all duration-200 z-10 p-4 space-y-4`}
         >
           {activeMode === 'document' ? (
@@ -321,23 +339,87 @@ export default function Review() {
             </>
           ) : (
             <>
-              {/* Level 2: Chronological Process Timeline */}
-              <ProcessTimeline
-                events={data.events}
-                onSeekToEvent={(stepIdx) => {
-                  setSeekStepIndex(stepIdx);
-                }}
-              />
+              {/* Level 2 & 3: Visual Process Analytics Sub-Tabs */}
+              <div className="flex items-center bg-white p-1 rounded-xl border border-gray-200 shadow-2xs text-xs font-mono">
+                <button
+                  type="button"
+                  onClick={() => setProcessTab('pattern')}
+                  className={`flex-1 py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
+                    processTab === 'pattern'
+                      ? 'bg-[#0047FF] text-white shadow-xs'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Pattern
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProcessTab('timeline')}
+                  className={`flex-1 py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
+                    processTab === 'timeline'
+                      ? 'bg-[#0047FF] text-white shadow-xs'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Timeline
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProcessTab('sources')}
+                  className={`flex-1 py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
+                    processTab === 'sources'
+                      ? 'bg-[#0047FF] text-white shadow-xs'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Sources
+                </button>
+              </div>
 
-              {/* Factual Pasted Snippets Viewer */}
-              <PasteAnalysis events={data.events} />
+              {processTab === 'pattern' && (
+                <div className="space-y-4">
+                  {/* 1. Holistic Writing Pattern Summary */}
+                  <WritingPatternSummary events={data.events} />
+
+                  {/* 2. Document Growth Chart */}
+                  <DocumentGrowthChart events={data.events} finalWordCount={wordCount} />
+
+                  {/* 3. Writing Rhythm & Velocity */}
+                  <WritingRhythmChart events={data.events} />
+
+                  {/* 4. Editing & Revision Breakdown */}
+                  <EditingActivity events={data.events} />
+                </div>
+              )}
+
+              {processTab === 'timeline' && (
+                <div className="space-y-4">
+                  {/* Chronological Process Timeline with Seeking */}
+                  <ProcessTimeline
+                    events={data.events}
+                    onSeekToEvent={(stepIdx) => {
+                      setSeekStepIndex(stepIdx);
+                    }}
+                  />
+                </div>
+              )}
+
+              {processTab === 'sources' && (
+                <div className="space-y-4">
+                  {/* Text Sources & Links */}
+                  <SourcesAndLinks events={data.events} rawContent={data.content} />
+
+                  {/* Factual Pasted Snippets Viewer */}
+                  <PasteAnalysis events={data.events} />
+                </div>
+              )}
 
               {/* Group Activity Charts if group submission */}
               {isGroup && data.insights && (
-                <>
+                <div className="space-y-4 pt-2 border-t border-gray-200">
                   <MemberActivityChart insights={data.insights} members={sections} />
                   <CopiedTextViewer insights={data.insights} members={sections} />
-                </>
+                </div>
               )}
             </>
           )}
