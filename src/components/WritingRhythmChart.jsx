@@ -8,7 +8,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
-import { Zap, Clock } from 'lucide-react';
+import { Zap } from 'lucide-react';
 
 export default function WritingRhythmChart({ events }) {
   const { data, avgWpm, rhythmSummary } = useMemo(() => {
@@ -25,80 +25,88 @@ export default function WritingRhythmChart({ events }) {
       return { data: [], avgWpm: 0, rhythmSummary: 'No writing velocity data recorded.' };
     }
 
-    // Measure rolling speed across 30-second windows
-    const WINDOW_SEC = 30;
-    const firstTime = Number(timed[0].occurred_at);
-    const lastTime = Number(timed[timed.length - 1].occurred_at);
-    const duration = Math.max(lastTime - firstTime, 1);
+    // Group typing events by active minute buckets
+    const minuteBuckets = new Map();
 
-    const points = [];
-    let windowStart = firstTime;
-    let windowEnd = firstTime + WINDOW_SEC;
-    let eventIdx = 0;
-    const speeds = [];
+    for (const ev of timed) {
+      const timeSec = Number(ev.occurred_at);
+      const minuteKey = Math.floor(timeSec / 60) * 60;
 
-    while (windowStart <= lastTime) {
-      let charsInWindow = 0;
-      let pausesInWindow = 0;
-
-      while (eventIdx < timed.length && Number(timed[eventIdx].occurred_at) < windowEnd) {
-        const ev = timed[eventIdx];
-        if (ev.type === 'step' || ev.type === 'keystroke') {
-          charsInWindow += 1;
-        } else if (ev.type === 'paste') {
-          // paste characters don't count toward typing speed
-        }
-        eventIdx++;
+      if (!minuteBuckets.has(minuteKey)) {
+        minuteBuckets.set(minuteKey, {
+          timestamp: minuteKey,
+          typedChars: 0,
+          keystrokeTimes: [],
+        });
       }
 
-      // WPM = (chars / 5) / (minutes)
-      const wordsInWindow = charsInWindow / 5;
-      const minutes = WINDOW_SEC / 60;
-      const wpm = Math.round(wordsInWindow / minutes);
-
-      if (charsInWindow > 0) {
-        speeds.push(wpm);
+      const bucket = minuteBuckets.get(minuteKey);
+      if (ev.type === 'step' || ev.type === 'keystroke') {
+        bucket.typedChars += 1;
+        bucket.keystrokeTimes.push(timeSec);
       }
-
-      points.push({
-        time: new Date(windowStart * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        wpm: wpm,
-      });
-
-      windowStart += WINDOW_SEC;
-      windowEnd += WINDOW_SEC;
     }
 
-    // Calculate variance/standard deviation of typing velocity
+    // Calculate WPM only for minutes where writing actually occurred
+    const activePoints = [];
+    const validSpeeds = [];
+
+    for (const [minuteSec, bucket] of minuteBuckets.entries()) {
+      if (bucket.typedChars === 0) continue;
+
+      // Active duration within this minute (difference between first & last keystroke or active time)
+      let activeSecondsInMinute = 60;
+      if (bucket.keystrokeTimes.length >= 2) {
+        const firstK = bucket.keystrokeTimes[0];
+        const lastK = bucket.keystrokeTimes[bucket.keystrokeTimes.length - 1];
+        activeSecondsInMinute = Math.max(lastK - firstK, 10);
+      }
+
+      const words = bucket.typedChars / 5;
+      const minutesActive = activeSecondsInMinute / 60;
+      const wpm = Math.max(5, Math.min(180, Math.round(words / minutesActive)));
+
+      validSpeeds.push(wpm);
+
+      const timeLabel = new Date(minuteSec * 1000).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      activePoints.push({
+        time: timeLabel,
+        wpm: wpm,
+        chars: bucket.typedChars,
+        timestamp: minuteSec,
+      });
+    }
+
+    // Sort by timestamp
+    activePoints.sort((a, b) => a.timestamp - b.timestamp);
+
     const calculatedAvgWpm =
-      speeds.length > 0 ? Math.round(speeds.reduce((a, b) => a + b, 0) / speeds.length) : 0;
+      validSpeeds.length > 0
+        ? Math.round(validSpeeds.reduce((a, b) => a + b, 0) / validSpeeds.length)
+        : 0;
 
     let variance = 0;
-    if (speeds.length > 1) {
+    if (validSpeeds.length > 1) {
       const avg = calculatedAvgWpm;
-      const sqDiffs = speeds.map((s) => Math.pow(s - avg, 2));
-      variance = Math.sqrt(sqDiffs.reduce((a, b) => a + b, 0) / speeds.length);
+      const sqDiffs = validSpeeds.map((s) => Math.pow(s - avg, 2));
+      variance = Math.sqrt(sqDiffs.reduce((a, b) => a + b, 0) / validSpeeds.length);
     }
 
     let rhythmSummary = 'Typing speed naturally varied during the active writing sessions.';
-    if (speeds.length < 3) {
-      rhythmSummary = 'Short session duration with few continuous typing windows.';
-    } else if (variance < 2 && calculatedAvgWpm > 40) {
+    if (validSpeeds.length < 2) {
+      rhythmSummary = 'Short writing duration recorded.';
+    } else if (variance < 3 && calculatedAvgWpm > 40) {
       rhythmSummary = 'Typing speed remained unusually uniform throughout the session.';
     } else if (calculatedAvgWpm > 95) {
       rhythmSummary = 'Sustained high-velocity typing recorded across active periods.';
     }
 
-    // Downsample points if there are too many (e.g. max 20 data points for a clean graph)
-    const MAX_POINTS = 20;
-    let sampledPoints = points;
-    if (points.length > MAX_POINTS) {
-      const step = Math.ceil(points.length / MAX_POINTS);
-      sampledPoints = points.filter((_, i) => i % step === 0);
-    }
-
     return {
-      data: sampledPoints,
+      data: activePoints,
       avgWpm: calculatedAvgWpm,
       rhythmSummary,
     };
@@ -158,8 +166,8 @@ export default function WritingRhythmChart({ events }) {
               dataKey="wpm"
               stroke="#D97706"
               strokeWidth={2}
-              dot={{ r: 2, fill: '#D97706' }}
-              activeDot={{ r: 4 }}
+              dot={{ r: 3, fill: '#D97706' }}
+              activeDot={{ r: 5 }}
             />
           </LineChart>
         </ResponsiveContainer>
