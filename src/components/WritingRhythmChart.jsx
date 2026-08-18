@@ -108,7 +108,7 @@ export default function WritingRhythmChart({ events }) {
     if (validSpeeds.length < 2) {
       rhythmSummary = 'Short writing duration recorded.';
     } else if (abnormalCount > 0) {
-      rhythmSummary = 'Rapid typing bursts detected in specific writing intervals (highlighted in red).';
+      rhythmSummary = 'Rapid typing burst detected in a specific writing interval (highlighted in red).';
     } else if (variance < 3 && calculatedAvgWpm > 40) {
       rhythmSummary = 'Typing speed remained unusually uniform throughout the session.';
     }
@@ -133,8 +133,8 @@ export default function WritingRhythmChart({ events }) {
     if (payload.isAbnormalHigh) {
       return (
         <g>
-          <circle cx={cx} cy={cy} r={6} fill="#EF4444" fillOpacity={0.25} />
-          <circle cx={cx} cy={cy} r={3.5} fill="#EF4444" stroke="#FFFFFF" strokeWidth={1.5} />
+          <circle cx={cx} cy={cy} r={7} fill="#EF4444" fillOpacity={0.25} />
+          <circle cx={cx} cy={cy} r={4} fill="#EF4444" stroke="#FFFFFF" strokeWidth={1.5} />
         </g>
       );
     }
@@ -155,8 +155,8 @@ export default function WritingRhythmChart({ events }) {
         </div>
         <div className="flex items-center gap-2">
           {hasAbnormalPoint && (
-            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-50 border border-rose-200 text-rose-700 uppercase">
-              Spikes Detected
+            <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-700 uppercase tracking-wider">
+              Burst Spike
             </span>
           )}
           <span className="text-[11px] font-mono font-bold text-gray-700">
@@ -220,7 +220,7 @@ export default function WritingRhythmChart({ events }) {
             Natural rhythm
           </span>
           <span className="flex items-center gap-1 text-rose-700">
-            <span className="w-2 h-2 rounded-full bg-rose-500" />
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-rose-200" />
             High burst (&gt;85 WPM)
           </span>
         </div>
