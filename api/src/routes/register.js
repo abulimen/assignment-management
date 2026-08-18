@@ -34,10 +34,12 @@ export default async function register(ctx) {
   const [existing] = await ctx.pool.query('SELECT id FROM users WHERE email = ?', [String(data.email)]);
   if (existing.length) return sendError(ctx, 409, 'Email already registered');
 
+  const studentId = data.role === 'student' && data.student_id ? String(data.student_id).trim() : (data.student_id ? String(data.student_id).trim() : null);
+
   const hash = await bcrypt.hash(String(data.password), BCRYPT_COST);
   const [r] = await ctx.pool.query(
-    'INSERT INTO users (email, password, name, role, email_verified) VALUES (?, ?, ?, ?, 0)',
-    [String(data.email), hash, data.name, data.role],
+    'INSERT INTO users (email, password, name, role, student_id, email_verified) VALUES (?, ?, ?, ?, ?, 0)',
+    [String(data.email), hash, data.name, data.role, studentId],
   );
   const userId = r.insertId;
   rateLimiter.hit(`register:${ip}`, REGISTER_WINDOW_MS);
@@ -54,7 +56,7 @@ export default async function register(ctx) {
 
   // No auto-login, no token: the SPA shows a "check your email" prompt.
   sendJson(ctx, 201, {
-    user: { id: userId, email: String(data.email), name: data.name, role: data.role, emailVerified: false },
+    user: { id: userId, email: String(data.email), name: data.name, role: data.role, studentId, emailVerified: false },
     message: 'Account created! Please verify your email address before signing in.',
   });
 }

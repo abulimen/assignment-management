@@ -1,6 +1,6 @@
 import { sendJson, sendError, guard, parseIdParam } from '../http.js';
 import { sectionPastedTexts } from '../authorship.js';
-import { round } from '../text.js';
+import { round, extractPlainText, strWordCount } from '../text.js';
 import { bucketActivity, pasteInventory, summarizeMember } from '../insights.js';
 
 function parseJsonObj(s) {
@@ -27,9 +27,18 @@ export default async function playback(ctx) {
   const sub = rows[0];
   if (!sub) return sendError(ctx, 404, 'Submission not found');
 
-  // Access: lecturers any; students own or group-member (realtime via
+  // Access: lecturers of the course; students own or group-member (realtime via
   // submissions.group_id, legacy merged via groups.merged_submission_id).
-  if (user.role !== 'lecturer' && Number(sub.student_id) !== user.sub) {
+  if (user.role === 'lecturer') {
+    const [aRows] = await ctx.pool.query('SELECT course_id FROM assignments WHERE id = ?', [sub.assignment_id]);
+    const a = aRows[0];
+    if (!a) return sendError(ctx, 403, 'Forbidden');
+    const [cm] = await ctx.pool.query(
+      "SELECT 1 FROM course_members WHERE course_id = ? AND user_id = ? AND role = 'lecturer'",
+      [a.course_id, user.sub],
+    );
+    if (cm.length === 0) return sendError(ctx, 403, 'Forbidden');
+  } else if (Number(sub.student_id) !== user.sub) {
     let allowed = false;
     if (sub.group_id) {
       const [gr] = await ctx.pool.query('SELECT id FROM group_members WHERE group_id = ? AND student_id = ?', [sub.group_id, user.sub]);
@@ -45,7 +54,7 @@ export default async function playback(ctx) {
   }
 
   const [evRows] = await ctx.pool.query(
-    'SELECT type, data, steps_json, selection_from, selection_to, occurred_at, sequence FROM events WHERE submission_id = ? ORDER BY sequence ASC',
+    'SELECT id, type, data, steps_json, selection_from, selection_to, occurred_at, sequence FROM events WHERE submission_id = ? ORDER BY occurred_at ASC, id ASC',
     [id],
   );
   const events = evRows.map((e) => {
@@ -63,7 +72,16 @@ export default async function playback(ctx) {
   });
 
   const [statsRows] = await ctx.pool.query('SELECT * FROM submission_stats WHERE submission_id = ?', [id]);
-  const stats = statsRows[0] || {};
+  let stats = statsRows[0] || {};
+  if (sub.content) {
+    try {
+      const doc = JSON.parse(sub.content);
+      const computedWords = strWordCount(extractPlainText(doc));
+      if (computedWords > 0) {
+        stats = { ...stats, word_count: computedWords };
+      }
+    } catch {}
+  }
 
   // Realtime group submission: bind to the sealed snapshot.
   if (sub.group_id) {
@@ -73,7 +91,7 @@ export default async function playback(ctx) {
       const contributions = snapshot.contributions || {};
 
       const [secRows] = await ctx.pool.query(`
-        SELECT gm.student_id, u.name AS student_name,
+        SELECT gm.student_id, u.name AS student_name, u.student_id AS student_matric,
                s.id AS submission_id,
                ss.word_count, ss.keystroke_count, ss.paste_count,
                ss.total_time_ms, ss.paste_ratio
@@ -102,7 +120,7 @@ export default async function playback(ctx) {
         // Per-member insight aggregates (activity, effort, paste inventory).
         if (row.submission_id) {
           const [memEvents] = await ctx.pool.query(
-            'SELECT type, data, steps_json, occurred_at, sequence FROM events WHERE submission_id = ? ORDER BY sequence ASC',
+            'SELECT id, type, data, steps_json, occurred_at, sequence FROM events WHERE submission_id = ? ORDER BY occurred_at ASC, id ASC',
             [row.submission_id],
           );
           const decoded = memEvents.map((e) => ({

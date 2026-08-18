@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../hooks/useAuth';
+import { encodeId } from '../utils/id';
 import Dashboard from './Dashboard';
 
 vi.mock('../api', () => ({ api: { get: vi.fn() } }));
@@ -43,9 +44,27 @@ const lecturerPayload = {
 
 const studentPayload = {
   assignments: [
-    { id: 3, title: 'Individual Done', is_group_work: 0, due_date: null, submission_id: 10, submission_status: 'submitted' },
-    { id: 4, title: 'Individual Draft', is_group_work: 0, due_date: null, submission_status: 'draft' },
-    { id: 5, title: 'Group Together', is_group_work: 1, due_date: null },
+    {
+      id: 3,
+      title: 'Individual Done',
+      is_group_work: 0,
+      due_date: null,
+      submission_id: 10,
+      submission_status: 'submitted',
+    },
+    {
+      id: 4,
+      title: 'Individual Draft',
+      is_group_work: 0,
+      due_date: null,
+      submission_status: 'draft',
+    },
+    {
+      id: 5,
+      title: 'Group Together',
+      is_group_work: 1,
+      due_date: null,
+    },
   ],
 };
 
@@ -59,14 +78,17 @@ describe('Dashboard (lecturer)', () => {
     useAuth.mockReturnValue({ user: { role: 'lecturer', name: 'Lee Lecturer' } });
     renderDashboard();
 
+    // Welcome banner: strict single h1 check.
     expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.getByText('Submitted work and anything that needs your attention.')).toBeInTheDocument();
 
-    // Group aggregates + flag.
+    // Group aggregate chip on the group row.
     expect(screen.getByText('2 groups · 1 submitted')).toBeInTheDocument();
+    // Incomplete flag chip on the group row.
     expect(screen.getByText('1 group submitted with an incomplete member')).toBeInTheDocument();
-    // Individual aggregate.
+
+    // Individual aggregate chip on the individual row.
     expect(screen.getByText('3 submitted')).toBeInTheDocument();
 
     // Attachment points of the rows.
@@ -80,8 +102,8 @@ describe('Dashboard (lecturer)', () => {
     // Rows link to the existing detail routes via assignmentLink(a, role).
     const links = screen.getAllByRole('link');
     const hrefs = links.map((l) => l.getAttribute('href'));
-    expect(hrefs).toContain('/assignments/1');
-    expect(hrefs).toContain('/assignments/2');
+    expect(hrefs).toContain(`/assignments/${encodeId(1)}`);
+    expect(hrefs).toContain(`/assignments/${encodeId(2)}`);
   });
 
   it('does not show the flagged chip when there is nothing flagged', async () => {
@@ -136,9 +158,9 @@ describe('Dashboard (student)', () => {
     expect(screen.getByText('Group work')).toBeInTheDocument();
 
     const hrefs = screen.getAllByRole('link').map((l) => l.getAttribute('href'));
-    expect(hrefs).toContain('/submissions/3');
-    expect(hrefs).toContain('/assignments/4');
-    expect(hrefs).toContain('/group/5');
+    expect(hrefs).toContain(`/submissions/${encodeId(3)}`);
+    expect(hrefs).toContain(`/assignments/${encodeId(4)}`);
+    expect(hrefs).toContain(`/group/${encodeId(5)}`);
   });
 
   it('shows a calm empty state', async () => {

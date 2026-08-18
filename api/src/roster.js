@@ -4,7 +4,7 @@
 
 export async function groupMembers(pool, groupId) {
   const [members] = await pool.query(`
-    SELECT gm.student_id, u.name AS student_name, u.email, gm.joined_at,
+    SELECT gm.student_id, u.name AS student_name, u.email, u.student_id AS student_matric, gm.joined_at,
            (g.leader_id = gm.student_id) AS is_leader,
            COALESCE(gms.status, 'not_started') AS status
     FROM group_members gm

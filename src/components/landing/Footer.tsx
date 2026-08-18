@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Logo } from './Logo';
 
 interface FooterProps {
@@ -25,7 +26,7 @@ export const Footer: React.FC<FooterProps> = ({
             </p>
           </div>
 
-          {/* Right: Minimal Links */}
+          {/* Right: Navigation & Legal Links */}
           <div className="flex flex-wrap items-center gap-6 sm:gap-8 text-sm font-medium text-[#1A1A1B]/70 font-sans">
             <button
               onClick={onOpenBetaModal}
@@ -39,33 +40,29 @@ export const Footer: React.FC<FooterProps> = ({
             >
               Sign in
             </button>
-            <button
-              onClick={() =>
-                onOpenInfoModal(
-                  'Privacy Policy',
-                  'Draftly adheres to strict student data privacy standards (FERPA / GDPR compliant). Workspace provenance data is only captured during official assignment authoring sessions and is strictly confidential to course instructors and enrolled group members. We do not sell data, train public AI models on student work, or deploy invasive biometric/screen recording tools.'
-                )
-              }
+            <Link
+              to="/privacy"
               className="hover:text-[#0047FF] transition-colors cursor-pointer"
             >
               Privacy
-            </button>
-            <button
-              onClick={() =>
-                onOpenInfoModal(
-                  'Terms of Service',
-                  'Draftly provides an assignment workspace infrastructure for academic institutions. By participating in the Draftly beta, institutions and educators agree to use audit telemetry responsibly in accordance with their faculty guidelines and academic integrity policies.'
-                )
-              }
+            </Link>
+            <Link
+              to="/terms"
               className="hover:text-[#0047FF] transition-colors cursor-pointer"
             >
               Terms
-            </button>
+            </Link>
+            <Link
+              to="/cookies"
+              className="hover:text-[#0047FF] transition-colors cursor-pointer"
+            >
+              Cookies
+            </Link>
             <button
               onClick={() =>
                 onOpenInfoModal(
                   'Contact & Support',
-                  'Have questions about onboarding Draftly for your department or next semester course? Contact our academic integrations team at beta@draftly.edu or schedule a 15-minute walkthrough with an educational specialist.'
+                  'Have questions about onboarding Draftly for your department or next semester course? Contact our academic integrations team at beta@draftly.ng or schedule a walkthrough with an educational specialist at legal@draftly.ng.'
                 )
               }
               className="hover:text-[#0047FF] transition-colors cursor-pointer"
@@ -77,12 +74,16 @@ export const Footer: React.FC<FooterProps> = ({
         </div>
 
         {/* Bottom copyright notice */}
-        <div className="mt-8 pt-8 border-t border-gray-100 text-xs font-mono text-gray-400">
-          <div>&copy; {new Date().getFullYear()} Draftly Inc. All rights reserved.</div>
+        <div className="mt-8 pt-8 border-t border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs font-mono text-gray-400">
+          <div>&copy; {new Date().getFullYear()} Draftly Technologies Ltd. All rights reserved.</div>
+          <div className="text-[11px] text-gray-400 font-sans">
+            Aligned with Nigeria Data Protection Act (NDPA) 2023
+          </div>
         </div>
 
       </div>
     </footer>
   );
 };
+
 

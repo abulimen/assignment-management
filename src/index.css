@@ -1,22 +1,18 @@
 @import '@fontsource-variable/plus-jakarta-sans/index.css';
 @import './styles/word.css';
 
-/* Self-hosted fonts (latin subset, variable wght axes) — swapped from the
-   Google Fonts <link> so there is no render-blocking third-party CSS and no
-   extra TLS host on the critical path. font-display: swap paints text in the
-   system fallback immediately and swaps in Inter/JetBrains Mono when ready
-   (metrics are very close, so CLS impact is negligible). */
+/* Self-hosted fonts (latin subset, variable wght axes) */
 @font-face {
   font-family: 'Inter';
   font-style: normal;
-  font-weight: 100 900; /* variable wght axis */
+  font-weight: 100 900;
   font-display: swap;
   src: url('/fonts/inter-400.woff2') format('woff2');
 }
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
-  font-weight: 400 800; /* variable wght axis */
+  font-weight: 400 800;
   font-display: swap;
   src: url('/fonts/jetbrains-mono-400.woff2') format('woff2');
 }
@@ -25,36 +21,184 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tailwind v4 compatibility shim. The landing components are copied
-   byte-identical from the AI Studio export (Tailwind v4); these few v4-only
-   utilities are defined here so they render under the app's Tailwind v3
-   without editing the copied files. Entrance motion (animate-in …) comes
-   from the tailwindcss-animate plugin. */
+/* Tailwind utilities and shims */
 .shadow-xs { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
 .rounded-xs { border-radius: 0.125rem; }
 .backdrop-blur-xs { backdrop-filter: blur(4px); }
 .border-current\/20 { border-color: color-mix(in srgb, currentColor 20%, transparent); }
 .focus\:outline-hidden:focus { outline: 2px solid transparent; outline-offset: 2px; }
 
-/* The AI Studio shell sets scroll-smooth on <html>; mirrored for anchors. */
-html { scroll-behavior: smooth; }
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
+:root {
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+html { scroll-behavior: smooth; }
 
 @layer base {
   body {
     @apply min-h-screen;
-    color: #252530;          /* plum-charcoal ink, never #000 */
-    background-color: #f3f0e9; /* warm oat canvas, never flat gray */
+    color: #1A1A1B;            /* Graphite ink */
+    background-color: #F9F8F6; /* Warm off-white canvas */
     -webkit-font-smoothing: antialiased;
   }
   ::selection {
-    background-color: #ece8fe; /* plum-100 tint */
+    background-color: rgba(0, 71, 255, 0.15); /* Cobalt tint */
+    color: #0047FF;
   }
 }
 
-/* Generic content skeleton (plum-tinted pulse) */
+/* ------------------------------------------------------------- Motion System */
+
+@keyframes fadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeScale {
+  0% {
+    opacity: 0;
+    transform: scale(0.97) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.92);
+  }
+}
+
+.animate-fade-up {
+  animation: fadeUp 650ms var(--ease-out-quart) forwards;
+}
+
+.animate-fade-scale {
+  animation: fadeScale 750ms var(--ease-out-expo) forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2.5s ease-in-out infinite;
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translate(0px, 0px) rotate(0deg);
+  }
+  33% {
+    transform: translate(12px, -15px) rotate(1deg);
+  }
+  66% {
+    transform: translate(-10px, 10px) rotate(-1deg);
+  }
+}
+
+@keyframes floatReverse {
+  0%, 100% {
+    transform: translate(0px, 0px) rotate(0deg);
+  }
+  33% {
+    transform: translate(-15px, 12px) rotate(-1.5deg);
+  }
+  66% {
+    transform: translate(8px, -12px) rotate(1deg);
+  }
+}
+
+@keyframes beaconPulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes cobaltBeaconPulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(0, 71, 255, 0.6);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(0, 71, 255, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(0, 71, 255, 0);
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 14s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: floatReverse 18s ease-in-out infinite;
+}
+
+.animate-beacon-pulse {
+  animation: beaconPulse 2.2s infinite;
+}
+
+.animate-cobalt-beacon {
+  animation: cobaltBeaconPulse 2.4s infinite;
+}
+
+.delay-75 { animation-delay: 75ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-225 { animation-delay: 225ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+
+/* ------------------------------------------------------------- Scroll Reveal */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 700ms var(--ease-out-quart),
+              transform 700ms var(--ease-out-quart);
+  will-change: opacity, transform;
+}
+.scroll-reveal[data-visible="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Accessible Motion Safeguard */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Generic content skeleton */
 .skeleton {
   background: linear-gradient(90deg, #ece9e2 25%, #f7f4ee 50%, #ece9e2 75%);
   background-size: 200% 100%;
@@ -68,19 +212,19 @@ html { scroll-behavior: smooth; }
 /* Legacy TipTap editor styles — used by the Playback replay editor.
    The Word-style editors use .word-document (src/styles/word.css). */
 .ProseMirror:not(.word-document) {
-  @apply outline-none min-h-[400px] p-4;
+  @apply outline-none min-h-[400px] p-4 text-[#1A1A1B];
 }
-.ProseMirror:not(.word-document) h1 { @apply text-3xl font-bold mb-4; }
-.ProseMirror:not(.word-document) h2 { @apply text-2xl font-bold mb-3; }
-.ProseMirror:not(.word-document) h3 { @apply text-xl font-semibold mb-2; }
+.ProseMirror:not(.word-document) h1 { @apply text-3xl font-bold mb-4 text-[#1A1A1B]; }
+.ProseMirror:not(.word-document) h2 { @apply text-2xl font-bold mb-3 text-[#1A1A1B]; }
+.ProseMirror:not(.word-document) h3 { @apply text-xl font-semibold mb-2 text-[#1A1A1B]; }
 .ProseMirror:not(.word-document) p { @apply mb-2 leading-relaxed; }
 .ProseMirror:not(.word-document) ul { @apply list-disc pl-6 mb-2; }
 .ProseMirror:not(.word-document) ol { @apply list-decimal pl-6 mb-2; }
-.ProseMirror:not(.word-document) blockquote { @apply border-l-4 border-gray-300 pl-4 italic my-2; }
-.ProseMirror:not(.word-document) code { @apply bg-gray-100 rounded px-1 py-0.5 text-sm font-mono; }
-.ProseMirror:not(.word-document) pre { @apply bg-gray-900 text-gray-100 rounded-lg p-4 my-2 overflow-x-auto; }
+.ProseMirror:not(.word-document) blockquote { @apply border-l-4 border-[#0047FF]/30 pl-4 italic my-2 text-gray-700; }
+.ProseMirror:not(.word-document) code { @apply bg-gray-100 rounded px-1 py-0.5 text-sm font-mono text-[#1A1A1B]; }
+.ProseMirror:not(.word-document) pre { @apply bg-[#1A1A1B] text-gray-100 rounded-lg p-4 my-2 overflow-x-auto; }
 .ProseMirror:not(.word-document) pre code { @apply bg-transparent p-0; }
-.ProseMirror:not(.word-document) a { @apply text-primary-600 underline; }
+.ProseMirror:not(.word-document) a { @apply text-[#0047FF] underline; }
 .ProseMirror:not(.word-document) img { @apply max-w-full rounded-lg my-2; }
 .ProseMirror:not(.word-document) table { @apply w-full border-collapse my-2; }
 .ProseMirror:not(.word-document) th { @apply border border-gray-300 bg-gray-50 px-3 py-2 text-left font-semibold; }
@@ -95,7 +239,7 @@ html { scroll-behavior: smooth; }
   display: inline-block;
   width: 2px;
   height: 1.2em;
-  background: #593f91; /* Draftly aubergine */
+  background: #0047FF; /* Draftly cobalt */
   vertical-align: text-bottom;
   margin-left: -1px;
   animation: playback-blink 0.8s step-end infinite;
@@ -108,27 +252,27 @@ html { scroll-behavior: smooth; }
 
 /* Playback selection highlight */
 .playback-selection {
-  background: rgba(89, 63, 145, 0.2);
+  background: rgba(0, 71, 255, 0.18);
 }
 
-/* Source highlighting overlays — Grammarly-style transparent backgrounds */
+/* Source highlighting overlays — transparent backgrounds */
 .hl-typed {
-  background-color: rgba(22, 163, 74, 0.35);
-  border-bottom: 3px solid #16a34a;
+  background-color: rgba(16, 185, 129, 0.25);
+  border-bottom: 2px solid #059669;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   cursor: help;
 }
 .hl-pasted {
-  background-color: rgba(220, 38, 38, 0.35);
-  border-bottom: 3px solid #dc2626;
+  background-color: rgba(239, 68, 68, 0.2);
+  border-bottom: 2px solid #dc2626;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   cursor: help;
 }
 .hl-edited {
-  background-color: rgba(249, 115, 22, 0.40);
-  border-bottom: 3px solid #f97316;
+  background-color: rgba(245, 158, 11, 0.25);
+  border-bottom: 2px solid #d97706;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   cursor: help;
@@ -142,13 +286,18 @@ html { scroll-behavior: smooth; }
   padding: 0 1px;
 }
 
-/* Pasted-from-external-source highlight. The author color owns the
-   background; the red lives in a bright underline plus a faint wash so both
-   signals stay readable at once (a solid red background would occlude the
-   author tint). */
+/* Pasted-from-external-source highlight */
 .pasted-highlight {
-  background-color: rgba(220, 38, 38, 0.12);
-  border-bottom: 3px solid #dc2626;
+  background-color: rgba(220, 38, 38, 0.14);
+  border-bottom: 2px solid #dc2626;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* Originally typed text highlight */
+.typed-highlight {
+  background-color: rgba(16, 185, 129, 0.14);
+  border-bottom: 2px solid #059669;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -164,8 +313,80 @@ html { scroll-behavior: smooth; }
   color: white;
   pointer-events: none;
   white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
-.hl-tooltip-typed { background: #16a34a; }
+.hl-tooltip-typed { background: #059669; }
 .hl-tooltip-pasted { background: #dc2626; }
-.hl-tooltip-edited { background: #f97316; }
+.hl-tooltip-edited { background: #d97706; }
+
+/* ------------------------------------------------------------- Legal Pages Typography & Rhythm */
+.legal-article {
+  max-width: 68ch;
+  color: #1A1A1B;
+}
+.legal-article h2 {
+  font-size: 1.45rem;
+  line-height: 2rem;
+  font-weight: 800;
+  color: #1A1A1B;
+  letter-spacing: -0.02em;
+  margin-top: 3rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #F3F4F6;
+}
+.legal-article section:first-of-type h2 {
+  margin-top: 0;
+}
+.legal-article h3 {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 700;
+  color: #1A1A1B;
+  margin-top: 1.75rem;
+  margin-bottom: 0.75rem;
+}
+.legal-article p {
+  font-size: 0.9375rem;
+  line-height: 1.75rem;
+  color: rgba(26, 26, 27, 0.82);
+  margin-bottom: 1.25rem;
+}
+.legal-article ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-top: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+.legal-article ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin-top: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+.legal-article li {
+  font-size: 0.9375rem;
+  line-height: 1.65rem;
+  color: rgba(26, 26, 27, 0.82);
+  margin-bottom: 0.6rem;
+  padding-left: 0.25rem;
+}
+.legal-article hr {
+  border: 0;
+  border-top: 1px solid #E5E7EB;
+  margin-top: 2.75rem;
+  margin-bottom: 2.75rem;
+}
+.legal-article strong {
+  color: #1A1A1B;
+  font-weight: 700;
+}
+.legal-article code {
+  background-color: #F3F4F6;
+  color: #0047FF;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+  font-family: 'JetBrains Mono', monospace;
+}
+

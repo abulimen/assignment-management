@@ -15,6 +15,7 @@ export function countSliceTextLength(content) {
 
 export function extractNodeText(node) {
   if (!node) return '';
+  if (node.type === 'sectionTitle') return '';
   if (typeof node.text === 'string') return node.text;
   if (Array.isArray(node.content)) {
     let text = '';
@@ -25,18 +26,30 @@ export function extractNodeText(node) {
 }
 
 export function extractPlainText(doc) {
-  let text = '';
-  if (!doc || !Array.isArray(doc.content)) return text;
-  for (const node of doc.content) {
-    text += extractNodeText(node) + '\n';
+  if (!doc) return '';
+  const blocks = [];
+  function walk(node) {
+    if (!node) return;
+    if (node.type === 'sectionTitle') return;
+    if (typeof node.text === 'string') {
+      blocks.push(node.text);
+      return;
+    }
+    if (Array.isArray(node.content)) {
+      for (const child of node.content) walk(child);
+      if (node.type === 'paragraph' || node.type === 'heading' || node.type === 'section' || node.type === 'blockquote' || node.type === 'listItem' || node.type === 'codeBlock') {
+        blocks.push('\n');
+      }
+    }
   }
-  return text;
+  walk(doc);
+  return blocks.join('');
 }
 
-// PHP str_word_count default: ASCII letter sequences count as words.
+// Standard word counting matching TipTap / ProseMirror textContent.
 export function strWordCount(text) {
-  const m = String(text).match(/[A-Za-z]+/g);
-  return m ? m.length : 0;
+  const trimmed = String(text || '').trim();
+  return trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0;
 }
 
 // PHP round(v, decimals) — half away from zero, like PHP's round().

@@ -1,4 +1,5 @@
 import { sendJson, sendError, guard, parseIdParam } from '../http.js';
+import { extractPlainText, strWordCount } from '../text.js';
 
 function parseJsonObj(s) {
   if (s == null) return null;
@@ -13,11 +14,20 @@ export default async function verdict(ctx) {
   const id = parseIdParam(ctx, 'Submission ID required');
   if (id === null) return;
 
-  const [rows] = await ctx.pool.query('SELECT id, assignment_id, student_id, status FROM submissions WHERE id = ?', [id]);
+  const [rows] = await ctx.pool.query('SELECT id, assignment_id, student_id, status, content FROM submissions WHERE id = ?', [id]);
   const sub = rows[0];
   if (!sub) return sendError(ctx, 404, 'Submission not found');
 
-  if (user.role !== 'lecturer' && Number(sub.student_id) !== user.sub) {
+  if (user.role === 'lecturer') {
+    const [aRows] = await ctx.pool.query('SELECT course_id FROM assignments WHERE id = ?', [sub.assignment_id]);
+    const a = aRows[0];
+    if (!a) return sendError(ctx, 403, 'Forbidden');
+    const [cm] = await ctx.pool.query(
+      "SELECT 1 FROM course_members WHERE course_id = ? AND user_id = ? AND role = 'lecturer'",
+      [a.course_id, user.sub],
+    );
+    if (cm.length === 0) return sendError(ctx, 403, 'Forbidden');
+  } else if (Number(sub.student_id) !== user.sub) {
     const [c] = await ctx.pool.query(`
       SELECT COUNT(*) AS c FROM group_members gm1
       JOIN group_members gm2 ON gm1.group_id = gm2.group_id
@@ -27,7 +37,7 @@ export default async function verdict(ctx) {
   }
 
   const [evRows] = await ctx.pool.query(
-    'SELECT type, data, steps_json, occurred_at, received_at, sequence FROM events WHERE submission_id = ? ORDER BY sequence ASC',
+    'SELECT id, type, data, steps_json, occurred_at, received_at, sequence FROM events WHERE submission_id = ? ORDER BY occurred_at ASC, id ASC',
     [id],
   );
   const events = evRows.map((e) => ({
@@ -38,7 +48,16 @@ export default async function verdict(ctx) {
     steps: e.steps_json ? parseJsonObj(e.steps_json) : null,
   }));
   const [statsRows] = await ctx.pool.query('SELECT * FROM submission_stats WHERE submission_id = ?', [id]);
-  const stats = statsRows[0] || {};
+  let stats = statsRows[0] || {};
+  if (sub.content) {
+    try {
+      const doc = JSON.parse(sub.content);
+      const computedWords = strWordCount(extractPlainText(doc));
+      if (computedWords > 0) {
+        stats = { ...stats, word_count: computedWords };
+      }
+    } catch {}
+  }
 
   const payload = JSON.stringify({ events, stats });
   let response = null;

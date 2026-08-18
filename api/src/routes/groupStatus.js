@@ -1,4 +1,4 @@
-import { sendJson, sendError, guardRole } from '../http.js';
+import { sendJson, sendError, guardRole, parseIdParam } from '../http.js';
 import { collabRequest } from '../collab.js';
 
 // POST /api/groups/:id/done and /api/groups/:id/reopen (student only).
@@ -6,7 +6,7 @@ export default async function groupStatus(ctx) {
   const user = guardRole(ctx, 'student');
   if (!user) return;
 
-  const groupId = parseInt(ctx.params.id, 10);
+  const groupId = parseIdParam(ctx, 'Invalid group ID');
   const action = ctx.params.action;
   if (!groupId || !['done', 'reopen'].includes(action)) {
     return sendError(ctx, 400, 'Expected /api/groups/:id/<done|reopen>');

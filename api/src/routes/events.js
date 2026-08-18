@@ -1,5 +1,5 @@
 import { sendJson, sendError, guardRole, missingField } from '../http.js';
-import { recomputeSubmissionStats } from '@am/core';
+import { recomputeSubmissionStats, decodeId } from '@am/core';
 
 // POST /api/events — HTTP fallback intake; recompute + upsert submission_stats.
 // Ported line-by-line from public/api/events.php.
@@ -13,16 +13,17 @@ export default async function events(ctx) {
   if (data.events === undefined) return sendError(ctx, 422, 'Missing required field: events');
   if (!Array.isArray(data.events) || data.events.length === 0) return sendError(ctx, 422, 'events must be a non-empty array');
 
-  const [sRows] = await ctx.pool.query('SELECT student_id, status FROM submissions WHERE id = ?', [data.submission_id]);
+  const sid = decodeId(data.submission_id);
+  if (!sid) return sendError(ctx, 400, 'Invalid submission_id');
+
+  const [sRows] = await ctx.pool.query('SELECT student_id, status FROM submissions WHERE id = ?', [sid]);
   const sub = sRows[0];
   if (!sub) return sendError(ctx, 404, 'Submission not found');
   if (Number(sub.student_id) !== user.sub) return sendError(ctx, 403, 'Forbidden');
   if (sub.status === 'submitted') return sendError(ctx, 409, 'Cannot add events to submitted submission');
 
-  const [lockRows] = await ctx.pool.query('SELECT id FROM group_sections WHERE submission_id = ? AND merged = 1', [data.submission_id]);
+  const [lockRows] = await ctx.pool.query('SELECT id FROM group_sections WHERE submission_id = ? AND merged = 1', [sid]);
   if (lockRows.length) return sendError(ctx, 409, 'Section is locked after merge');
-
-  const sid = data.submission_id;
   const receivedAt = new Date(); // server truth, same as the WS intake
   let count = 0;
   for (const ev of data.events) {

@@ -1,10 +1,10 @@
-import { Users, CheckCircle2, Circle, Clock } from 'lucide-react';
+import { Users, CheckCircle2, Circle, Clock, Crown } from 'lucide-react';
 import { STATUS_LABEL, statusSummary } from '../utils/groupStatus';
 
 const STATUS_STYLE = {
-  not_started: 'bg-gray-100 text-gray-600',
-  in_progress: 'bg-amber-100 text-amber-700',
-  done: 'bg-green-100 text-green-700',
+  not_started: 'bg-gray-100 text-gray-600 border-gray-200',
+  in_progress: 'bg-amber-50 text-amber-800 border-amber-200',
+  done: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
 const STATUS_ICON = {
@@ -13,20 +13,26 @@ const STATUS_ICON = {
   done: CheckCircle2,
 };
 
-// Members list with contribution statuses and the mark-Done/reopen actions.
-// Statuses come from MySQL (via GET /api/groups/:id); actions hit POST /api/groups/:id/done|reopen.
 export default function GroupStatusPanel({ group, currentUserId, onAction, busy = false, frozen = false }) {
   const summary = statusSummary(group?.members);
 
   return (
-    <div className="bg-surface rounded-xl border border-line p-4">
-      <div className="flex items-center justify-between mb-3">
+    <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-xs space-y-3">
+      <div className="flex items-center justify-between pb-2 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          <Users className="w-4 h-4 text-gray-400" />
-          <h3 className="text-sm font-semibold text-gray-700">Members ({summary.total})</h3>
+          <Users className="w-4 h-4 text-[#0047FF]" />
+          <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-gray-700">
+            Members ({summary.total})
+          </h3>
         </div>
-        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${summary.allDone ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-          {summary.doneCount}/{summary.total} complete
+        <span
+          className={`text-[11px] font-mono font-semibold px-2 py-0.5 rounded border ${
+            summary.allDone
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              : 'bg-gray-100 text-gray-600 border-gray-200'
+          }`}
+        >
+          {summary.doneCount}/{summary.total} Done
         </span>
       </div>
 
@@ -36,36 +42,59 @@ export default function GroupStatusPanel({ group, currentUserId, onAction, busy 
           const status = m.status || 'not_started';
           const Icon = STATUS_ICON[status] || Circle;
           return (
-            <div key={m.student_id} className="flex items-center gap-2">
+            <div
+              key={m.student_id}
+              className={`flex items-center justify-between gap-2 p-2.5 rounded-lg border ${
+                mine ? 'bg-[#0047FF]/5 border-[#0047FF]/20' : 'bg-[#F9F8F6] border-gray-200'
+              }`}
+            >
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">
-                  {m.student_name}
-                  {m.is_leader == 1 && <span className="ml-1.5 text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-medium">Leader</span>}
-                </p>
-                <p className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded mt-0.5 ${STATUS_STYLE[status]}`}>
-                  <Icon className="w-3 h-3" /> {STATUS_LABEL[status]}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="text-xs font-bold text-[#1A1A1B] truncate">
+                    {m.student_name} {mine && <span className="text-gray-500 font-normal">(You)</span>}
+                  </p>
+                  {m.student_matric && (
+                    <span className="text-[9px] font-mono font-bold text-gray-600 bg-white px-1 py-0.2 rounded border border-gray-200">
+                      ID: {m.student_matric}
+                    </span>
+                  )}
+                  {m.is_leader == 1 && (
+                    <Crown className="w-3 h-3 text-amber-500 shrink-0" title="Leader" />
+                  )}
+                </div>
+                <p className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border mt-1 font-medium ${STATUS_STYLE[status]}`}>
+                  <Icon className="w-2.5 h-2.5" /> {STATUS_LABEL[status]}
                 </p>
               </div>
+
               {mine && !frozen && (
-                status === 'done' ? (
-                  <button onClick={() => onAction('reopen')} disabled={busy}
-                    className="text-xs min-h-11 min-w-11 px-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50">
-                    Reopen
-                  </button>
-                ) : (
-                  <button onClick={() => onAction('done')} disabled={busy}
-                    className="text-xs min-h-11 min-w-11 px-3 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50">
-                    Mark Done
-                  </button>
-                )
+                <div>
+                  {status === 'done' ? (
+                    <button
+                      onClick={() => onAction('reopen')}
+                      disabled={busy}
+                      className="text-[11px] font-mono font-semibold px-2.5 py-1.5 border border-gray-300 rounded-md bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      Reopen
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => onAction('done')}
+                      disabled={busy}
+                      className="text-[11px] font-mono font-bold px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+                    >
+                      Mark Done
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           );
         })}
       </div>
 
-      <p className="text-xs text-gray-600 mt-3">
-        Mark yourself Done when your contribution is finished. Editing afterwards reopens you automatically.
+      <p className="text-[11px] text-gray-500 leading-relaxed font-sans pt-1">
+        Mark yourself Done when your writing is complete. Editing later will reopen your status automatically.
       </p>
     </div>
   );

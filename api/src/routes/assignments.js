@@ -1,19 +1,27 @@
-import { sendJson, sendError, guard, guardRole, missingField } from '../http.js';
+import { sendJson, sendError, guard, guardRole, missingField, parseDate } from '../http.js';
+import { decodeId } from '@am/core';
 
 // GET /api/assignments (list) and POST /api/assignments (create).
 export default async function assignments(ctx) {
   const user = guard(ctx);
   if (!user) return;
 
+  const url = new URL(ctx.req.url, 'http://localhost');
+  const courseFilterRaw = url.searchParams.get('course_id');
+  const courseFilter = courseFilterRaw ? decodeId(courseFilterRaw) : null;
+
   if (ctx.req.method === 'GET') {
     if (user.role === 'lecturer') {
-      const [rows] = await ctx.pool.query(`
-        SELECT a.id, a.title, a.description, a.rubric, a.due_date, a.is_group_work, a.created_at,
+      let query = `
+        SELECT a.id, a.course_id, a.title, a.description, a.rubric, a.due_date, a.is_group_work, a.target_type, a.created_at,
+               c.code AS course_code, c.title AS course_title,
                COALESCE(g.group_count, 0)              AS group_count,
                COALESCE(g.submitted_group_count, 0)    AS submitted_group_count,
                COALESCE(g.flagged_group_count, 0)      AS flagged_group_count,
                COALESCE(s.submitted_count, 0)          AS submitted_count
         FROM assignments a
+        JOIN courses c ON c.id = a.course_id
+        JOIN course_members cm ON cm.course_id = c.id AND cm.user_id = ? AND cm.role = 'lecturer'
         LEFT JOIN (
           SELECT g.assignment_id,
                  COUNT(*)                                            AS group_count,
@@ -40,18 +48,42 @@ export default async function assignments(ctx) {
           WHERE status = 'submitted' AND group_id IS NULL
           GROUP BY assignment_id
         ) s ON s.assignment_id = a.id
-        WHERE a.lecturer_id = ?
-        ORDER BY a.created_at DESC
-      `, [user.sub]);
+      `;
+      const params = [user.sub];
+
+      if (courseFilter) {
+        query += ' WHERE a.course_id = ?';
+        params.push(courseFilter);
+      }
+
+      query += ' ORDER BY a.created_at DESC';
+
+      const [rows] = await ctx.pool.query(query, params);
       return sendJson(ctx, 200, { assignments: rows });
     }
-    const [rows] = await ctx.pool.query(`
-      SELECT a.id, a.title, a.description, a.rubric, a.due_date, a.is_group_work, a.created_at,
+
+    // Student role: strictly filter to user's enrolled courses and eligible assignments
+    let query = `
+      SELECT a.id, a.course_id, a.title, a.description, a.rubric, a.due_date, a.is_group_work, a.target_type, a.created_at,
+             c.code AS course_code, c.title AS course_title,
              s.id AS submission_id, s.status AS submission_status
       FROM assignments a
+      JOIN courses c ON c.id = a.course_id
+      JOIN course_members cm ON cm.course_id = c.id AND cm.user_id = ? AND cm.role = 'student'
+      LEFT JOIN assignment_participants ap ON ap.assignment_id = a.id AND ap.user_id = ?
       LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = ?
-      ORDER BY a.created_at DESC
-    `, [user.sub]);
+      WHERE (a.target_type = 'all' OR ap.user_id IS NOT NULL)
+    `;
+    const params = [user.sub, user.sub, user.sub];
+
+    if (courseFilter) {
+      query += ' AND a.course_id = ?';
+      params.push(courseFilter);
+    }
+
+    query += ' ORDER BY a.created_at DESC';
+
+    const [rows] = await ctx.pool.query(query, params);
     return sendJson(ctx, 200, { assignments: rows });
   }
 
@@ -61,23 +93,108 @@ export default async function assignments(ctx) {
     const data = ctx.body;
     if (missingField(data, 'title')) return sendError(ctx, 422, 'Missing required field: title');
 
-    const [r] = await ctx.pool.query(
-      'INSERT INTO assignments (lecturer_id, title, description, rubric, due_date, is_group_work) VALUES (?, ?, ?, ?, ?, ?)',
-      [
-        u.sub,
-        data.title,
-        data.description ?? null,
-        data.rubric !== undefined ? JSON.stringify(data.rubric) : null,
-        data.due_date ?? null,
-        data.is_group_work ? 1 : 0,
-      ],
-    );
-    const id = r.insertId;
-    const [rows] = await ctx.pool.query(
-      'SELECT id, title, description, rubric, due_date, created_at FROM assignments WHERE id = ?',
-      [id],
-    );
-    return sendJson(ctx, 201, { assignment: rows[0] });
+    // Support single course_id, additional_course_ids, or multiple target_courses array
+    let courseIds = [];
+    if (Array.isArray(data.target_courses) && data.target_courses.length > 0) {
+      courseIds = data.target_courses.map((id) => decodeId(id)).filter((id) => id !== null);
+    } else if (data.course_id) {
+      const parsed = decodeId(data.course_id);
+      if (parsed) courseIds = [parsed];
+      if (Array.isArray(data.additional_course_ids)) {
+        for (const addId of data.additional_course_ids) {
+          const parsedAdd = decodeId(addId);
+          if (parsedAdd && !courseIds.includes(parsedAdd)) {
+            courseIds.push(parsedAdd);
+          }
+        }
+      }
+    }
+
+    // Fallback: If no course specified, find or create the lecturer's default course
+    if (courseIds.length === 0) {
+      const [lecturerCourses] = await ctx.pool.query(
+        "SELECT course_id FROM course_members WHERE user_id = ? AND role = 'lecturer' LIMIT 1",
+        [u.sub],
+      );
+      if (lecturerCourses.length > 0) {
+        courseIds = [lecturerCourses[0].course_id];
+      } else {
+        // Create default course for lecturer
+        const [org] = await ctx.pool.query('SELECT id FROM organizations LIMIT 1');
+        const orgId = org[0]?.id || 1;
+        const [newCourse] = await ctx.pool.query(
+          'INSERT INTO courses (organization_id, code, title, invite_code, created_by) VALUES (?, ?, ?, ?, ?)',
+          [orgId, 'GEN 101', 'General Coursework', `GEN-${Math.random().toString(36).slice(2, 6).toUpperCase()}`, u.sub],
+        );
+        const newCourseId = newCourse.insertId;
+        await ctx.pool.query(
+          'INSERT INTO course_members (course_id, user_id, role) VALUES (?, ?, ?)',
+          [newCourseId, u.sub, 'lecturer'],
+        );
+        await ctx.pool.query(
+          "INSERT IGNORE INTO course_members (course_id, user_id, role) SELECT ?, id, 'student' FROM users WHERE role = 'student'",
+          [newCourseId],
+        );
+        courseIds = [newCourseId];
+      }
+    }
+
+    // Verify lecturer is a lecturer in all target courses
+    for (const cId of courseIds) {
+      const [m] = await ctx.pool.query(
+        "SELECT 1 FROM course_members WHERE course_id = ? AND user_id = ? AND role = 'lecturer'",
+        [cId, u.sub],
+      );
+      if (m.length === 0) {
+        return sendError(ctx, 403, `You are not authorized to create assignments in course ${cId}`);
+      }
+    }
+
+    const createdAssignments = [];
+    const targetType = data.target_type === 'selected' ? 'selected' : 'all';
+    const formattedDueDate = parseDate(data.due_date);
+
+    for (const cId of courseIds) {
+      const [r] = await ctx.pool.query(
+        `INSERT INTO assignments (course_id, lecturer_id, title, description, rubric, due_date, is_group_work, target_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          cId,
+          u.sub,
+          data.title.trim(),
+          data.description ?? null,
+          data.rubric !== undefined ? (typeof data.rubric === 'string' ? data.rubric : JSON.stringify(data.rubric)) : null,
+          formattedDueDate,
+          data.is_group_work ? 1 : 0,
+          targetType,
+        ],
+      );
+      const id = r.insertId;
+
+      // If targeted students provided, insert into assignment_participants
+      if (targetType === 'selected' && Array.isArray(data.student_ids) && data.student_ids.length > 0) {
+        for (const sId of data.student_ids) {
+          const numSId = parseInt(sId, 10);
+          if (!isNaN(numSId)) {
+            await ctx.pool.query(
+              'INSERT IGNORE INTO assignment_participants (assignment_id, user_id) VALUES (?, ?)',
+              [id, numSId],
+            );
+          }
+        }
+      }
+
+      const [rows] = await ctx.pool.query(
+        'SELECT id, title, description, rubric, due_date, created_at FROM assignments WHERE id = ?',
+        [id],
+      );
+      createdAssignments.push(rows[0]);
+    }
+
+    return sendJson(ctx, 201, {
+      assignment: createdAssignments[0],
+      assignments: createdAssignments,
+    });
   }
 
   sendError(ctx, 405, 'Method not allowed');

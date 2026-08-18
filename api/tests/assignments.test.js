@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { encodeId } from '@am/core';
 import { getHarness, apiCall, registerUser } from './helpers/harness.js';
 
 let h;
@@ -141,6 +142,22 @@ describe('POST /api/assignments', () => {
     expect(row.rubric).toEqual(['a', 'b']);
   });
 
+  it('creates an assignment with ISO due_date and additional_course_ids', async () => {
+    const { status, json } = await createAssignment(lecturer.token, {
+      title: 'Due Date ISO Test',
+      description: 'You can freestyle ;)',
+      due_date: '2026-08-18T08:30:00.000Z',
+      is_group_work: 0,
+      target_type: 'all',
+      additional_course_ids: [],
+    });
+    expect(status).toBe(201);
+    expect(json.assignment.title).toBe('Due Date ISO Test');
+    expect(json.assignment.due_date).toBeDefined();
+    const [[row]] = await h.pool.query('SELECT due_date FROM assignments WHERE id = ?', [json.assignment.id]);
+    expect(row.due_date).toBeDefined();
+  });
+
   it('rejects a student with 403', async () => {
     const { status, json } = await createAssignment(student.token, { title: 'Nope' });
     expect(status).toBe(403);
@@ -188,6 +205,19 @@ describe('GET /api/assignments/:id', () => {
     const { status, json } = await apiCall(h.api, `assignments/${created.json.assignment.id}`, { token: lecturer.token });
     expect(status).toBe(200);
     expect(json.assignment.submissions).toEqual([]);
+  });
+
+  it('resolves assignment using short obfuscated hash ID', async () => {
+    const created = await createAssignment(lecturer.token, { title: 'Hash ID Test' });
+    const aid = created.json.assignment.id;
+    const encId = encodeId(aid);
+    expect(typeof encId).toBe('string');
+    expect(encId.length).toBeGreaterThanOrEqual(6);
+
+    const { status, json } = await apiCall(h.api, `assignments/${encId}`, { token: lecturer.token });
+    expect(status).toBe(200);
+    expect(json.assignment.id).toBe(aid);
+    expect(json.assignment.title).toBe('Hash ID Test');
   });
 });
 

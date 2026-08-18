@@ -1,4 +1,4 @@
-import { sendJson, sendError, guardRole } from '../http.js';
+import { sendJson, sendError, guardRole, parseIdParam } from '../http.js';
 import { collabRequest } from '../collab.js';
 import { countGroupWords } from '../text.js';
 
@@ -7,8 +7,8 @@ export default async function groupSubmit(ctx) {
   const user = guardRole(ctx, 'student');
   if (!user) return;
 
-  const groupId = parseInt(ctx.params.id, 10);
-  if (!groupId) return sendError(ctx, 400, 'Group ID required');
+  const groupId = parseIdParam(ctx, 'Group ID required');
+  if (!groupId) return;
   const data = ctx.body;
 
   const [gRows] = await ctx.pool.query('SELECT * FROM `groups` WHERE id = ?', [groupId]);

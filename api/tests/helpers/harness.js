@@ -217,6 +217,12 @@ export async function registerUser(api, { name, role = 'student' } = {}) {
   if (loginRes.status !== 200) {
     throw new Error(`helper login failed: ${loginRes.status} ${JSON.stringify(loginRes.json)}`);
   }
+  const [courses] = await api.pool.query('SELECT id FROM courses');
+  if (role === 'student' && courses.length > 0) {
+    for (const c of courses) {
+      await api.pool.query('INSERT IGNORE INTO course_members (course_id, user_id, role) VALUES (?, ?, ?)', [c.id, json.user.id, 'student']);
+    }
+  }
   return { token: loginRes.json.accessToken, user: loginRes.json.user };
 }
 

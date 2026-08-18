@@ -7,7 +7,7 @@ import {
 } from '../components/AuthShell';
 
 export default function Register() {
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'student' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'student', student_id: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(null); // null | { email }
@@ -21,7 +21,11 @@ export default function Register() {
     setLoading(true);
     try {
       // The new contract does NOT auto-login: expect { user, message } only.
-      const data = await api.post('register', form);
+      const payload = {
+        ...form,
+        student_id: form.role === 'student' ? form.student_id.trim() : undefined,
+      };
+      const data = await api.post('register', payload);
       setDone({ email: data.user.email });
     } catch (err) {
       setError(err.message || 'Unable to create your account. Please try again.');
@@ -120,6 +124,22 @@ export default function Register() {
             <option value="lecturer">Lecturer</option>
           </select>
         </div>
+        {form.role === 'student' && (
+          <div>
+            <label htmlFor="reg-student-id" className="mb-1 block text-sm font-medium text-gray-700">
+              Student ID / Matric Number
+            </label>
+            <input
+              id="reg-student-id"
+              type="text"
+              name="student_id"
+              value={form.student_id}
+              onChange={(e) => update('student_id', e.target.value)}
+              placeholder="e.g. 24/001"
+              className={authInput}
+            />
+          </div>
+        )}
         <button type="submit" disabled={loading} className={authBtn}>
           {loading ? 'Creating account...' : 'Create account'}
         </button>

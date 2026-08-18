@@ -1,61 +1,67 @@
-import { CheckCircle2, AlertTriangle, RefreshCcw } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Info } from 'lucide-react';
 
-// The detailed "why this verdict" block, rendered inside the VerdictPanel's
-// expander. No outer card — it embeds in the verdict card so the review page
-// stays a single, scannable surface instead of stacked panels.
+function getFactorRating(score) {
+  if (score >= 80) return { label: 'Normal pattern', pill: 'bg-emerald-50 text-emerald-800 border-emerald-200' };
+  if (score >= 60) return { label: 'Typical variation', pill: 'bg-amber-50 text-amber-800 border-amber-200' };
+  if (score >= 40) return { label: 'Notable variation', pill: 'bg-orange-50 text-orange-800 border-orange-200' };
+  return { label: 'Needs attention', pill: 'bg-red-50 text-red-800 border-red-200' };
+}
 
 function FactorCard({ factor }) {
   const score = factor.score;
-  const scoreColor = score >= 80 ? 'text-green-700' : score >= 60 ? 'text-yellow-700' : score >= 40 ? 'text-orange-700' : 'text-red-600';
-  const barColor = score >= 80 ? 'bg-green-500' : score >= 60 ? 'bg-yellow-500' : score >= 40 ? 'bg-orange-500' : 'bg-red-500';
+  const rating = getFactorRating(score);
 
   return (
-    <div className={`rounded-lg border p-3 ${score < 40 ? 'border-red-200 bg-red-50/40' : 'border-line bg-surface'}`}>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-sm font-medium text-gray-700">{factor.label}</span>
-        <span className={`text-sm font-bold ${scoreColor}`}>{score}</span>
+    <div
+      className={`rounded-xl border p-3.5 space-y-2 ${
+        score < 40 ? 'border-red-200 bg-red-50/30' : 'border-gray-200 bg-[#F9F8F6]'
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-bold text-[#1A1A1B]">{factor.label}</span>
+        <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${rating.pill}`}>
+          {rating.label}
+        </span>
       </div>
-      <div className="w-full bg-gray-100 rounded-full h-1 mb-2">
-        <div className={`h-1 rounded-full ${barColor}`} style={{ width: `${score}%` }} />
-      </div>
-      <p className="text-xs text-gray-600 leading-snug">{factor.narrative || factor.detail}</p>
-      {score < 40 && factor.flip && (
-        <p className="text-xs text-primary-700 mt-1.5 leading-snug">
-          <RefreshCcw className="w-3 h-3 inline mr-1" />{factor.flip}
-        </p>
-      )}
+      <p className="text-xs text-gray-600 leading-relaxed font-sans">{factor.narrative || factor.detail}</p>
     </div>
   );
 }
 
 export default function DecisionRecord({ record, factors }) {
   if (!record) return null;
-  const { evidence_for_originality, concerns, flip_conditions } = record;
+  const { evidence_for_originality, concerns } = record;
   const hasConcerns = concerns?.length > 0;
+  const hasPositive = evidence_for_originality?.length > 0;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {hasConcerns && (
         <DetailList
-          icon={<AlertTriangle className="w-4 h-4 text-orange-600" />}
-          title="What raised a concern"
+          icon={<AlertTriangle className="w-4 h-4 text-amber-600" />}
+          title="Areas of Attention"
           items={concerns}
-          tone="text-orange-700"
+          tone="text-amber-900"
+          boxCls="bg-amber-50/50 border border-amber-200/80"
         />
       )}
 
-      {evidence_for_originality?.length > 0 && (
+      {hasPositive && (
         <DetailList
-          icon={<CheckCircle2 className="w-4 h-4 text-green-600" />}
-          title="What looks original"
+          icon={<CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+          title="Positive Indicators"
           items={evidence_for_originality}
-          tone="text-green-700"
+          tone="text-emerald-900"
+          boxCls="bg-emerald-50/50 border border-emerald-200/80"
         />
       )}
 
-      {factors && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">How each signal scored</h3>
+      {factors && Object.keys(factors).length > 0 && (
+        <div className="pt-2">
+          <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-gray-500 mb-2.5 flex items-center gap-1.5">
+            <Info className="w-3.5 h-3.5 text-[#0047FF]" />
+            <span>Telemetry Factors</span>
+          </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {Object.entries(factors).map(([key, factor]) => (
               <FactorCard key={key} factor={factor} />
@@ -64,25 +70,28 @@ export default function DecisionRecord({ record, factors }) {
         </div>
       )}
 
-      {!hasConcerns && flip_conditions?.length > 0 && (
-        <p className="text-xs text-gray-600">No signals raised a concern for this submission.</p>
+      {!hasConcerns && (
+        <p className="text-xs text-gray-500 font-mono">
+          All telemetry patterns align with expected drafting behavior.
+        </p>
       )}
     </div>
   );
 }
 
-function DetailList({ icon, title, items, tone }) {
+function DetailList({ icon, title, items, tone, boxCls }) {
   return (
-    <div>
-      <div className="flex items-center gap-1.5 mb-1.5">
+    <div className={`p-3.5 rounded-xl ${boxCls}`}>
+      <div className="flex items-center gap-2 mb-2">
         {icon}
-        <h3 className={`text-sm font-semibold ${tone}`}>{title}</h3>
+        <h3 className={`text-xs font-bold font-mono uppercase tracking-wider ${tone}`}>{title}</h3>
       </div>
-      <ul className="space-y-1.5">
+      <ul className="space-y-1.5 pl-5 list-disc text-xs text-gray-700 font-sans leading-relaxed">
         {items.map((item, i) => (
-          <li key={i} className="text-sm text-gray-700 leading-snug pl-5.5 ml-0.5 list-disc">{item}</li>
+          <li key={i}>{item}</li>
         ))}
       </ul>
     </div>
   );
 }
+

@@ -4,9 +4,6 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { api } from '../api';
 import Review from './Review';
 
-// jsdom has no ResizeObserver; recharts' ResponsiveContainer polls the
-// browser API when present (it also falls back), but a stub keeps the group
-// chart clean when the fold is opened under test.
 if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = class {
     observe() {}
@@ -16,8 +13,6 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 }
 
 vi.mock('../api', () => ({ api: { get: vi.fn() } }));
-// GroupFinalDoc mounts the full TipTap editor + tracker; a stub keeps the
-// fold test focused and free of websocket noise.
 vi.mock('../components/GroupFinalDoc', () => ({ default: () => <div>group-final-doc</div> }));
 
 const hourly = Array.from({ length: 24 }, (_, h) => ({ h, n: 0 }));
@@ -50,22 +45,10 @@ const groupPlayback = {
 const individualPlayback = {
   id: 1,
   content: JSON.stringify({ type: 'doc', content: [{ type: 'paragraph' }] }),
-  events: [],
+  events: [
+    { type: 'keystroke', occurred_at: 100, steps: [{ from: 0, to: 0, insert: 'Hello' }] },
+  ],
   stats: { word_count: 100 },
-};
-
-const verdict = {
-  overall_score: 82,
-  verdict: 'Likely Original',
-  confidence: 'high',
-  needs_review: false,
-  decision_record: {
-    summary: 'This looks like genuine, original writing — you can still inspect the evidence yourself.',
-    evidence_for_originality: [],
-    concerns: [],
-    flip_conditions: [],
-  },
-  factors: {},
 };
 
 function renderReview() {
@@ -82,22 +65,26 @@ describe('Review (individual)', () => {
   beforeEach(() => {
     api.get.mockReset();
     api.get.mockImplementation((path) =>
-      path.endsWith('/playback') ? Promise.resolve(individualPlayback) : Promise.resolve(verdict),
+      path.endsWith('/playback') ? Promise.resolve(individualPlayback) : Promise.resolve({}),
     );
   });
 
-  it('renders the verdict card and keeps detailed evidence folded by default', async () => {
+  it('renders document-first view with factual submission record and mode toggling', async () => {
     renderReview();
-    const fold = await screen.findByRole('button', { name: /show detailed evidence/i });
-    expect(fold).toHaveAttribute('aria-expanded', 'false');
-    expect(fold).toHaveAttribute('aria-controls');
-    expect(screen.getByText('Submission Review')).toBeInTheDocument();
-    expect(screen.getByText(/no automated verdict/)).toBeInTheDocument();
-    expect(screen.queryByText('Paste Analysis')).not.toBeInTheDocument();
+    expect(await screen.findByText('Submission Review')).toBeInTheDocument();
 
-    fireEvent.click(fold);
-    expect(await screen.findByRole('button', { name: /hide detailed evidence/i })).toHaveAttribute('aria-expanded', 'true');
-    expect(await screen.findByText('Paste Analysis')).toBeInTheDocument();
+    // Mode buttons in top bar
+    expect(screen.getByRole('button', { name: /^document view$/i })).toBeInTheDocument();
+    const processBtn = screen.getByRole('button', { name: /^process record$/i });
+    expect(processBtn).toBeInTheDocument();
+
+    // Right sidebar displays factual submission record
+    expect(screen.getByText('Submission Record')).toBeInTheDocument();
+    expect(screen.getByText('Process Summary')).toBeInTheDocument();
+
+    // Toggle into Process Record mode
+    fireEvent.click(processBtn);
+    expect(await screen.findByText('Process Timeline')).toBeInTheDocument();
   });
 });
 
@@ -105,25 +92,19 @@ describe('Review (group)', () => {
   beforeEach(() => {
     api.get.mockReset();
     api.get.mockImplementation((path) =>
-      path.endsWith('/playback') ? Promise.resolve(groupPlayback) : Promise.resolve(verdict),
+      path.endsWith('/playback') ? Promise.resolve(groupPlayback) : Promise.resolve({}),
     );
   });
 
-  it('shows the contribution summary and finally the document, with deep evidence behind the group fold', async () => {
+  it('renders group document and member contributions in sidebars and canvas', async () => {
     renderReview();
-    // At-a-glance answer + final document are visible without any drilling.
-    expect(await screen.findByText('Contribution X-Ray')).toBeInTheDocument();
-    expect(screen.getByText('group-final-doc')).toBeInTheDocument();
+    expect(await screen.findByText('Submission Review')).toBeInTheDocument();
 
-    const fold = await screen.findByRole('button', { name: /show detailed evidence/i });
-    expect(fold).toHaveAttribute('aria-expanded', 'false');
-    // Deep evidence is hidden initially.
-    expect(screen.queryByText('Member workload')).not.toBeInTheDocument();
-    expect(screen.queryByText('Copied text (')).not.toBeInTheDocument();
+    // Group final doc rendered in center
+    expect(await screen.findByText('group-final-doc')).toBeInTheDocument();
 
-    fireEvent.click(fold);
-    expect(await screen.findByText('Member workload')).toBeInTheDocument();
-    expect(await screen.findByText('Edits per member')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /hide detailed evidence/i })).toHaveAttribute('aria-expanded', 'true');
+    // Member contributions rendered in sidebar
+    expect(await screen.findByRole('heading', { name: /member contributions/i })).toBeInTheDocument();
+    expect(screen.getByText('Member workload')).toBeInTheDocument();
   });
 });

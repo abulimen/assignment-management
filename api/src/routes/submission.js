@@ -35,9 +35,14 @@ export default async function submission(ctx) {
       if (Number(c[0].c) === 0) return sendError(ctx, 403, 'Forbidden');
     }
     if (user.role === 'lecturer') {
-      const [aRows] = await ctx.pool.query('SELECT lecturer_id FROM assignments WHERE id = ?', [sub.assignment_id]);
+      const [aRows] = await ctx.pool.query('SELECT course_id FROM assignments WHERE id = ?', [sub.assignment_id]);
       const a = aRows[0];
-      if (!a || Number(a.lecturer_id) !== user.sub) return sendError(ctx, 403, 'Forbidden');
+      if (!a) return sendError(ctx, 403, 'Forbidden');
+      const [cm] = await ctx.pool.query(
+        "SELECT 1 FROM course_members WHERE course_id = ? AND user_id = ? AND role = 'lecturer'",
+        [a.course_id, user.sub],
+      );
+      if (cm.length === 0) return sendError(ctx, 403, 'Forbidden');
     }
 
     const [secRows] = await ctx.pool.query('SELECT merged FROM group_sections WHERE submission_id = ?', [id]);

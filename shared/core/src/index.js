@@ -70,3 +70,4 @@ export function createPool(db) {  return mysql.createPool({
 
 export * from "./text.js";
 export * from "./stats.js";
+export * from "./hashids.js";

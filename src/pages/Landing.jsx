@@ -4,23 +4,28 @@ import { Navbar } from '../components/landing/Navbar';
 import { Hero } from '../components/landing/Hero';
 import { TheProblem } from '../components/landing/TheProblem';
 import { TwoModes } from '../components/landing/TwoModes';
-import { HowItWorks } from '../components/landing/HowItWorks';
-import { WorkHistory } from '../components/landing/WorkHistory';
-import { EvidenceSection } from '../components/landing/EvidenceSection';
-import { GroupContribution } from '../components/landing/GroupContribution';
-import { StudentBenefit } from '../components/landing/StudentBenefit';
+import { WorkspaceShowcase } from '../components/landing/WorkspaceShowcase';
 import { SubmissionSection } from '../components/landing/SubmissionSection';
+import { WhoBenefits } from '../components/landing/WhoBenefits';
 import { BetaCTA } from '../components/landing/BetaCTA';
 import { Footer } from '../components/landing/Footer';
 import { EvidenceModal } from '../components/landing/EvidenceModal';
 import { InfoModal } from '../components/landing/InfoModal';
+import { useParallax, useScrollReveal } from '../hooks/useParallax';
 
-// Glue for the AI Studio landing components (src/components/landing, kept
-// byte-identical to the source export). The export's Join/Sign-in modals are
-// mock-only; here those two callbacks route into the product's real auth
-// flows instead. Everything else renders exactly as authored.
+/** Scroll-reveal wrapper: fades + slides children into view on intersection. */
+function RevealSection({ children, className = '' }) {
+  const ref = useScrollReveal();
+  return (
+    <div ref={ref} className={`scroll-reveal ${className}`}>
+      {children}
+    </div>
+  );
+}
+
 export default function Landing() {
   const navigate = useNavigate();
+  const scrollY = useParallax();
   const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
   const [infoModalData, setInfoModalData] = useState({
     isOpen: false,
@@ -50,21 +55,42 @@ export default function Landing() {
         onOpenSignInModal={() => navigate('/login')}
       />
 
-      {/* div, not main: the Hero artifact authors its own <main> landmark. */}
-      <div id="main" className="flex-grow">
-        <Hero onOpenBetaModal={() => navigate('/register')} />
-        <TheProblem />
-        <TwoModes />
-        <HowItWorks />
-        <WorkHistory />
-        <EvidenceSection />
-        <GroupContribution
-          onOpenEvidenceModal={() => setIsEvidenceModalOpen(true)}
-        />
-        <StudentBenefit />
-        <SubmissionSection />
-        <BetaCTA onOpenBetaModal={() => navigate('/register')} />
-      </div>
+      <main id="main" className="flex-grow">
+        {/* Section 1: Hero (parallax-driven) */}
+        <Hero onOpenBetaModal={() => navigate('/register')} scrollY={scrollY} />
+
+        {/* Section 2: The Problem / Workflow Difference */}
+        <RevealSection>
+          <TheProblem />
+        </RevealSection>
+
+        {/* Section 3: Individual + Group Assignments */}
+        <RevealSection>
+          <TwoModes />
+        </RevealSection>
+
+        {/* Section 4: The Draftly Workspace Experience */}
+        <RevealSection>
+          <WorkspaceShowcase />
+        </RevealSection>
+
+        {/* Section 5: What Happens When They Submit */}
+        <RevealSection>
+          <SubmissionSection
+            onOpenEvidenceModal={() => setIsEvidenceModalOpen(true)}
+          />
+        </RevealSection>
+
+        {/* Section 6: Who Benefits */}
+        <RevealSection>
+          <WhoBenefits />
+        </RevealSection>
+
+        {/* Section 7: Beta CTA */}
+        <RevealSection>
+          <BetaCTA onOpenBetaModal={() => navigate('/register')} />
+        </RevealSection>
+      </main>
 
       <Footer
         onOpenBetaModal={() => navigate('/register')}

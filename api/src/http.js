@@ -1,7 +1,7 @@
 // Shared HTTP helpers for the API server: CORS, JSON responses, error
 // envelope, body parsing, and the JWT guards. Mirrors src/guard.php and
 // src/response.php behavior exactly (status codes + messages).
-import { verifyJwt } from '@am/core';
+import { verifyJwt, decodeId } from '@am/core';
 
 const MAX_BODY = 10 * 1024 * 1024; // 10 MB
 
@@ -70,10 +70,10 @@ export function guardRole(ctx, role) {
   return payload;
 }
 
-// Parse a numeric path param; returns null when missing/invalid (route 400).
+// Parse a path param (supporting both obfuscated string IDs and raw numbers); returns null when missing/invalid (route 400).
 export function parseIdParam(ctx, message = 'ID required') {
   const raw = ctx.params.id;
-  const n = parseInt(raw, 10);
+  const n = decodeId(raw);
   if (!n) {
     sendError(ctx, 400, message);
     return null;
@@ -86,4 +86,12 @@ export function parseIdParam(ctx, message = 'ID required') {
 export function missingField(data, field) {
   const v = data[field];
   return v === undefined || (typeof v === 'string' && v.trim() === '');
+}
+
+// Convert ISO strings, timestamps, or date inputs into MySQL DATETIME 'YYYY-MM-DD HH:MM:SS'
+export function parseDate(val) {
+  if (!val) return null;
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 19).replace('T', ' ');
 }

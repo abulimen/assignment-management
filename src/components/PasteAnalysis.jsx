@@ -1,174 +1,146 @@
-import { useState, useMemo } from 'react';
-import { Clipboard, ExternalLink, Link2, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Clipboard, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 
-export default function PasteAnalysis({ events, finalContent }) {
-  const [showLinks, setShowLinks] = useState(false);
-  const [expandedPastes, setExpandedPastes] = useState({});
+/**
+ * PasteAnalysis — factual inspection of text entered via paste events.
+ */
+export default function PasteAnalysis({ events }) {
+  const [expandedId, setExpandedId] = useState(null);
 
-  // Extract external paste events
   const pastes = useMemo(() => {
     if (!events) return [];
     return events
-      .filter(e => e.type === 'paste' && e.data?.external_paste)
-      .map(e => ({
-        id: e.sequence,
-        text: e.data.pasted_text || '',
-        length: e.data.pasted_text_length || (e.data.pasted_text || '').length,
-        position: e.data.position,
+      .filter((e) => e.type === 'paste')
+      .map((e, idx) => ({
+        id: e.sequence ?? idx,
+        text: e.data?.pasted_text || e.data?.text || '',
+        length: (e.data?.pasted_text || e.data?.text || '').length,
+        isHtml: !!e.data?.is_html,
         occurredAt: e.occurred_at,
-        isHtml: e.data.is_html,
-      }));
+      }))
+      .filter((p) => p.text.length >= 10);
   }, [events]);
-
-  // Extract hyperlinks from pasted text
-  const hyperlinks = useMemo(() => {
-    const links = [];
-    for (const paste of pastes) {
-      const matches = paste.text.match(/https?:\/\/[^\s<>"']+/g);
-      if (matches) {
-        for (const url of matches) {
-          links.push({ url, pasteId: paste.id });
-        }
-      }
-    }
-    return links;
-  }, [pastes]);
-
-  // Check how much of pasted text survived in final document
-  const survivalStats = useMemo(() => {
-    if (!events || pastes.length === 0) return { totalPasted: 0, retained: 0, modified: 0 };
-
-    // Track paste ranges and overlapping deletes (same logic as verdict)
-    const pasteRanges = pastes.map(p => ({
-      from: p.position,
-      to: p.position + p.length,
-      origLen: p.length,
-      deleted: 0,
-    }));
-
-    // Find delete events that overlap paste ranges
-    const deletes = events.filter(e => e.type === 'delete');
-    for (const del of deletes) {
-      const delPos = del.data?.position ?? 0;
-      const delLen = del.data?.length ?? 0;
-      for (const pr of pasteRanges) {
-        if (delPos < pr.to && (delPos + delLen) > pr.from) {
-          const overlapStart = Math.max(delPos, pr.from);
-          const overlapEnd = Math.min(delPos + delLen, pr.to);
-          const overlap = Math.max(0, overlapEnd - overlapStart);
-          pr.deleted += overlap;
-        }
-      }
-    }
-
-    const totalPasted = pasteRanges.reduce((sum, pr) => sum + pr.origLen, 0);
-    const unmodified = pasteRanges.reduce((sum, pr) => sum + Math.max(0, pr.origLen - pr.deleted), 0);
-    const modified = totalPasted - unmodified;
-    return { totalPasted, retained: unmodified, modified };
-  }, [pastes, events]);
 
   if (pastes.length === 0) {
     return (
-      <div className="bg-surface rounded-xl border border-line p-6 mb-6">
-        <div className="flex items-center gap-2 mb-2">
-          <Clipboard className="w-5 h-5 text-green-500" />
-          <h2 className="text-lg font-semibold">Paste Analysis</h2>
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs">
+        <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
+          <Clipboard className="w-4 h-4 text-emerald-600" />
+          <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-gray-700">
+            Inserted Text
+          </h2>
         </div>
-        <p className="text-sm text-gray-600">No external pastes recorded — the content appears to be typed.</p>
+        <p className="text-xs text-gray-500 pt-3 font-sans">
+          No paste events recorded. All content in this document was entered directly in the editor.
+        </p>
       </div>
     );
   }
 
-  const modifiedChars = survivalStats.totalPasted - survivalStats.retained;
+  const totalWords = pastes.reduce((sum, p) => {
+    return sum + p.text.trim().split(/\s+/).filter(Boolean).length;
+  }, 0);
 
   return (
-    <div className="bg-surface rounded-xl border border-line p-6 mb-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs space-y-3">
+      <div className="flex items-center justify-between pb-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          <Clipboard className="w-5 h-5 text-orange-500" />
-          <h2 className="text-lg font-semibold">Paste Analysis</h2>
+          <Clipboard className="w-4 h-4 text-[#0047FF]" />
+          <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-gray-700">
+            Inserted Text
+          </h2>
         </div>
-        {hyperlinks.length > 0 && (
-          <button
-            onClick={() => setShowLinks(!showLinks)}
-            aria-expanded={showLinks}
-            className="flex items-center gap-1.5 text-sm text-primary-600 hover:bg-primary-50 px-3 min-h-11 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
-          >
-            <Link2 className="w-4 h-4" />
-            {hyperlinks.length} hyperlink{hyperlinks.length > 1 ? 's' : ''} found
-          </button>
-        )}
+        <span className="text-xs font-mono text-gray-500">
+          {pastes.length} event{pastes.length > 1 ? 's' : ''} · ~{totalWords} words
+        </span>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <div className="bg-orange-50 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-orange-600">{pastes.length}</div>
-          <div className="text-xs text-gray-600">External Pastes</div>
-        </div>
-        <div className="bg-primary-50 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-primary-600">{survivalStats.totalPasted}</div>
-          <div className="text-xs text-gray-600">Chars Pasted</div>
-        </div>
-        <div className="bg-green-50 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-green-600">{survivalStats.retained}</div>
-          <div className="text-xs text-gray-600">Retained Unmodified</div>
-        </div>
-        <div className="bg-red-50 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-red-600">{modifiedChars}</div>
-          <div className="text-xs text-gray-600">Modified / Removed</div>
-        </div>
-      </div>
+      <p className="text-xs text-gray-500 font-sans">
+        The following text was entered via paste event.
+      </p>
 
-      {/* Hyperlinks */}
-      {showLinks && hyperlinks.length > 0 && (
-        <div className="mb-4 bg-canvas rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1">
-            <ExternalLink className="w-4 h-4" /> Hyperlinks in Pasted Content
-          </h3>
-          <div className="space-y-1">
-            {hyperlinks.map((link, i) => (
-              <a key={i} href={link.url} target="_blank" rel="noopener noreferrer"
-                className="block text-sm text-primary-600 hover:underline truncate">
-                {link.url}
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="space-y-2">
+        {pastes.map((paste, idx) => {
+          const isOpen = expandedId === paste.id;
+          const preview = paste.text.length > 100 ? paste.text.slice(0, 100) + '…' : paste.text;
+          const wordCount = paste.text.trim().split(/\s+/).filter(Boolean).length;
+          const urls = paste.text.match(/https?:\/\/[^\s<>"']+/g) || [];
 
-      {/* Paste details */}
-      <div className="space-y-3">
-        {pastes.map((paste) => {
-          const isExpanded = expandedPastes[paste.id];
-          const preview = paste.text.length > 100 ? paste.text.substring(0, 100) + '...' : paste.text;
           return (
-            <div key={paste.id} className="border border-gray-200 rounded-lg overflow-hidden">
+            <div key={paste.id} className="border border-gray-200 rounded-xl overflow-hidden bg-white">
               <button
-                onClick={() => setExpandedPastes(prev => ({ ...prev, [paste.id]: !prev[paste.id] }))}
-                aria-expanded={isExpanded}
-                className="w-full flex items-center justify-between p-3 min-h-11 hover:bg-gray-50 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+                type="button"
+                onClick={() => setExpandedId(isOpen ? null : paste.id)}
+                aria-expanded={isOpen}
+                className="w-full flex items-start gap-3 p-3 text-left hover:bg-[#F9F8F6] transition-colors cursor-pointer"
               >
-                <div className="flex items-center gap-2 text-left flex-1 min-w-0">
-                  <span className="text-xs font-mono text-gray-600">#{paste.id}</span>
-                  <span className="text-sm text-gray-700 truncate bg-yellow-100 px-1.5 py-0.5 rounded">
-                    {preview}
-                  </span>
+                {/* Paste number badge */}
+                <span className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black flex items-center justify-center">
+                  {idx + 1}
+                </span>
+
+                <div className="flex-1 min-w-0 space-y-1">
+                  {/* Preview text */}
+                  <p className="text-xs text-gray-800 leading-relaxed line-clamp-2 font-sans italic">
+                    "{preview}"
+                  </p>
+                  <div className="flex items-center gap-2 text-[10px] font-mono text-gray-400">
+                    <span>{wordCount} words ({paste.length} chars)</span>
+                    {paste.isHtml && (
+                      <span className="px-1.5 py-0.5 bg-[#0047FF]/10 text-[#0047FF] rounded font-bold">
+                        HTML
+                      </span>
+                    )}
+                    {urls.length > 0 && (
+                      <span className="flex items-center gap-0.5 text-blue-600">
+                        <ExternalLink className="w-2.5 h-2.5" />
+                        {urls.length} link{urls.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {paste.occurredAt && (
+                      <span>
+                        · {new Date(paste.occurredAt * 1000).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 text-xs text-gray-600 ml-2 flex-shrink-0">
-                  <span>{paste.length} chars</span>
-                  {paste.isHtml && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded">HTML</span>}
-                  {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+
+                <div className="shrink-0 mt-0.5">
+                  {isOpen ? (
+                    <ChevronUp className="w-3.5 h-3.5 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                  )}
                 </div>
               </button>
-              {isExpanded && (
-                <div className="border-t border-gray-200 p-3">
-                  <div className="bg-yellow-50 rounded p-3 text-sm whitespace-pre-wrap break-words font-mono">
+
+              {isOpen && (
+                <div className="border-t border-gray-100 bg-[#FFFDF5] p-4 space-y-3">
+                  <div className="bg-white border border-amber-200 rounded-lg p-3 text-xs font-sans text-gray-800 leading-relaxed whitespace-pre-wrap break-words max-h-52 overflow-y-auto">
                     {paste.text}
                   </div>
-                  <div className="text-xs text-gray-400 mt-2">
-                    Pasted at position {paste.position} · {new Date(paste.occurredAt * 1000).toLocaleString()}
-                  </div>
+                  {urls.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">
+                        Embedded Links
+                      </div>
+                      {urls.map((url, i) => (
+                        <a
+                          key={i}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-[#0047FF] hover:underline truncate font-mono"
+                        >
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                          {url}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -177,16 +149,4 @@ export default function PasteAnalysis({ events, finalContent }) {
       </div>
     </div>
   );
-}
-
-// Extract plain text from a ProseMirror JSON document
-function extractDocText(doc) {
-  if (!doc || !doc.content) return '';
-  return doc.content.map(node => extractNodeText(node)).join('\n');
-}
-
-function extractNodeText(node) {
-  if (node.text) return node.text;
-  if (!node.content) return '';
-  return node.content.map(child => extractNodeText(child)).join('');
 }

@@ -58,6 +58,35 @@ describe('POST /api/register', () => {
     expect(vrow.token_hash).toBe(sha256hex(mail.token));
   });
 
+  it('stores student_id for student registration and returns it on login and me', async () => {
+    const email = uni('reg_stu_id');
+    const { status, json } = await apiCall(h.api, 'register', {
+      method: 'POST',
+      body: { email, password: PASSWORD, name: 'Student With ID', role: 'student', student_id: '24/042' },
+    });
+    expect(status).toBe(201);
+    expect(json.user.studentId).toBe('24/042');
+
+    const [[row]] = await h.pool.query('SELECT student_id FROM users WHERE id = ?', [json.user.id]);
+    expect(row.student_id).toBe('24/042');
+
+    // Verify email and login
+    await h.pool.query('UPDATE users SET email_verified = 1 WHERE id = ?', [json.user.id]);
+    const { status: lStatus, json: lJson } = await apiCall(h.api, 'login', {
+      method: 'POST',
+      body: { email, password: PASSWORD },
+    });
+    expect(lStatus).toBe(200);
+    expect(lJson.user.studentId).toBe('24/042');
+
+    // GET /api/me
+    const { status: mStatus, json: mJson } = await apiCall(h.api, 'me', {
+      headers: { Authorization: `Bearer ${lJson.accessToken}` },
+    });
+    expect(mStatus).toBe(200);
+    expect(mJson.user.studentId).toBe('24/042');
+  });
+
   it('rejects duplicate email with 409', async () => {
     const email = uni('dup');
     await apiCall(h.api, 'register', { method: 'POST', body: { email, password: PASSWORD, name: 'A', role: 'student' } });

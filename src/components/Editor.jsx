@@ -25,6 +25,8 @@ export default function Editor({
   collab = null,
   statusBarExtra = null,
   onReady = null,
+  onToggleFocus = null,
+  isFocus = false,
 }) {
   const { flush, captureTransaction, setEditorRef, enqueue } = useTracker(submissionId);
   const pendingPasteRef = useRef(null);
@@ -135,8 +137,8 @@ export default function Editor({
   }, [enqueue, editable]);
 
   return (
-    <div className={`word-editor${editable ? '' : ' word-editor-readonly'}`}>
-      <WordRibbon editor={editor} editable={editable} />
+    <div className={`word-editor${editable ? '' : ' word-editor-readonly'}${isFocus ? ' word-editor-focus' : ''}`}>
+      <WordRibbon editor={editor} editable={editable} onToggleFocus={onToggleFocus} isFocus={isFocus} />
       <div className="word-canvas">
         <div className="word-sheet-wrap">
           <EditorContent editor={editor} />

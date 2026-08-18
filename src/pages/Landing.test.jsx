@@ -3,8 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import Landing from './Landing';
 
-// The landing components are the AI Studio export, kept byte-identical; its
-// Join/Sign-in actions are wired by the Landing glue to the real auth routes.
 function renderLanding() {
   return render(
     <MemoryRouter initialEntries={['/']}>
@@ -17,23 +15,23 @@ function renderLanding() {
   );
 }
 
-describe('Landing page (AI Studio public surface)', () => {
+describe('Landing page (Redesigned Assignment Workspace Surface)', () => {
   it('renders exactly one h1 with the workspace-first pitch', () => {
     renderLanding();
     const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
-    expect(h1s[0]).toHaveTextContent('See the work behind the submission.');
+    expect(h1s[0]).toHaveTextContent('The workspace for student assignments.');
   });
 
   it('tells the full workspace story in sections', () => {
     renderLanding();
     for (const name of [
-      'How Draftly works',
-      'One workspace. Two modes.',
-      'Everything that happened, kept.',
-      'Evidence on demand. Not surveillance.',
-      'Your work speaks for itself.',
-      'Free for early lecturers and their courses.',
+      "The assignment shouldn't disappear into a file upload.",
+      'Built for individual and group assignments.',
+      'One workspace. From first draft to submission.',
+      'The final submission comes with its history.',
+      'A clearer workflow for everyone involved.',
+      'Try Draftly with one real assignment.',
     ]) {
       expect(
         screen.getByRole('heading', { level: 2, name })
@@ -81,18 +79,21 @@ describe('Landing page (AI Studio public surface)', () => {
     ).toBe(before + 1);
   });
 
-  it('opens the evidence inspector from the group contribution card', () => {
+  it('opens the work history inspector from the submission card', () => {
     renderLanding();
-    fireEvent.click(screen.getByRole('button', { name: /view evidence/i }));
+    fireEvent.click(screen.getByRole('button', { name: /view work history/i }));
     expect(screen.getByText(/Provenance Record Verified/i)).toBeInTheDocument();
   });
 
-  it('opens the privacy info modal from the footer', () => {
+  it('renders links to Privacy, Terms, and Cookie legal pages in the footer', () => {
     renderLanding();
-    fireEvent.click(screen.getByRole('button', { name: 'Privacy' }));
-    expect(
-      screen.getByRole('heading', { name: 'Privacy Policy' })
-    ).toBeInTheDocument();
+    const privacyLink = screen.getByRole('link', { name: 'Privacy' });
+    const termsLink = screen.getByRole('link', { name: 'Terms' });
+    const cookiesLink = screen.getByRole('link', { name: 'Cookies' });
+
+    expect(privacyLink).toHaveAttribute('href', '/privacy');
+    expect(termsLink).toHaveAttribute('href', '/terms');
+    expect(cookiesLink).toHaveAttribute('href', '/cookies');
   });
 
   it('carries no third-party studio credit in the footer', () => {

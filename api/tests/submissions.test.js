@@ -43,11 +43,13 @@ describe('POST /api/submissions', () => {
     expect(json.error).toBe('Assignment not found');
   });
 
-  it('permits a second submission (the unique per-assignment constraint was dropped)', async () => {
+  it('returns the existing draft if one exists for the student', async () => {
     const aid = await makeAssignment();
-    await apiCall(h.api, 'submissions', { method: 'POST', token: student.token, body: { assignment_id: aid } });
-    const { status } = await apiCall(h.api, 'submissions', { method: 'POST', token: student.token, body: { assignment_id: aid } });
-    expect(status).toBe(201);
+    const first = await apiCall(h.api, 'submissions', { method: 'POST', token: student.token, body: { assignment_id: aid } });
+    expect(first.status).toBe(201);
+    const second = await apiCall(h.api, 'submissions', { method: 'POST', token: student.token, body: { assignment_id: aid } });
+    expect(second.status).toBe(200);
+    expect(second.json.submission.id).toBe(first.json.submission.id);
   });
 });
 
@@ -123,11 +125,13 @@ describe('POST /api/submissions/:id/submit', () => {
 });
 
 describe('GET /api/submissions?assignment_id=', () => {
-  it('lists submissions for the assignment (lecturer sees all)', async () => {
+  it('lists submissions for the assignment (lecturer sees all submitted work)', async () => {
     const aid = await makeAssignment();
     const other = await registerUser(h.api, { name: 'Sub Other' });
-    await apiCall(h.api, 'submissions', { method: 'POST', token: student.token, body: { assignment_id: aid } });
-    await apiCall(h.api, 'submissions', { method: 'POST', token: other.token, body: { assignment_id: aid } });
+    const sub1 = await apiCall(h.api, 'submissions', { method: 'POST', token: student.token, body: { assignment_id: aid } });
+    const sub2 = await apiCall(h.api, 'submissions', { method: 'POST', token: other.token, body: { assignment_id: aid } });
+    await apiCall(h.api, `submissions/${sub1.json.submission.id}/submit`, { method: 'POST', token: student.token, body: { content: DOC } });
+    await apiCall(h.api, `submissions/${sub2.json.submission.id}/submit`, { method: 'POST', token: other.token, body: { content: DOC } });
     const { status, json } = await apiCall(h.api, `submissions?assignment_id=${aid}`, { token: lecturer.token });
     expect(status).toBe(200);
     expect(json.submissions.length).toBe(2);

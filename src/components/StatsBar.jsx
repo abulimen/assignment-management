@@ -1,37 +1,65 @@
-import { Clock, Keyboard, Gauge, FileText, Clipboard } from 'lucide-react';
+import { FileText, Clock, Clipboard } from 'lucide-react';
 
-// Compact effort snapshot: the handful of numbers a lecturer needs to judge
-// "did they actually write this?" Deeper breakdowns live in the evidence fold.
 export default function StatsBar({ stats }) {
   if (!stats) return null;
 
   const activeMs = stats.active_time_ms || stats.total_time_ms || 0;
   const activeMinutes = Math.round(activeMs / 60000);
-  const timeDisplay = activeMinutes >= 60
-    ? `${Math.floor(activeMinutes / 60)}h ${activeMinutes % 60}m`
-    : `${activeMinutes}m`;
+  const timeDisplay =
+    activeMinutes >= 60
+      ? `${Math.floor(activeMinutes / 60)}h ${activeMinutes % 60}m`
+      : `${activeMinutes}m`;
 
   const pastePct = (stats.paste_ratio || 0) * 100;
 
   const items = [
-    { label: 'Words', value: (stats.word_count || 0).toLocaleString(), icon: <FileText className="w-4 h-4" /> },
-    { label: 'Keystrokes', value: (stats.keystroke_count || 0).toLocaleString(), icon: <Keyboard className="w-4 h-4" /> },
-    { label: 'Time spent', value: timeDisplay, icon: <Clock className="w-4 h-4" /> },
-    { label: 'Typing speed', value: `${stats.avg_wpm || 0} wpm`, icon: <Gauge className="w-4 h-4" /> },
-    { label: 'Pasted', value: `${pastePct.toFixed(0)}%`, icon: <Clipboard className="w-4 h-4" />, warn: pastePct > 30 },
+    {
+      label: 'Length',
+      value: `${(stats.word_count || 0).toLocaleString()} words`,
+      sub: stats.character_count ? `${stats.character_count.toLocaleString()} characters` : 'Total submission',
+      icon: <FileText className="w-4 h-4 text-[#0047FF]" />,
+    },
+    {
+      label: 'Time Spent',
+      value: timeDisplay,
+      sub: stats.avg_wpm ? `Avg ${stats.avg_wpm} WPM` : 'Active writing time',
+      icon: <Clock className="w-4 h-4 text-[#0047FF]" />,
+    },
+    {
+      label: 'Pasted Content',
+      value: `${pastePct.toFixed(0)}%`,
+      sub: pastePct > 0 ? 'Pasted text detected' : '100% typed directly',
+      icon: <Clipboard className="w-4 h-4 text-[#0047FF]" />,
+      warn: pastePct > 30,
+    },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-6">
-      {items.map(item => (
-        <div key={item.label} className="flex items-center gap-3 rounded-xl border border-line bg-surface px-3 py-3">
-          <div className={`flex-shrink-0 ${item.warn ? 'text-orange-500' : 'text-gray-400'}`}>{item.icon}</div>
-          <div className="min-w-0">
-            <div className={`text-base font-semibold leading-tight ${item.warn ? 'text-orange-700' : 'text-gray-900'}`}>{item.value}</div>
-            <div className="text-xs text-gray-500 truncate">{item.label}</div>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="rounded-2xl border border-gray-200 bg-white p-4 shadow-xs space-y-1.5"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-gray-500 font-sans">{item.label}</span>
+            <div className="w-7 h-7 rounded-lg bg-[#F9F8F6] border border-gray-200 flex items-center justify-center">
+              {item.icon}
+            </div>
+          </div>
+          <div
+            className={`text-lg font-black font-mono tracking-tight ${
+              item.warn ? 'text-amber-800' : 'text-[#1A1A1B]'
+            }`}
+          >
+            {item.value}
+          </div>
+          <div className="text-[11px] text-gray-400 font-sans truncate">
+            {item.sub}
           </div>
         </div>
       ))}
     </div>
   );
 }
+

@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
+import { Activity } from 'lucide-react';
 
 export default function EditDensity({ events, totalTimeMs }) {
   const buckets = useMemo(() => {
     if (!events?.length) return [];
 
-    // Find actual time range (events may not be sorted by time)
-    const times = events.filter(e => e.occurred_at != null).map(e => e.occurred_at);
+    const times = events.filter((e) => e.occurred_at != null).map((e) => e.occurred_at);
     if (times.length === 0) return [];
 
     const first = Math.min(...times);
@@ -34,26 +34,36 @@ export default function EditDensity({ events, totalTimeMs }) {
   const peakCount = buckets.reduce((m, b) => Math.max(m, b.count), 0);
 
   return (
-    <div className="bg-surface rounded-xl border border-line p-4 mb-6">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">Activity Timeline</h3>
-      <div className="flex items-end gap-0.5 h-24" role="img"
-        aria-label={`Bar chart of edit volume over time. ${buckets.length} time buckets; peak ${peakCount} events in a single bucket.`}>
-        <span className="sr-only">Peak {peakCount} edits in one bucket; {buckets[buckets.length - 1]?.count} in the last.</span>
+    <div className="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 shadow-xs space-y-4">
+      <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
+        <Activity className="w-4 h-4 text-[#0047FF]" />
+        <h3 className="text-sm font-bold text-[#1A1A1B]">Writing Pace & Activity</h3>
+      </div>
+
+      <div
+        className="flex items-end gap-1.5 h-28 bg-[#F9F8F6] p-3 rounded-xl border border-gray-200"
+        role="img"
+        aria-label={`Bar chart of edit volume over time. ${buckets.length} time buckets; peak ${peakCount} events in a single bucket.`}
+      >
+        <span className="sr-only">
+          Peak {peakCount} edits in one bucket; {buckets[buckets.length - 1]?.count} in the last.
+        </span>
         {buckets.map((b, i) => (
-          <div key={i} className="flex-1 relative group" title={`${b.count} events`}>
+          <div key={i} className="flex-1 relative group h-full flex items-end" title={`${b.count} events`}>
             <div
-              className="bg-primary-400 rounded-t hover:bg-primary-500 transition-colors w-full"
-              style={{ height: `${Math.max(b.height, 2)}%` }}
+              className="bg-[#0047FF]/75 rounded-t hover:bg-[#0047FF] transition-colors w-full"
+              style={{ height: `${Math.max(b.height, 6)}%` }}
             />
-            <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none">
+            <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-[#1A1A1B] text-white text-[10px] font-mono px-2 py-1 rounded shadow-md opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-10">
               {b.count} events
             </div>
           </div>
         ))}
       </div>
-      <div className="flex justify-between text-xs text-gray-600 mt-1">
-        <span>{buckets[0] ? new Date(buckets[0].time * 1000).toLocaleTimeString() : ''}</span>
-        <span>{buckets[buckets.length - 1] ? new Date(buckets[buckets.length - 1].time * 1000).toLocaleTimeString() : ''}</span>
+
+      <div className="flex justify-between text-[11px] font-mono text-gray-500">
+        <span>Session Start: {buckets[0] ? new Date(buckets[0].time * 1000).toLocaleTimeString() : ''}</span>
+        <span>Session End: {buckets[buckets.length - 1] ? new Date(buckets[buckets.length - 1].time * 1000).toLocaleTimeString() : ''}</span>
       </div>
     </div>
   );

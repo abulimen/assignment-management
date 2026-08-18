@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, ShieldCheck } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { X, ShieldCheck, Clock, FileText } from 'lucide-react';
 
 interface EvidenceModalProps {
   isOpen: boolean;
@@ -9,8 +10,8 @@ interface EvidenceModalProps {
 export const EvidenceModal: React.FC<EvidenceModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
       <div
         className="bg-white rounded-xl border border-gray-200 shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
@@ -19,23 +20,24 @@ export const EvidenceModal: React.FC<EvidenceModalProps> = ({ isOpen, onClose })
         <div className="bg-[#F9F8F6] border-b border-gray-200 p-5 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-md bg-[#1A1A1B] text-white flex items-center justify-center font-mono text-xs font-bold">
-              EVD
+              DOC
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-[10px] font-bold text-[#0047FF] bg-[#0047FF]/5 px-2 py-0.5 rounded border border-[#0047FF]/15">
-                  LECTURER EVIDENCE INSPECTOR
+                <span className="font-mono text-[10px] font-bold text-[#0047FF] bg-[#0047FF]/10 px-2 py-0.5 rounded border border-[#0047FF]/20">
+                  WORK HISTORY RECORD
                 </span>
-                <span className="text-xs font-mono text-gray-400">CASE #G07-8834</span>
+                <span className="text-xs font-mono text-gray-500">COURSE #ECON-402</span>
               </div>
               <h3 className="text-base font-bold text-[#1A1A1B]">
-                Group 07 · M&A Valuation Model (Submitted Aug 14)
+                Comparative Analysis of Monetary Policy · Preserved Record
               </h3>
             </div>
           </div>
           <button
             onClick={onClose}
             className="p-1 rounded-md text-gray-500 hover:text-[#1A1A1B] hover:bg-gray-200 transition-colors cursor-pointer"
+            aria-label="Close modal"
           >
             <X className="w-5 h-5" />
           </button>
@@ -48,7 +50,7 @@ export const EvidenceModal: React.FC<EvidenceModalProps> = ({ isOpen, onClose })
           <div className="p-4 rounded-lg bg-[#0047FF]/5 border border-[#0047FF]/15 flex items-start gap-3">
             <ShieldCheck className="w-5 h-5 text-[#0047FF] flex-shrink-0 mt-0.5" />
             <div className="text-xs text-[#1A1A1B]/80 leading-relaxed font-sans">
-              <span className="font-bold text-[#1A1A1B]">Provenance Record Verified:</span> The group document was developed across 14 collaborative working sessions totaling 18.4 authoring hours. No sudden whole-document bulk replacement was detected.
+              <span className="font-bold text-[#1A1A1B]">Provenance Record Verified:</span> The group document was developed across 14 collaborative working sessions totaling 18.4 authoring hours. All revisions and section contributions are preserved for review.
             </div>
           </div>
 
@@ -56,7 +58,7 @@ export const EvidenceModal: React.FC<EvidenceModalProps> = ({ isOpen, onClose })
           <div>
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">
-                SECTION ATTRIBUTION MAPPING
+                PAGE & SECTION ATTRIBUTION
               </span>
               <span className="text-xs text-gray-400 font-mono">4 SECTIONS · 3,440 WORDS</span>
             </div>
@@ -65,31 +67,31 @@ export const EvidenceModal: React.FC<EvidenceModalProps> = ({ isOpen, onClose })
               {[
                 {
                   section: 'Section 1: Executive Summary',
-                  lead: 'Jonathan Ray',
+                  lead: 'Chukwudi Nnamdi',
                   share: '41% of total words',
                   sessions: '5 sessions (6.2 hrs)',
                   status: 'Authentic gradual drafting',
                   color: '#0047FF',
                 },
                 {
-                  section: 'Section 2: Valuation Model & DCF',
-                  lead: 'Sarah Chen',
+                  section: 'Section 2: Monetary Policy Framework',
+                  lead: 'Chiamaka Eze',
                   share: '29% of total words',
                   sessions: '4 sessions (4.8 hrs)',
                   status: 'Institutional dataset linked',
                   color: '#008899',
                 },
                 {
-                  section: 'Section 3: Empirical Regression',
-                  lead: 'David Lee',
+                  section: 'Section 3: Empirical Model & Findings',
+                  lead: 'Babatunde Adeleke',
                   share: '22% of total words',
                   sessions: '4 sessions (4.1 hrs)',
                   status: 'Iterative formula updates',
                   color: '#4F46E5',
                 },
                 {
-                  section: 'Section 4: References & Layout',
-                  lead: 'Michael Kwan',
+                  section: 'Section 4: Policy Recommendations',
+                  lead: 'Emeka Okafor',
                   share: '8% of total words',
                   sessions: '1 session (0.9 hrs)',
                   status: 'Late structural contribution',
@@ -134,7 +136,7 @@ export const EvidenceModal: React.FC<EvidenceModalProps> = ({ isOpen, onClose })
           {/* Session Timeline Visualizer */}
           <div className="bg-[#F9F8F6] p-4 rounded-lg border border-gray-200">
             <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 block mb-3">
-              WORKING SESSION TIMELINE (AUG 10 – AUG 14)
+              WORKING SESSION TIMELINE (AUG 10 – AUG 16)
             </span>
             <div className="space-y-2 text-xs font-mono">
               <div className="flex items-center gap-3">
@@ -154,7 +156,7 @@ export const EvidenceModal: React.FC<EvidenceModalProps> = ({ isOpen, onClose })
                 <span className="text-[11px] text-gray-500">Core drafting</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="w-16 text-gray-400">Aug 14</span>
+                <span className="w-16 text-gray-400">Aug 16</span>
                 <div className="flex-1 bg-gray-200 h-2.5 rounded-full overflow-hidden flex">
                   <div className="bg-[#0047FF] w-[20%]" />
                   <div className="bg-[#008899] w-[25%]" />
@@ -168,7 +170,7 @@ export const EvidenceModal: React.FC<EvidenceModalProps> = ({ isOpen, onClose })
 
           {/* Principle Reminder */}
           <div className="p-3.5 bg-white rounded-lg border border-gray-200 text-xs text-gray-500 leading-relaxed font-sans">
-            <span className="font-bold text-[#1A1A1B]">Lecturer Advisory:</span> Draftly supplies neutral telemetry to support academic discretion. If uneven distribution is flagged (e.g. 8% contribution by Michael Kwan), the lecturer may choose to adjust group weighting, request an oral defense, or evaluate individual sections directly.
+            <span className="font-bold text-[#1A1A1B]">Lecturer Context:</span> Draftly provides verifiable developmental context to inform your grading decisions. The final evaluation and grading remain entirely in the hands of the educator.
           </div>
 
         </div>
@@ -186,5 +188,6 @@ export const EvidenceModal: React.FC<EvidenceModalProps> = ({ isOpen, onClose })
       </div>
     </div>
   );
-};
 
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
+};

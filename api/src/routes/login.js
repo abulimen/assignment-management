@@ -10,7 +10,14 @@ export function accessEnvelope(user, accessToken) {
   return {
     accessToken,
     expiresIn: 15 * 60,
-    user: { id: user.id, email: user.email, name: user.name, role: user.role, emailVerified: !!user.email_verified },
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      studentId: user.student_id || null,
+      emailVerified: !!user.email_verified,
+    },
   };
 }
 
@@ -49,7 +56,7 @@ export default async function login(ctx) {
   }
 
   const [rows] = await ctx.pool.query(
-    'SELECT id, email, password, name, role, email_verified FROM users WHERE email = ?',
+    'SELECT id, email, password, name, role, student_id, email_verified FROM users WHERE email = ?',
     [email],
   );
   const user = rows[0];

@@ -8,8 +8,13 @@ import verifyEmail from './verifyEmail.js';
 import resendVerification from './resendVerification.js';
 import forgotPassword from './forgotPassword.js';
 import resetPassword from './resetPassword.js';
+import courses from './courses.js';
+import course from './course.js';
+import courseMembers from './courseMembers.js';
+import joinCourse from './joinCourse.js';
 import assignments from './assignments.js';
 import assignment from './assignment.js';
+import duplicateAssignment from './duplicateAssignment.js';
 import assignGroups from './assignGroups.js';
 import createGroup from './createGroup.js';
 import joinGroup from './joinGroup.js';
@@ -26,21 +31,40 @@ export const routes = [
   { method: 'POST', pattern: '/api/register', handler: register },
   { method: 'POST', pattern: '/api/login', handler: login },
   { method: 'GET', pattern: '/api/me', handler: me },
+  { method: 'PUT', pattern: '/api/me', handler: me },
   { method: 'POST', pattern: '/api/refresh', handler: refresh },
   { method: 'POST', pattern: '/api/logout', handler: logout },
   { method: 'GET', pattern: '/api/verify-email', handler: verifyEmail },
   { method: 'POST', pattern: '/api/resend-verification', handler: resendVerification },
   { method: 'POST', pattern: '/api/forgot-password', handler: forgotPassword },
   { method: 'POST', pattern: '/api/reset-password', handler: resetPassword },
+  
+  // Courses & Memberships
+  { method: 'GET', pattern: '/api/courses', handler: courses },
+  { method: 'POST', pattern: '/api/courses', handler: courses },
+  { method: 'POST', pattern: '/api/courses/join', handler: joinCourse },
+  { method: 'GET', pattern: '/api/courses/:id', handler: course },
+  { method: 'PUT', pattern: '/api/courses/:id', handler: course },
+  { method: 'DELETE', pattern: '/api/courses/:id', handler: course },
+  { method: 'GET', pattern: '/api/courses/:id/members', handler: courseMembers },
+  { method: 'POST', pattern: '/api/courses/:id/members', handler: courseMembers },
+  { method: 'DELETE', pattern: '/api/courses/:id/members/:userId', handler: courseMembers },
+
+  // Assignments
   { method: 'GET', pattern: '/api/assignments', handler: assignments },
   { method: 'POST', pattern: '/api/assignments', handler: assignments },
   { method: 'GET', pattern: '/api/assignments/:id', handler: assignment },
   { method: 'PUT', pattern: '/api/assignments/:id', handler: assignment },
   { method: 'DELETE', pattern: '/api/assignments/:id', handler: assignment },
+  { method: 'POST', pattern: '/api/assignments/:id/duplicate', handler: duplicateAssignment },
   { method: 'GET', pattern: '/api/assignments/:id/groups', handler: assignGroups },
+
+  // Groups
   { method: 'POST', pattern: '/api/groups', handler: createGroup },
   { method: 'POST', pattern: '/api/groups/join', handler: joinGroup },
   { method: 'GET', pattern: '/api/groups/:id', handler: group },
+
+  // Submissions & Workspaces
   { method: 'GET', pattern: '/api/submissions', handler: submissions },
   { method: 'POST', pattern: '/api/submissions', handler: submissions },
   { method: 'GET', pattern: '/api/submissions/:id', handler: submission },
