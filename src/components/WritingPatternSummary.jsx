@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Activity, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Activity } from 'lucide-react';
 
 export default function WritingPatternSummary({ events }) {
   const pattern = useMemo(() => {
@@ -9,11 +9,11 @@ export default function WritingPatternSummary({ events }) {
         statusColor: 'text-emerald-700 bg-emerald-50 border-emerald-200',
         summary: 'Recorded activity indicates standard drafting progression.',
         indicators: [
-          { name: 'Typing rhythm', rating: 4, detail: 'Natural speed variation' },
-          { name: 'Pauses & thinking', rating: 4, detail: 'Regular pauses between thoughts' },
-          { name: 'Corrections', rating: 3, detail: 'Standard backspacing and typo fixes' },
-          { name: 'Revisions', rating: 3, detail: 'Iterative content changes' },
-          { name: 'Direct typing', rating: 5, detail: 'High proportion of direct input' },
+          { name: 'Typing rhythm', rating: 4, detail: 'Natural speed variation', level: 'good' },
+          { name: 'Pauses & thinking', rating: 4, detail: 'Regular pauses between thoughts', level: 'good' },
+          { name: 'Corrections', rating: 3, detail: 'Standard backspacing and typo fixes', level: 'neutral' },
+          { name: 'Revisions', rating: 3, detail: 'Iterative content changes', level: 'neutral' },
+          { name: 'Direct input', rating: 5, detail: 'High proportion of direct input', level: 'good' },
         ],
       };
     }
@@ -51,33 +51,49 @@ export default function WritingPatternSummary({ events }) {
     const totalChars = Math.max(typedChars + pastedChars, 1);
     const pasteRatio = pastedChars / totalChars;
 
-    // Determine status purely from observable signals
     const isUnusual = pasteRatio > 0.65 || (typedChars < 100 && pastedChars > 800);
+
+    const directInputRating = Math.max(1, Math.round((1 - pasteRatio) * 5));
+    const revisionsRating = deleteChars > 100 ? 4 : (deleteChars > 30 ? 3 : 2);
+    const correctionsRating = Math.min(5, Math.max(1, Math.round(deleteChars / 50) + 1));
+    const pausesRating = Math.min(5, Math.max(2, Math.round(pauseCount / 4) + 1));
+    const rhythmRating = isUnusual ? 2 : 4;
+
+    const getLevel = (rating) => {
+      if (rating >= 4) return 'good';
+      if (rating === 3) return 'neutral';
+      return 'notable';
+    };
 
     const indicators = [
       {
         name: 'Typing rhythm',
-        rating: isUnusual ? 2 : 4,
+        rating: rhythmRating,
+        level: getLevel(rhythmRating),
         detail: isUnusual ? 'Low keyboard input volume' : 'Natural variation in keystroke velocity',
       },
       {
         name: 'Pauses & thinking',
-        rating: Math.min(5, Math.max(2, Math.round(pauseCount / 4) + 1)),
+        rating: pausesRating,
+        level: getLevel(pausesRating),
         detail: `${pauseCount} thinking pauses (10s–2m) recorded`,
       },
       {
         name: 'Corrections',
-        rating: Math.min(5, Math.max(1, Math.round(deleteChars / 50) + 1)),
+        rating: correctionsRating,
+        level: getLevel(correctionsRating),
         detail: `${deleteChars} characters modified or deleted`,
       },
       {
         name: 'Revisions',
-        rating: deleteChars > 100 ? 4 : 2,
+        rating: revisionsRating,
+        level: getLevel(revisionsRating),
         detail: deleteChars > 100 ? 'Multiple edits and rewrites across drafts' : 'Linear drafting with minimal rewrites',
       },
       {
         name: 'Direct input',
-        rating: Math.max(1, Math.round((1 - pasteRatio) * 5)),
+        rating: directInputRating,
+        level: getLevel(directInputRating),
         detail: `${Math.round((1 - pasteRatio) * 100)}% entered directly into workspace`,
       },
     ];
@@ -97,6 +113,13 @@ export default function WritingPatternSummary({ events }) {
     };
   }, [events]);
 
+  const getDotColor = (level, active) => {
+    if (!active) return 'bg-gray-200';
+    if (level === 'good') return 'bg-emerald-500';
+    if (level === 'neutral') return 'bg-blue-500';
+    return 'bg-amber-500';
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs space-y-3.5">
       <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
@@ -115,18 +138,21 @@ export default function WritingPatternSummary({ events }) {
         {pattern.summary}
       </p>
 
-      {/* Indicator Bars */}
-      <div className="space-y-2 pt-1">
+      {/* Indicator Bars with Level Color-Coding */}
+      <div className="space-y-2.5 pt-1">
         {pattern.indicators.map((ind, i) => (
           <div key={i} className="flex items-center justify-between gap-3 text-xs">
-            <span className="font-sans text-gray-700 truncate w-32 shrink-0">{ind.name}</span>
-            <div className="flex items-center gap-1">
+            <div className="flex flex-col min-w-0">
+              <span className="font-sans font-medium text-gray-800 truncate">{ind.name}</span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0" title={ind.detail}>
               {[1, 2, 3, 4, 5].map((dot) => (
                 <span
                   key={dot}
-                  className={`w-2 h-2 rounded-full ${
-                    dot <= ind.rating ? 'bg-[#0047FF]' : 'bg-gray-200'
-                  }`}
+                  className={`w-2 h-2 rounded-full transition-colors ${getDotColor(
+                    ind.level,
+                    dot <= ind.rating
+                  )}`}
                 />
               ))}
             </div>

@@ -5,10 +5,10 @@ export default function EditingActivity({ events }) {
   const metrics = useMemo(() => {
     if (!events || !events.length) {
       return {
-        correctionsCount: 0,
-        revisionsCount: 0,
-        addedChars: 0,
-        deletedChars: 0,
+        inlineCorrections: 0,
+        structuralRevisions: 0,
+        approxAddedWords: 0,
+        approxDeletedWords: 0,
         summary: 'No editing actions recorded.',
       };
     }
@@ -32,7 +32,6 @@ export default function EditingActivity({ events }) {
         const delLen = Number(ev.data?.length) || 1;
         deletedChars += delLen;
 
-        // Small deletion (< 6 chars) = in-line typing correction (backspacing a typo)
         if (delLen <= 5) {
           inlineCorrections += 1;
         } else {
@@ -81,41 +80,55 @@ export default function EditingActivity({ events }) {
         <span className="text-[10px] font-mono text-gray-400">Process Breakdown</span>
       </div>
 
-      {/* Metrics Grid */}
+      {/* Metrics Grid with Color-Coded Level Badges */}
       <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-        <div className="bg-[#F9F8F6] p-2.5 rounded-xl border border-gray-200/80">
-          <div className="text-[10px] text-gray-500 font-sans uppercase">In-line Corrections</div>
-          <div className="font-bold text-sm text-[#1A1A1B] mt-0.5">
+        <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-200/70">
+          <div className="text-[10px] text-blue-700 font-sans uppercase font-semibold">In-line Corrections</div>
+          <div className="font-bold text-base text-blue-950 mt-0.5">
             {metrics.inlineCorrections.toLocaleString()}
           </div>
-          <div className="text-[9px] text-gray-400 font-sans mt-0.5">Typo fixes / backspaces</div>
+          <div className="text-[9px] text-blue-600/80 font-sans mt-0.5">Typo fixes / backspaces</div>
         </div>
 
-        <div className="bg-[#F9F8F6] p-2.5 rounded-xl border border-gray-200/80">
-          <div className="text-[10px] text-gray-500 font-sans uppercase">Structural Revisions</div>
-          <div className="font-bold text-sm text-[#1A1A1B] mt-0.5">
+        <div className={`p-2.5 rounded-xl border ${
+          metrics.structuralRevisions > 0
+            ? 'bg-purple-50/50 border-purple-200/70'
+            : 'bg-gray-50 border-gray-200/80'
+        }`}>
+          <div className={`text-[10px] font-sans uppercase font-semibold ${
+            metrics.structuralRevisions > 0 ? 'text-purple-700' : 'text-gray-500'
+          }`}>
+            Structural Revisions
+          </div>
+          <div className={`font-bold text-base mt-0.5 ${
+            metrics.structuralRevisions > 0 ? 'text-purple-950' : 'text-gray-700'
+          }`}>
             {metrics.structuralRevisions}
           </div>
-          <div className="text-[9px] text-gray-400 font-sans mt-0.5">Paragraph / block rewrites</div>
+          <div className={`text-[9px] font-sans mt-0.5 ${
+            metrics.structuralRevisions > 0 ? 'text-purple-600/80' : 'text-gray-400'
+          }`}>
+            Paragraph / block rewrites
+          </div>
         </div>
       </div>
 
       {/* Added vs Deleted Bar */}
       <div className="space-y-1.5 pt-1">
         <div className="flex items-center justify-between text-[11px] font-mono">
-          <span className="text-emerald-700 flex items-center gap-1">
+          <span className="text-emerald-700 font-semibold flex items-center gap-1">
             <PlusCircle className="w-3 h-3 text-emerald-600" />
             Added ~{metrics.approxAddedWords.toLocaleString()}w
           </span>
-          <span className="text-rose-700 flex items-center gap-1">
+          <span className="text-rose-700 font-semibold flex items-center gap-1">
             <Trash2 className="w-3 h-3 text-rose-600" />
             Deleted ~{metrics.approxDeletedWords.toLocaleString()}w
           </span>
         </div>
 
         <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden flex">
-          <div className="bg-emerald-500 h-full" style={{ width: `${addedPct}%` }} />
-          <div className="bg-rose-400 h-full" style={{ width: `${deletedPct}%` }} />
+          <div className="bg-emerald-500 h-full transition-all" style={{ width: `${addedPct}%` }} />
+          <div className="bg-rose-400 h-full transition-all" style={{ width: `${deletedPct}%` }} />
         </div>
       </div>
 
