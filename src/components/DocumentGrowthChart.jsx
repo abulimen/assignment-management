@@ -13,71 +13,92 @@ import { TrendingUp } from 'lucide-react';
 export default function DocumentGrowthChart({ events, finalWordCount = 0 }) {
   const data = useMemo(() => {
     if (!events || !events.length) {
-      return [{ time: 'Start', words: 0 }, { time: 'Final', words: finalWordCount }];
+      return [
+        { time: 'Start', words: 0 },
+        { time: 'Final', words: finalWordCount },
+      ];
     }
 
+    // Filter and sort all timed events chronologically
     const timed = events
       .filter((e) => Number.isFinite(Number(e?.occurred_at)))
       .slice()
       .sort((a, b) => Number(a.occurred_at) - Number(b.occurred_at));
 
     if (!timed.length) {
-      return [{ time: 'Start', words: 0 }, { time: 'Final', words: finalWordCount }];
+      return [
+        { time: 'Start', words: 0 },
+        { time: 'Final', words: finalWordCount },
+      ];
     }
 
-    // Track approximate document word count through step additions/deletions/pastes
-    let currentLength = 0;
-    const points = [];
     const firstTime = Number(timed[0].occurred_at);
     const lastTime = Number(timed[timed.length - 1].occurred_at);
-    const duration = Math.max(lastTime - firstTime, 1);
 
-    // Initial point
-    points.push({
-      time: new Date(firstTime * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      words: 0,
+    // Track running character count accurately
+    let runningChars = 0;
+    const history = [];
+
+    history.push({
       timestamp: firstTime,
+      chars: 0,
     });
 
-    // Sample across timeline into ~12 evenly distributed buckets
-    const BUCKETS = 12;
-    const bucketInterval = duration / BUCKETS;
-    let nextBucketTime = firstTime + bucketInterval;
-    let eventIndex = 0;
+    for (let i = 0; i < timed.length; i++) {
+      const ev = timed[i];
+      const timeSec = Number(ev.occurred_at);
 
-    for (let b = 0; b < BUCKETS; b++) {
-      while (eventIndex < timed.length && Number(timed[eventIndex].occurred_at) <= nextBucketTime) {
-        const ev = timed[eventIndex];
-        if (ev.type === 'paste') {
-          const text = ev.data?.pasted_text || ev.data?.text || '';
-          const len = text.length || ev.data?.pasted_text_length || ev.data?.length || 0;
-          currentLength += len;
-        } else if (ev.type === 'delete') {
-          const delLen = Number(ev.data?.length) || 1;
-          currentLength = Math.max(0, currentLength - delLen);
-        } else if (ev.type === 'step' || ev.type === 'keystroke') {
-          currentLength += 1;
+      if (ev.type === 'paste') {
+        const text = ev.data?.pasted_text || ev.data?.text || '';
+        const len = text.length || ev.data?.pasted_text_length || ev.data?.length || 0;
+        runningChars += len;
+        history.push({ timestamp: timeSec, chars: runningChars });
+      } else if (ev.type === 'delete') {
+        const delLen = Number(ev.data?.length) || 1;
+        runningChars = Math.max(0, runningChars - delLen);
+        history.push({ timestamp: timeSec, chars: runningChars });
+      } else if (ev.type === 'step' || ev.type === 'keystroke') {
+        runningChars += 1;
+        // Record point on typing
+        if (runningChars % 15 === 0 || i === timed.length - 1) {
+          history.push({ timestamp: timeSec, chars: runningChars });
         }
-        eventIndex++;
       }
-
-      // Convert characters to estimated words (avg ~5.5 chars per word), capped at finalWordCount if available
-      const approxWords = Math.round(currentLength / 5.5);
-      points.push({
-        time: new Date(nextBucketTime * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        words: Math.max(approxWords, 0),
-        timestamp: nextBucketTime,
-      });
-
-      nextBucketTime += bucketInterval;
     }
 
     // Final point
-    points.push({
-      time: new Date(lastTime * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      words: finalWordCount > 0 ? finalWordCount : Math.round(currentLength / 5.5),
-      timestamp: lastTime,
-    });
+    const maxCharsRecorded = Math.max(...history.map((h) => h.chars), 1);
+    const finalTargetWords = finalWordCount > 0 ? finalWordCount : Math.round(maxCharsRecorded / 5.5);
+
+    // Scale character progression accurately to target words
+    const charToWordRatio = finalTargetWords > 0 && maxCharsRecorded > 0 ? finalTargetWords / maxCharsRecorded : 1 / 5.5;
+
+    // Build distinct minute-by-minute / key active points
+    const pointsMap = new Map();
+
+    for (const h of history) {
+      const date = new Date(h.timestamp * 1000);
+      const timeLabel = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const currentWords = Math.min(
+        finalTargetWords,
+        Math.max(0, Math.round(h.chars * charToWordRatio))
+      );
+
+      // Keep the latest word count for each active minute
+      pointsMap.set(timeLabel, {
+        time: timeLabel,
+        words: currentWords,
+        timestamp: h.timestamp,
+      });
+    }
+
+    const points = Array.from(pointsMap.values());
+
+    // Ensure first and last points are clean
+    if (points.length > 0) {
+      points[0].words = 0;
+      points[points.length - 1].words = finalTargetWords;
+    }
 
     return points;
   }, [events, finalWordCount]);
@@ -113,7 +134,7 @@ export default function DocumentGrowthChart({ events, finalWordCount = 0 }) {
               axisLine={{ stroke: '#E5E5EA' }}
             />
             <YAxis
-              domain={[0, Math.ceil(maxWords * 1.1)]}
+              domain={[0, Math.ceil(maxWords * 1.15)]}
               tick={{ fontSize: 10, fill: '#8E8E93', fontFamily: 'monospace' }}
               tickLine={false}
               axisLine={false}
@@ -145,7 +166,7 @@ export default function DocumentGrowthChart({ events, finalWordCount = 0 }) {
         </ResponsiveContainer>
       </div>
       <p className="text-[11px] text-gray-500 font-sans leading-snug">
-        Progression of document length from initial keystrokes to final submission.
+        Progression of document length from initial keystrokes to final submission ({finalWordCount} words).
       </p>
     </div>
   );
