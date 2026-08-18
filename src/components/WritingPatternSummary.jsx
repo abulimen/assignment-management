@@ -82,7 +82,7 @@ export default function WritingPatternSummary({ events }) {
       },
     ];
 
-    let summary = 'The recorded work shows varied typing, pauses, corrections, and revisions across writing sessions.';
+    let summary = 'The recorded work shows varied typing, pauses, corrections, and revisions throughout the writing process.';
     if (isUnusual) {
       summary = 'A substantial portion of the text appeared via paste/insertion. Review the activity timeline and pasted text for context.';
     }

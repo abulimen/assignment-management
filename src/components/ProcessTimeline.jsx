@@ -6,121 +6,17 @@ import {
   Clipboard,
   CheckCircle2,
   Lock,
-  Calendar,
-  Activity,
-  AlertCircle,
+  PauseCircle,
+  RotateCcw,
+  Sparkles,
 } from 'lucide-react';
 
 export default function ProcessTimeline({ events, onSeekToEvent, currentStepIndex = null }) {
-  // 1. Process Overview & Activity Pattern computation
-  const activityOverview = useMemo(() => {
-    if (!events || !events.length) return null;
-
-    const timed = events
-      .filter((e) => Number.isFinite(Number(e?.occurred_at)))
-      .slice()
-      .sort((a, b) => Number(a.occurred_at) - Number(b.occurred_at));
-
-    if (!timed.length) return null;
-
-    const first = Number(timed[0].occurred_at);
-    const last = Number(timed[timed.length - 1].occurred_at);
-
-    // Group into sessions (> 2 min gap)
-    const GAP = 120;
-    const sessions = [];
-    let curSession = [timed[0]];
-
-    for (let i = 1; i < timed.length; i++) {
-      if (Number(timed[i].occurred_at) - Number(timed[i - 1].occurred_at) > GAP) {
-        sessions.push(curSession);
-        curSession = [];
-      }
-      curSession.push(timed[i]);
-    }
-    if (curSession.length) sessions.push(curSession);
-
-    // Calculate active duration across sessions
-    const activeSec = sessions.reduce((sum, s) => {
-      const start = Number(s[0].occurred_at);
-      const end = Number(s[s.length - 1].occurred_at);
-      return sum + Math.max(end - start, 1);
-    }, 0);
-
-    const activeMinutes = Math.max(Math.round(activeSec / 60), sessions.length > 0 ? 1 : 0);
-    const timeDisplay =
-      activeMinutes >= 60
-        ? `${Math.floor(activeMinutes / 60)}h ${activeMinutes % 60}m`
-        : `${activeMinutes}m`;
-
-    // Group activity by day
-    const dayMap = {};
-    for (const e of timed) {
-      const dateKey = new Date(Number(e.occurred_at) * 1000).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      });
-      dayMap[dateKey] = (dayMap[dateKey] || 0) + 1;
-    }
-
-    const dayEntries = Object.entries(dayMap).map(([day, count]) => ({ day, count }));
-    const maxDayCount = Math.max(...dayEntries.map((d) => d.count), 1);
-
-    // Factual pattern summary
-    let patternSummary = 'Work occurred across multiple sessions.';
-    if (sessions.length === 1) {
-      patternSummary = 'Recorded activity occurred within a single writing session.';
-    } else if (dayEntries.length === 1) {
-      patternSummary = `Activity occurred across ${sessions.length} sessions on a single day.`;
-    } else {
-      patternSummary = `Activity occurred across ${sessions.length} sessions over ${dayEntries.length} days.`;
-    }
-
-    // Detect observable process characteristics
-    const notableObservations = [];
-
-    // 1. Large single paste event (> 500 chars)
-    const largePastes = timed.filter(
-      (e) =>
-        e.type === 'paste' &&
-        (e.data?.pasted_text?.length > 400 || (e.data?.pasted_text_length || 0) > 400)
-    );
-    if (largePastes.length > 0) {
-      const totalChars = largePastes.reduce(
-        (sum, p) => sum + (p.data?.pasted_text?.length || p.data?.pasted_text_length || 0),
-        0
-      );
-      notableObservations.push({
-        id: 'obs-large-paste',
-        text: `Large text insertion: ${totalChars.toLocaleString()} characters entered via paste event.`,
-      });
-    }
-
-    // 2. High concentration in single short burst
-    if (sessions.length === 1 && activeMinutes <= 15 && timed.length >= 300) {
-      notableObservations.push({
-        id: 'obs-concentrated',
-        text: `Concentrated activity: Entire document drafted within a single ${activeMinutes}-minute session.`,
-      });
-    }
-
-    return {
-      firstDate: new Date(first * 1000),
-      lastDate: new Date(last * 1000),
-      sessionsCount: sessions.length,
-      activeDaysCount: dayEntries.length,
-      timeDisplay,
-      dayEntries,
-      maxDayCount,
-      patternSummary,
-      notableObservations,
-    };
-  }, [events]);
-
-  // 2. Curated Milestone Timeline
+  // Synthesize raw events into a human narrative timeline
   const timelineEntries = useMemo(() => {
     if (!events || !events.length) return [];
 
+    // Filter and sort all timed events chronologically
     const timed = events
       .filter((e) => Number.isFinite(Number(e?.occurred_at)))
       .slice()
@@ -128,6 +24,7 @@ export default function ProcessTimeline({ events, onSeekToEvent, currentStepInde
 
     if (!timed.length) return [];
 
+    // Filter and sort all step events (matches replay scrubber 0..N-1)
     const stepEvents = events
       .filter((e) => e?.steps && Array.isArray(e.steps) && e.steps.length > 0)
       .slice()
@@ -151,47 +48,98 @@ export default function ProcessTimeline({ events, onSeekToEvent, currentStepInde
     const firstTime = Number(firstEv.occurred_at);
     const firstDate = new Date(firstTime * 1000);
 
-    // 1. Milestone: Workspace opened
+    // 1. Initial Milestone: Workspace opened
     entries.push({
       id: 'entry-open',
       stepIndex: 0,
       occurredAt: firstTime,
       timeStr: firstDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       title: 'Workspace opened',
-      detail: 'Initial session started',
+      detail: 'Student opened the assignment workspace.',
       icon: FileText,
       iconColor: 'text-[#0047FF]',
       badge: 'Start',
+      isBreak: false,
     });
 
-    let draftedBegan = false;
+    let writingBegan = false;
     let accumulatedDeletes = 0;
-    let lastEventTime = firstTime;
-    let lastRevisionStep = null;
-    const resumptions = [];
+    let lastActiveTime = firstTime;
+    const BREAK_THRESHOLD_SEC = 180; // 3 minutes of inactivity is a meaningful break
 
-    // Scan events to detect meaningful shifts
     for (let i = 0; i < timed.length; i++) {
       const ev = timed[i];
       const timeSec = Number(ev.occurred_at);
       const date = new Date(timeSec * 1000);
       const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-      const timeDiff = timeSec - lastEventTime;
+      const inactivity = timeSec - lastActiveTime;
 
-      // First typing action -> Drafting began
-      if (!draftedBegan && (ev.type === 'step' || ev.type === 'keystroke')) {
-        draftedBegan = true;
+      // Check if a meaningful break occurred before this event
+      if (inactivity >= BREAK_THRESHOLD_SEC && writingBegan) {
+        const breakMin = Math.round(inactivity / 60);
+        let breakDurationStr = `${breakMin} minutes`;
+        if (breakMin >= 1440) {
+          const days = Math.floor(breakMin / 1440);
+          const remHours = Math.round((breakMin % 1440) / 60);
+          breakDurationStr = `${days} ${days === 1 ? 'day' : 'days'}${remHours > 0 ? ` ${remHours}h` : ''}`;
+        } else if (breakMin >= 60) {
+          const hrs = Math.floor(breakMin / 60);
+          const mins = breakMin % 60;
+          breakDurationStr = `${hrs}h${mins > 0 ? ` ${mins}m` : ''}`;
+        }
+
+        const breakStartDate = new Date(lastActiveTime * 1000);
+        const breakStartTimeStr = breakStartDate.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+
+        // Add Break Event
         entries.push({
-          id: `entry-draft-${i}`,
+          id: `entry-break-${i}`,
+          stepIndex: getStepIndexForTime(lastActiveTime),
+          occurredAt: lastActiveTime + 1,
+          timeStr: breakStartTimeStr,
+          title: `Break · ${breakDurationStr}`,
+          detail: 'No writing activity was recorded during this period.',
+          icon: PauseCircle,
+          iconColor: 'text-gray-400',
+          badge: 'Break',
+          isBreak: true,
+        });
+
+        // Add Writing Resumed Event
+        entries.push({
+          id: `entry-resume-${i}`,
           stepIndex: getStepIndexForTime(timeSec),
           occurredAt: timeSec,
           timeStr,
-          title: 'Drafting began',
-          detail: 'Initial writing in document',
+          title: 'Writing resumed',
+          detail: 'Student returned to the assignment and continued working.',
+          icon: Edit3,
+          iconColor: 'text-indigo-600',
+          isBreak: false,
+        });
+
+        lastActiveTime = timeSec;
+        accumulatedDeletes = 0;
+      }
+
+      // First typing action -> Writing began
+      if (!writingBegan && (ev.type === 'step' || ev.type === 'keystroke')) {
+        writingBegan = true;
+        entries.push({
+          id: `entry-start-writing-${i}`,
+          stepIndex: getStepIndexForTime(timeSec),
+          occurredAt: timeSec,
+          timeStr,
+          title: 'Writing began',
+          detail: 'Student began entering text into the document.',
           icon: Edit3,
           iconColor: 'text-blue-600',
+          isBreak: false,
         });
-        lastEventTime = timeSec;
+        lastActiveTime = timeSec;
         continue;
       }
 
@@ -200,7 +148,7 @@ export default function ProcessTimeline({ events, onSeekToEvent, currentStepInde
         const text = ev.data?.pasted_text || ev.data?.text || '';
         const len = text.length || ev.data?.pasted_text_length || ev.data?.length || 0;
         const words = text ? text.trim().split(/\s+/).filter(Boolean).length : 0;
-        const preview = text.length > 50 ? text.slice(0, 50) + '…' : text;
+        const preview = text.length > 60 ? text.slice(0, 60) + '…' : text;
 
         entries.push({
           id: `entry-paste-${i}`,
@@ -208,79 +156,42 @@ export default function ProcessTimeline({ events, onSeekToEvent, currentStepInde
           occurredAt: timeSec,
           timeStr,
           title: 'Text inserted',
-          detail: `${len} characters${words ? ` (~${words} words)` : ''}${preview ? `: "${preview}"` : ''}`,
+          detail: `${len.toLocaleString()} characters${words ? ` (~${words} words)` : ''} entered through a paste event${preview ? `: "${preview}"` : ''}.`,
           icon: Clipboard,
           iconColor: 'text-amber-600',
           badge: 'Paste',
+          isBreak: false,
         });
-        lastEventTime = timeSec;
+        lastActiveTime = timeSec;
         continue;
       }
 
-      // Session resumption (> 3 min gap)
-      if (timeDiff > 180 && draftedBegan) {
-        resumptions.push({
-          stepIndex: getStepIndexForTime(timeSec),
-          occurredAt: timeSec,
-          timeStr,
-        });
-        lastEventTime = timeSec;
-      }
-
-      // Revision & deletion
+      // Major revision / substantial deletion
       if (ev.type === 'delete') {
         const delLen = Number(ev.data?.length) || 0;
         accumulatedDeletes += delLen;
-        if (accumulatedDeletes >= 40) {
-          lastRevisionStep = {
+        if (accumulatedDeletes >= 50) {
+          const approxWords = Math.round(accumulatedDeletes / 5.5);
+          entries.push({
+            id: `entry-revision-${i}`,
             stepIndex: getStepIndexForTime(timeSec),
             occurredAt: timeSec,
             timeStr,
-          };
+            title: 'Major revision',
+            detail: `Student substantially revised previously written content (~${approxWords} words removed or restructured).`,
+            icon: RotateCcw,
+            iconColor: 'text-purple-600',
+            badge: 'Edit',
+            isBreak: false,
+          });
           accumulatedDeletes = 0;
+          lastActiveTime = timeSec;
         }
       }
-    }
 
-    // Group resumptions
-    if (resumptions.length === 1) {
-      entries.push({
-        id: 'entry-resume-1',
-        stepIndex: resumptions[0].stepIndex,
-        occurredAt: resumptions[0].occurredAt,
-        timeStr: resumptions[0].timeStr,
-        title: 'Writing resumed',
-        detail: 'Drafting continued in subsequent session',
-        icon: Edit3,
-        iconColor: 'text-indigo-600',
-      });
-    } else if (resumptions.length > 1) {
-      const firstRes = resumptions[0];
-      const lastRes = resumptions[resumptions.length - 1];
-      entries.push({
-        id: 'entry-resume-multi',
-        stepIndex: firstRes.stepIndex,
-        occurredAt: firstRes.occurredAt,
-        timeStr: `${firstRes.timeStr} – ${lastRes.timeStr}`,
-        title: 'Continued drafting',
-        detail: `Work continued across ${resumptions.length} additional writing sessions`,
-        icon: Edit3,
-        iconColor: 'text-indigo-600',
-      });
-    }
-
-    // Add revision milestone if notable edits took place
-    if (lastRevisionStep) {
-      entries.push({
-        id: 'entry-revision',
-        stepIndex: lastRevisionStep.stepIndex,
-        occurredAt: lastRevisionStep.occurredAt,
-        timeStr: lastRevisionStep.timeStr,
-        title: 'Draft revised',
-        detail: 'Document content edited and restructured',
-        icon: Edit3,
-        iconColor: 'text-gray-600',
-      });
+      if (ev.type === 'step' || ev.type === 'keystroke') {
+        lastActiveTime = timeSec;
+      }
     }
 
     // Final Milestone: Submission sealed
@@ -293,10 +204,11 @@ export default function ProcessTimeline({ events, onSeekToEvent, currentStepInde
       occurredAt: lastTime,
       timeStr: finalDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       title: 'Submission sealed',
-      detail: 'Document permanently recorded and locked',
+      detail: 'Document permanently recorded and locked for evaluation.',
       icon: Lock,
       iconColor: 'text-emerald-600',
       badge: 'Sealed',
+      isBreak: false,
     });
 
     entries.sort((a, b) => (a.occurredAt || 0) - (b.occurredAt || 0));
@@ -307,155 +219,109 @@ export default function ProcessTimeline({ events, onSeekToEvent, currentStepInde
     return (
       <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center shadow-xs">
         <Clock className="w-6 h-6 text-gray-400 mx-auto mb-2" />
-        <h3 className="text-xs font-bold text-gray-700">No Process Milestones</h3>
+        <h3 className="text-xs font-bold text-gray-700">No Process Records</h3>
         <p className="text-[11px] text-gray-500 mt-1 font-sans">
-          Detailed event timestamps are not available for this record.
+          Detailed event timestamps are not available for this submission.
         </p>
       </div>
     );
   }
 
+  const notableCount = timelineEntries.filter((e) => !e.isBreak).length;
+
   return (
-    <div className="space-y-4">
-      {/* ── Layer 2: Process Overview / Work Pattern ── */}
-      {activityOverview && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs space-y-3.5">
-          <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-[#0047FF]" />
-              <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-gray-700">
-                Work Pattern
-              </h2>
-            </div>
-            <span className="text-[11px] font-mono text-gray-500">
-              {activityOverview.timeDisplay} recorded
-            </span>
-          </div>
-
-          {/* Quick Metrics */}
-          <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-            <div className="bg-[#F9F8F6] p-2 rounded-xl border border-gray-200/80">
-              <div className="text-[10px] text-gray-400 font-sans uppercase">Sessions</div>
-              <div className="font-bold text-[#1A1A1B] mt-0.5">
-                {activityOverview.sessionsCount} {activityOverview.sessionsCount === 1 ? 'session' : 'sessions'}
-              </div>
-            </div>
-            <div className="bg-[#F9F8F6] p-2 rounded-xl border border-gray-200/80">
-              <div className="text-[10px] text-gray-400 font-sans uppercase">Active Days</div>
-              <div className="font-bold text-[#1A1A1B] mt-0.5">
-                {activityOverview.activeDaysCount} {activityOverview.activeDaysCount === 1 ? 'day' : 'days'}
-              </div>
-            </div>
-          </div>
-
-          {/* Activity Over Time Bars */}
-          {activityOverview.dayEntries.length > 0 && (
-            <div className="space-y-1.5 pt-1">
-              <div className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">
-                Activity Distribution
-              </div>
-              <div className="space-y-1.5 bg-[#F9F8F6] p-2.5 rounded-xl border border-gray-200">
-                {activityOverview.dayEntries.map((d, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs font-mono">
-                    <span className="w-14 text-[10px] text-gray-500 shrink-0 truncate">{d.day}</span>
-                    <div className="flex-1 h-3.5 bg-gray-200/60 rounded overflow-hidden">
-                      <div
-                        className="h-full bg-[#0047FF] rounded"
-                        style={{
-                          width: `${Math.max(10, Math.round((d.count / activityOverview.maxDayCount) * 100))}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <p className="text-[11px] text-gray-600 font-sans leading-snug">
-                {activityOverview.patternSummary}
-              </p>
-            </div>
-          )}
-
-          {/* Observable Process Notes (No Accusations) */}
-          {activityOverview.notableObservations.length > 0 && (
-            <div className="pt-2 border-t border-gray-100 space-y-1.5">
-              <div className="text-[10px] font-mono text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                <AlertCircle className="w-3 h-3 text-gray-500" />
-                <span>Process Observations</span>
-              </div>
-              {activityOverview.notableObservations.map((obs) => (
-                <div
-                  key={obs.id}
-                  className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-2 text-xs text-amber-900 leading-snug font-sans"
-                >
-                  {obs.text}
-                </div>
-              ))}
-            </div>
-          )}
+    <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-[#0047FF]" />
+          <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-gray-700">
+            Process Timeline
+          </h2>
         </div>
-      )}
+        <span className="text-[10px] font-mono text-gray-500 bg-[#F9F8F6] px-2 py-0.5 rounded border border-gray-200">
+          {notableCount} notable events
+        </span>
+      </div>
 
-      {/* ── Layer 3: Chronological Event Timeline ── */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-[#0047FF]" />
-            <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-gray-700">
-              Process Timeline
-            </h2>
-          </div>
-          <span className="text-[10px] font-mono text-gray-400">
-            {timelineEntries.length} milestone events
-          </span>
-        </div>
+      <p className="text-xs text-gray-500 font-sans leading-relaxed">
+        A chronological record of how this assignment was developed. Click any event to jump replay to that moment.
+      </p>
 
-        <p className="text-xs text-gray-500 font-sans">
-          Chronological development of the submission. Click any milestone to jump replay to that moment.
-        </p>
+      {/* Vertical Timeline */}
+      <div className="relative pl-4 space-y-2.5 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-200">
+        {timelineEntries.map((entry, idx) => {
+          const Icon = entry.icon;
 
-        {/* Vertical Timeline */}
-        <div className="relative pl-4 space-y-3 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-200">
-          {timelineEntries.map((entry, idx) => {
-            const Icon = entry.icon;
+          if (entry.isBreak) {
             return (
               <button
                 key={entry.id || idx}
                 type="button"
                 onClick={() => onSeekToEvent && onSeekToEvent(entry.stepIndex)}
-                className="group relative flex items-start gap-3 w-full text-left transition-all cursor-pointer"
+                className="group relative flex items-start gap-3 w-full text-left transition-all cursor-pointer py-1"
               >
-                {/* Timeline marker */}
-                <div className="absolute -left-4 mt-0.5 w-4 h-4 rounded-full bg-white border-2 border-gray-300 group-hover:border-[#0047FF] flex items-center justify-center transition-colors">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400 group-hover:bg-[#0047FF]" />
+                {/* Break Marker */}
+                <div className="absolute -left-4 mt-1 w-4 h-4 rounded-full bg-gray-100 border-2 border-gray-300 group-hover:border-gray-500 flex items-center justify-center transition-colors">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400 group-hover:bg-gray-700" />
                 </div>
 
-                <div className="flex-1 min-w-0 bg-[#F9F8F6] group-hover:bg-blue-50/50 p-2.5 rounded-xl border border-gray-200 group-hover:border-blue-200 transition-all">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex-1 min-w-0 bg-gray-50 group-hover:bg-gray-100/80 px-3 py-2 rounded-xl border border-dashed border-gray-300 transition-all">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] font-mono font-bold text-gray-500">
                       {entry.timeStr}
                     </span>
-                    {entry.badge && (
-                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-white border border-gray-200 text-gray-600 uppercase">
-                        {entry.badge}
-                      </span>
-                    )}
+                    <span className="text-[9px] font-mono font-semibold px-1.5 py-0.2 rounded bg-white border border-gray-200 text-gray-500 uppercase">
+                      Inactivity
+                    </span>
                   </div>
-
-                  <div className="text-xs font-bold text-[#1A1A1B] mt-0.5 flex items-center gap-1.5">
-                    <Icon className={`w-3.5 h-3.5 ${entry.iconColor} shrink-0`} />
-                    <span className="truncate">{entry.title}</span>
+                  <div className="text-xs font-semibold text-gray-600 mt-0.5 flex items-center gap-1.5">
+                    <Icon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    <span>{entry.title}</span>
                   </div>
-
-                  {entry.detail && (
-                    <p className="text-[11px] text-gray-600 mt-1 leading-snug font-sans break-words">
-                      {entry.detail}
-                    </p>
-                  )}
                 </div>
               </button>
             );
-          })}
-        </div>
+          }
+
+          return (
+            <button
+              key={entry.id || idx}
+              type="button"
+              onClick={() => onSeekToEvent && onSeekToEvent(entry.stepIndex)}
+              className="group relative flex items-start gap-3 w-full text-left transition-all cursor-pointer"
+            >
+              {/* Event Marker */}
+              <div className="absolute -left-4 mt-1 w-4 h-4 rounded-full bg-white border-2 border-gray-300 group-hover:border-[#0047FF] flex items-center justify-center transition-colors">
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 group-hover:bg-[#0047FF]" />
+              </div>
+
+              <div className="flex-1 min-w-0 bg-[#F9F8F6] group-hover:bg-blue-50/50 p-2.5 rounded-xl border border-gray-200 group-hover:border-blue-200 transition-all">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-[11px] font-mono font-bold text-gray-500">
+                    {entry.timeStr}
+                  </span>
+                  {entry.badge && (
+                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-white border border-gray-200 text-gray-600 uppercase">
+                      {entry.badge}
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-xs font-bold text-[#1A1A1B] mt-0.5 flex items-center gap-1.5">
+                  <Icon className={`w-3.5 h-3.5 ${entry.iconColor} shrink-0`} />
+                  <span className="truncate">{entry.title}</span>
+                </div>
+
+                {entry.detail && (
+                  <p className="text-[11px] text-gray-600 mt-1 leading-snug font-sans break-words">
+                    {entry.detail}
+                  </p>
+                )}
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

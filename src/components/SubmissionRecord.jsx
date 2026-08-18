@@ -212,7 +212,7 @@ export default function SubmissionRecord({
               {workPattern.sessionsCount}
             </div>
             <div className="text-[10px] text-gray-500 font-sans mt-0.5">
-              {workPattern.sessionsCount === 1 ? 'Session' : 'Sessions'}
+              {workPattern.sessionsCount === 1 ? 'Work Period' : 'Work Periods'}
             </div>
           </div>
         </div>
