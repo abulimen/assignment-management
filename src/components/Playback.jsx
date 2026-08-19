@@ -418,6 +418,96 @@ export default function Playback({
     }
   }, [highlight, editor]);
 
+  // Hover tooltips for highlighted text
+  useEffect(() => {
+    const root = contentRef.current;
+    if (!root || !highlight) return;
+    let tip = null;
+
+    const onMouseMove = (e) => {
+      let target = e.target;
+      while (target && target !== root) {
+        if (
+          target.classList &&
+          (target.classList.contains('hl-typed') ||
+           target.classList.contains('hl-pasted') ||
+           target.classList.contains('hl-edited') ||
+           target.getAttribute?.('data-label'))
+        ) {
+          break;
+        }
+        target = target.parentElement;
+      }
+
+      if (!target || target === root) {
+        if (tip) {
+          tip.remove();
+          tip = null;
+        }
+        return;
+      }
+
+      const isTyped = target.classList?.contains('hl-typed');
+      const isPasted = target.classList?.contains('hl-pasted');
+      const isEdited = target.classList?.contains('hl-edited');
+
+      const label =
+        target.getAttribute('data-label') ||
+        (isTyped ? 'Typed in Draftly workspace' :
+         isPasted ? 'Pasted from external source' :
+         isEdited ? 'Edited / Modified' : '');
+
+      if (!label) {
+        if (tip) {
+          tip.remove();
+          tip = null;
+        }
+        return;
+      }
+
+      const type = isTyped ? 'typed' : isPasted ? 'pasted' : isEdited ? 'edited' : 'typed';
+
+      if (!tip) {
+        tip = document.createElement('div');
+        tip.className = `hl-tooltip hl-tooltip-${type}`;
+        document.body.appendChild(tip);
+      } else {
+        tip.className = `hl-tooltip hl-tooltip-${type}`;
+      }
+
+      tip.textContent = label;
+
+      // Position tooltip near cursor, above the element
+      tip.style.left = `${e.clientX}px`;
+      tip.style.top = `${e.clientY - 35}px`;
+
+      // Clamp to viewport
+      const rect = tip.getBoundingClientRect();
+      if (rect.left + rect.width > window.innerWidth) {
+        tip.style.left = `${window.innerWidth - rect.width - 10}px`;
+      }
+      if (rect.top < 0) {
+        tip.style.top = `${e.clientY + 20}px`;
+      }
+    };
+
+    const onMouseLeave = () => {
+      if (tip) {
+        tip.remove();
+        tip = null;
+      }
+    };
+
+    root.addEventListener('mousemove', onMouseMove);
+    root.addEventListener('mouseleave', onMouseLeave);
+
+    return () => {
+      root.removeEventListener('mousemove', onMouseMove);
+      root.removeEventListener('mouseleave', onMouseLeave);
+      if (tip) tip.remove();
+    };
+  }, [highlight, editor]);
+
   // Playback timer
   useEffect(() => {
     if (playing && stepEvents.length > 0) {

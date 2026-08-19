@@ -305,19 +305,21 @@ html { scroll-behavior: smooth; }
 /* Source highlight tooltips */
 .hl-tooltip {
   position: fixed;
-  z-index: 9999;
+  z-index: 99999;
   padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: 8px;
+  font-size: 11px;
   font-weight: 600;
   color: white;
   pointer-events: none;
   white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  font-family: inherit;
+  transition: opacity 0.1s ease;
 }
-.hl-tooltip-typed { background: #059669; }
-.hl-tooltip-pasted { background: #dc2626; }
-.hl-tooltip-edited { background: #d97706; }
+.hl-tooltip-typed { background: #059669; border: 1px solid rgba(255,255,255,0.2); }
+.hl-tooltip-pasted { background: #dc2626; border: 1px solid rgba(255,255,255,0.2); }
+.hl-tooltip-edited { background: #d97706; border: 1px solid rgba(255,255,255,0.2); }
 
 /* ------------------------------------------------------------- Legal Pages Typography & Rhythm */
 .legal-article {
