@@ -10,6 +10,7 @@ import BrandMark from '../components/BrandMark';
 import UserAvatar from '../components/UserAvatar';
 import { useMinLoading } from '../hooks/useMinLoading';
 import { wrapFlatContent, listSections } from '../utils/sectionDoc';
+import { reviewLink } from '../utils/links';
 import { TextSelection } from '@tiptap/pm/state';
 import {
   Save,
@@ -319,7 +320,7 @@ export default function Submission() {
             </button>
           ) : (
             <Link
-              to={`/review/${submission.id}`}
+              to={reviewLink(submission)}
               className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold text-[#0047FF] bg-[#0047FF]/10 hover:bg-[#0047FF]/20 rounded-xl transition-all cursor-pointer"
             >
               <FileCheck className="w-3.5 h-3.5" />
@@ -436,12 +437,15 @@ export default function Submission() {
           }`}
         >
           <Editor
+            key={`${submission.id}-${isSubmitted ? 'sealed' : 'draft'}`}
             content={content}
+            initialContent={content}
             submissionId={submission.id}
             onReady={(ed) => setEditor(ed)}
             editable={!isSubmitted}
             onToggleFocus={() => setIsFocusMode(!isFocusMode)}
             isFocus={isFocusMode}
+            onContentChange={(val) => setContent(val)}
             onSave={handleSave}
             saving={saving}
           />

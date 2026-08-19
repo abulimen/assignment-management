@@ -11,7 +11,7 @@ import { SectionDocument, Section, SectionTitle } from '../extensions/Section';
 import { useTracker } from '../hooks/useTracker';
 import WordRibbon from './WordRibbon';
 import WordStatusBar from './WordStatusBar';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 
 // The Word-style editor used everywhere: solo drafts, the realtime group
 // document, and read-only review views. The document model is sectioned
@@ -19,6 +19,7 @@ import { useEffect, useRef } from 'react';
 export default function Editor({
   submissionId,
   initialContent,
+  content: controlledContent,
   onContentChange,
   editable = true,
   extraExtensions = [],
@@ -27,6 +28,8 @@ export default function Editor({
   onReady = null,
   onToggleFocus = null,
   isFocus = false,
+  onSave = null,
+  saving = false,
 }) {
   const { flush, captureTransaction, setEditorRef, enqueue } = useTracker(submissionId);
   const pendingPasteRef = useRef(null);
@@ -60,9 +63,19 @@ export default function Editor({
         ...extraExtensions,
       ];
 
+  const rawInit = controlledContent || initialContent;
+  const parsedInit = useMemo(() => {
+    if (collab || !rawInit) return undefined;
+    try {
+      return typeof rawInit === 'string' ? JSON.parse(rawInit) : rawInit;
+    } catch {
+      return undefined;
+    }
+  }, [collab, rawInit]);
+
   const editor = useEditor({
     extensions,
-    ...(collab ? {} : { content: initialContent ? JSON.parse(initialContent) : undefined }),
+    ...(collab ? {} : { content: parsedInit }),
     editable,
     editorProps: {
       attributes: {
@@ -93,6 +106,30 @@ export default function Editor({
     },
     onBlur: () => { if (editable) flush(); },
   });
+
+  // Sync content into editor when loaded asynchronously or when changed from outside
+  useEffect(() => {
+    if (!editor || editor.isDestroyed || collab) return;
+    const target = controlledContent || initialContent;
+    if (!target) return;
+    let newDoc = null;
+    try {
+      newDoc = typeof target === 'string' ? JSON.parse(target) : target;
+    } catch {
+      newDoc = null;
+    }
+    if (newDoc) {
+      try {
+        const currentDocJson = JSON.stringify(editor.getJSON());
+        const targetDocJson = JSON.stringify(newDoc);
+        if (currentDocJson !== targetDocJson) {
+          editor.commands.setContent(newDoc, false);
+        }
+      } catch (e) {
+        /* skip invalid schema */
+      }
+    }
+  }, [editor, controlledContent, initialContent, collab]);
 
   // Give the tracker access to the editor for snapshots
   useEffect(() => {

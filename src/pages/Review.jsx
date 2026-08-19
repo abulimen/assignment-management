@@ -20,6 +20,8 @@ import { AuthContext } from '../context/AuthContext';
 import { useMinLoading } from '../hooks/useMinLoading';
 import BrandMark from '../components/BrandMark';
 import UserAvatar from '../components/UserAvatar';
+import NotFound from './NotFound';
+import { encodeId, decodeId } from '../utils/id';
 import Playback from '../components/Playback';
 import GroupFinalDoc from '../components/GroupFinalDoc';
 import SubmissionRecord from '../components/SubmissionRecord';
@@ -58,7 +60,18 @@ export default function Review() {
   const sidebarRef = useRef(null);
   const [sidebarScrolledDown, setSidebarScrolledDown] = useState(false);
 
+  const isValidEncodedId = useMemo(() => {
+    if (!id) return false;
+    const decoded = decodeId(id);
+    if (!decoded) return false;
+    return encodeId(decoded) === id;
+  }, [id]);
+
   useEffect(() => {
+    if (!isValidEncodedId) {
+      setLoading(false);
+      return;
+    }
     api.get(`submissions/${id}/playback`)
       .then((d) => {
         setData(d);
@@ -66,8 +79,11 @@ export default function Review() {
           setSections(d.sections);
         }
       })
+      .catch(() => {
+        setData(null);
+      })
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, isValidEncodedId]);
 
   // Handle sidebar scroll to dismiss or re-show floating amber indicator
   function handleSidebarScroll(e) {
@@ -224,25 +240,8 @@ export default function Review() {
     );
   }
 
-  if (!data) {
-    return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#ECEAE5] p-4 text-center">
-        <div className="max-w-md w-full bg-white rounded-2xl border border-gray-200 p-8 shadow-xl space-y-4">
-          <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" />
-          <h2 className="text-lg font-bold text-gray-900">Submission Unavailable</h2>
-          <p className="text-xs text-gray-500 font-sans leading-relaxed">
-            Unable to load playback or review data for this submission. It may not exist or has been removed.
-          </p>
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-lg shadow-xs transition-all"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Return to Dashboard</span>
-          </Link>
-        </div>
-      </div>
-    );
+  if (!isValidEncodedId || !data) {
+    return <NotFound />;
   }
 
   const isGroup = Boolean(data?.is_group || sections);

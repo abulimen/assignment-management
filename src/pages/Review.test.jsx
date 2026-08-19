@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { api } from '../api';
+import { encodeId } from '../utils/id';
 import Review from './Review';
 
 if (typeof globalThis.ResizeObserver === 'undefined') {
@@ -51,9 +52,9 @@ const individualPlayback = {
   stats: { word_count: 100 },
 };
 
-function renderReview() {
+function renderReview(reviewId = encodeId(9)) {
   return render(
-    <MemoryRouter initialEntries={['/review/9']}>
+    <MemoryRouter initialEntries={[`/review/${reviewId}`]}>
       <Routes>
         <Route path="/review/:id" element={<Review />} />
       </Routes>
@@ -98,6 +99,12 @@ describe('Review (individual)', () => {
     // Switch to Pattern tab
     fireEvent.click(patternTab);
     expect(await screen.findByText('Writing Pattern')).toBeInTheDocument();
+  });
+
+  it('renders 404 for raw unencoded numeric id like /review/1', async () => {
+    renderReview('1');
+    expect(await screen.findByText('404')).toBeInTheDocument();
+    expect(screen.getByText('Uncharted Document Coordinates')).toBeInTheDocument();
   });
 });
 
