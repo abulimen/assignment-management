@@ -32,6 +32,7 @@ import {
   Clock,
   Layers,
   FileText,
+  Activity,
 } from 'lucide-react';
 
 export default function GroupEditor() {
@@ -48,14 +49,14 @@ export default function GroupEditor() {
   const [submitDialog, setSubmitDialog] = useState(null);
   const [submitBusy, setSubmitBusy] = useState(false);
   const [editor, setEditor] = useState(null);
-  const [activeMobileView, setActiveMobileView] = useState('editor'); // 'editor' | 'outline' | 'status'
+  const [activeMobileTab, setActiveMobileTab] = useState('editor'); // 'editor' | 'outline' | 'team'
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [, setTick] = useState(0);
 
   const isCollabReady = Boolean(collab && anchorId != null);
   const showSkeleton = useMinLoading(!isCollabReady, 280);
 
-  // Who is editing which section right now (remote users only).
+  // Who is editing which section right now
   const presence = useSectionPresence(collab?.provider, editor);
 
   // Group detail + status polling
@@ -139,270 +140,250 @@ export default function GroupEditor() {
     }
   }
 
-  // Yjs provider lifecycle
+  // Yjs provider connection lifecycle
   useEffect(() => {
-    const ydoc = new Y.Doc();
-    const provider = new HocuspocusProvider({
-      url: collabUrl(),
-      name: `group:${groupId}`,
-      document: ydoc,
-      token: authToken() || '',
-    });
-    const onStatus = ({ status }) => setConnStatus(status);
-    const onAuthFailed = () => setConnStatus('rejected');
-    provider.on('status', onStatus);
-    provider.on('authenticationFailed', onAuthFailed);
-    setCollab({ ydoc, provider });
-    return () => {
-      provider.off('status', onStatus);
-      provider.off('authenticationFailed', onAuthFailed);
-      provider.destroy();
-      setCollab(null);
-    };
-  }, [groupId]);
+    let unmounted = false;
+    let provider = null;
+    let ydoc = null;
 
-  // Anchor submission for this member's behavioral events
-  useEffect(() => {
-    if (!group) return;
-    let cancelled = false;
-    api.get(`submissions?assignment_id=${group.assignment_id}`)
-      .then((d) => {
-        if (cancelled) return null;
-        const mine = (d.submissions || [])[0];
-        if (mine) {
-          setAnchorId(mine.id);
-          return null;
-        }
-        return api.post('submissions', { assignment_id: group.assignment_id }).then((r) => {
-          if (!cancelled) setAnchorId(r.submission.id);
+    async function initCollab() {
+      try {
+        const d = await api.get(`groups/${groupId}`);
+        if (unmounted) return;
+        setGroup(d.group);
+        setAnchorId(d.anchor_submission_id);
+
+        ydoc = new Y.Doc();
+        const token = authToken();
+        provider = new HocuspocusProvider({
+          url: collabUrl(),
+          name: `group-${groupId}`,
+          document: ydoc,
+          token,
+          onStatus: ({ status }) => {
+            if (!unmounted) setConnStatus(status);
+          },
+          onSynced: () => {
+            if (!unmounted) setConnStatus('connected');
+          },
         });
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [group && group.assignment_id]);
 
-  // Extract parsed sections and page title snippets
+        if (user) {
+          const color = AUTHOR_PALETTE[Math.abs(user.id || 0) % AUTHOR_PALETTE.length];
+          provider.setAwarenessField('user', {
+            id: user.id,
+            name: user.name,
+            role: user.role,
+            color,
+          });
+        }
+
+        if (!unmounted) {
+          setCollab({ ydoc, provider });
+        }
+      } catch (err) {
+        if (!unmounted) {
+          setConnStatus('error');
+          toast.error(err.message || 'Failed to initialize collaborative document');
+        }
+      }
+    }
+
+    initCollab();
+
+    return () => {
+      unmounted = true;
+      if (provider) provider.destroy();
+      if (ydoc) ydoc.destroy();
+    };
+  }, [groupId, user?.id]);
+
+  const authorColors = useMemo(() => {
+    return buildAuthorColorMap(group?.members || []);
+  }, [group?.members]);
+
+  const currentMember = (group?.members || []).find((m) => m.student_id === user?.id);
+  const isLeader = group && user && group.leader_id === user.id;
+  const frozen = group?.status === 'submitted';
+  const summary = statusSummary(group?.members || []);
+
+  const extraExtensions = useMemo(() => {
+    if (!user) return [];
+    return [
+      AuthorOverride.configure({
+        currentUserId: user.id,
+        currentUserName: user.name,
+        isGroup: true,
+      }),
+    ];
+  }, [user?.id, user?.name]);
+
+  // Derive outline sections
   const sectionsList = useMemo(() => {
     if (!editor) return [];
     try {
-      const list = listSections(editor.getJSON());
-      const doc = editor.state.doc;
-      return list.map((sec, idx) => {
-        // Find text snippet from first real paragraph/heading in this section
-        let snippet = '';
-        try {
-          doc.forEach((child) => {
-            if (child.attrs.id === sec.id) {
-              const text = (child.textBetween ? child.textBetween(0, child.content.size, ' ', ' ') : child.textContent).trim();
-              if (text) snippet = text.slice(0, 32);
-            }
-          });
-        } catch {}
-        return {
-          ...sec,
-          pageLabel: `Page ${idx + 1}`,
-          displayTitle: snippet || sec.title || `Page ${idx + 1}`,
-        };
-      });
+      return listSections(editor.state.doc).map((sec, idx) => ({
+        id: sec.id,
+        pos: sec.pos,
+        title: sec.title || '',
+        pageLabel: `Page ${idx + 1}`,
+        displayTitle: sec.title ? `${sec.title}` : `Page ${idx + 1}`,
+      }));
     } catch {
       return [];
     }
-  }, [editor, editor?.state?.doc]);
+  }, [editor, group?.status]);
 
   const activeSectionIndex = useMemo(() => {
-    if (!editor) return 0;
-    const doc = editor.state.doc;
-    const pos = editor.state.selection.$from.pos;
-    let offset = 0;
-    for (let i = 0; i < doc.childCount; i++) {
-      offset += doc.child(i).nodeSize;
-      if (pos < offset) return i;
+    if (!editor || !sectionsList.length) return 0;
+    try {
+      const { from } = editor.state.selection;
+      let activeIdx = 0;
+      for (let i = 0; i < sectionsList.length; i++) {
+        if (sectionsList[i].pos <= from) {
+          activeIdx = i;
+        } else {
+          break;
+        }
+      }
+      return activeIdx;
+    } catch {
+      return 0;
     }
-    return 0;
-  }, [editor, editor?.state?.selection]);
-
-  const activeSectionObj = sectionsList[activeSectionIndex] || sectionsList[0];
-
-  const totalWords = useMemo(() => {
-    if (!editor) return 0;
-    const doc = editor.state.doc;
-    const text = (doc.textBetween ? doc.textBetween(0, doc.content.size, '\n', '\n') : doc.textContent).trim();
-    return text ? text.split(/\s+/).filter(Boolean).length : 0;
-  }, [editor, editor?.state?.doc]);
+  }, [editor, sectionsList]);
 
   function jumpToSection(sectionId) {
     if (!editor) return;
-    const doc = editor.state.doc;
-    let offset = 0;
-    let found = -1;
-    doc.forEach((child) => {
-      if (found === -1) {
-        if (child.attrs.id === sectionId) found = offset;
-        offset += child.nodeSize;
-      }
-    });
-    if (found === -1) return;
-    const tr = editor.state.tr.setSelection(
-      TextSelection.near(editor.state.doc.resolve(found + 2)),
-    ).scrollIntoView();
-    editor.view.dispatch(tr);
-    editor.view.focus();
+    try {
+      const sec = sectionsList.find((s) => s.id === sectionId);
+      if (!sec) return;
+      const targetPos = Math.min(sec.pos + 1, editor.state.doc.content.size);
+      const tr = editor.state.tr.setSelection(TextSelection.create(editor.state.doc, targetPos));
+      editor.view.dispatch(tr);
+      editor.view.focus();
+      setActiveMobileTab('editor');
+
+      setTimeout(() => {
+        const el = document.querySelector(`[data-section-id="${sectionId}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 50);
+    } catch {}
   }
 
-  if (connStatus === 'rejected') {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#ECEAE5] p-4">
-        <div className="max-w-md w-full text-center bg-white rounded-2xl border border-gray-200 p-8 shadow-xl">
-          <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 border border-red-200 flex items-center justify-center mx-auto mb-4">
-            <WifiOff className="w-6 h-6" />
-          </div>
-          <h2 className="text-lg font-bold text-[#1A1A1B] mb-1">Cannot open the group workspace</h2>
-          <p className="text-xs text-gray-500 mb-6 font-sans">
-            You are not a registered member of this group, or your session has expired.
-          </p>
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0047FF] hover:underline"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-          </Link>
-        </div>
-      </div>
-    );
+  const totalWords = useMemo(() => {
+    if (!editor) return 0;
+    try {
+      const text = editor.getText();
+      return text.trim() ? text.trim().split(/\s+/).length : 0;
+    } catch {
+      return 0;
+    }
+  }, [editor, group?.status]);
+
+  if (showSkeleton) {
+    return <EditorSkeleton />;
   }
-
-  const frozen = !!group?.frozen_at;
-  const isLeader = group ? parseInt(group.leader_id) === user?.id : false;
-  const summary = statusSummary(group?.members);
-  const colorMap = buildAuthorColorMap(group?.members || []);
-  const myMember = group?.members?.find((m) => parseInt(m.student_id) === user?.id);
-  const cursorUser = {
-    name: myMember?.student_name || 'Me',
-    color: AUTHOR_PALETTE[colorMap[user?.id] || 0].replace(/[\d.]+\)$/, '1)'),
-  };
-
-  const activeTypingUser = Object.values(presence).flat()[0];
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#ECEAE5] text-[#1A1A1B] overflow-hidden font-sans antialiased">
+    <div className="h-screen w-screen flex flex-col bg-[#ECEAE5] text-[#1A1A1B] overflow-hidden font-sans antialiased select-none">
       
-      {/* Full-Width Workspace Header */}
-      <header className="h-14 bg-white border-b border-gray-200 px-4 sm:px-6 flex items-center justify-between shrink-0 z-30 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-        {/* Left: Brand + Back Button + Document Title + Avatar Stack */}
-        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+      {/* ============================================================ */}
+      {/* 1. TOP APP BAR (Standard 64px / h-16)                        */}
+      {/* ============================================================ */}
+      <header className="h-16 bg-white border-b border-gray-200 px-3 sm:px-6 flex items-center justify-between shrink-0 z-30 shadow-2xs">
+        {/* Left: Back Arrow + Group Details */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Link
-            to={`/group/${group?.assignment_id || ''}`}
-            className="flex items-center gap-1.5 text-xs font-bold text-gray-600 hover:text-[#0047FF] transition-colors pr-2 border-r border-gray-200 py-1"
+            to={`/group/${groupId}`}
+            className="p-2 rounded-xl text-gray-500 hover:text-[#1A1A1B] hover:bg-gray-100 transition-colors cursor-pointer shrink-0"
             title="Return to Group Hub"
           >
-            <BrandMark className="w-5 h-5 text-[#0047FF]" />
-            <ArrowLeft className="w-3.5 h-3.5 ml-1" />
-            <span className="hidden sm:inline">Hub</span>
+            <ArrowLeft className="w-5 h-5 sm:w-4 sm:h-4" />
           </Link>
-
-          {/* Avatar Stack */}
-          <div className="flex -space-x-1.5 overflow-hidden shrink-0">
-            {(group?.members || []).map((m, idx) => {
-              const authorColor = AUTHOR_PALETTE[colorMap[m.student_id] || idx % AUTHOR_PALETTE.length];
-              const initials = m.student_name
-                ? m.student_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
-                : 'ST';
-              return (
-                <div
-                  key={m.student_id}
-                  className="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-xs shrink-0"
-                  style={{ backgroundColor: authorColor.replace(/[\d.]+\)$/, '1)') }}
-                  title={`${m.student_name} (${STATUS_LABEL[m.status] || 'Not Started'})`}
-                >
-                  {initials}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Title & Autosave Pill */}
-          <div className="min-w-0 flex items-center gap-2">
-            <span className="text-xs sm:text-sm font-bold text-[#1A1A1B] truncate max-w-[180px] sm:max-w-md">
-              {assignment?.title || group?.name || 'Group Assignment'}
-            </span>
-            {frozen ? (
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 shrink-0">
-                <Lock className="w-2.5 h-2.5" /> Sealed Snapshot
+          <div className="h-5 w-px bg-gray-200 hidden sm:block shrink-0" />
+          <BrandMark variant="wordmark" className="h-4.5 hidden sm:block shrink-0" />
+          
+          <div className="flex flex-col min-w-0 justify-center">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Users className="w-3.5 h-3.5 text-[#0047FF] shrink-0" />
+              <span className="text-xs sm:text-sm font-bold text-[#1A1A1B] truncate max-w-[150px] sm:max-w-xs leading-tight">
+                {group?.name || 'Group Document'}
               </span>
-            ) : (
-              <span className="hidden md:inline-flex text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                Autosaved
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-[10px] text-gray-500 font-mono truncate">
+                {totalWords} words
               </span>
-            )}
+              <span className="text-gray-300">·</span>
+              {frozen ? (
+                <span className="text-[9px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 flex items-center gap-1 shrink-0">
+                  <Lock className="w-2.5 h-2.5" /> Sealed
+                </span>
+              ) : connStatus === 'connected' ? (
+                <span className="text-[9px] font-mono text-emerald-600 bg-emerald-50/80 px-1.5 py-0.2 rounded flex items-center gap-1 shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Realtime
+                </span>
+              ) : (
+                <span className="text-[9px] font-mono text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded shrink-0">
+                  {connStatus}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Right: Mobile View Tabs + Live Drafting Indicator + User Avatar */}
-        <div className="flex items-center gap-3">
-          {/* Mobile View Switcher */}
-          <div className="flex md:hidden items-center gap-1 bg-gray-100 p-0.5 rounded-lg text-xs font-medium">
-            <button
-              onClick={() => setActiveMobileView('editor')}
-              className={`px-2.5 py-1 rounded-md transition-colors ${
-                activeMobileView === 'editor' ? 'bg-white shadow-xs text-[#1A1A1B] font-bold' : 'text-gray-600'
-              }`}
-            >
-              Editor
-            </button>
-            <button
-              onClick={() => setActiveMobileView('outline')}
-              className={`px-2.5 py-1 rounded-md transition-colors ${
-                activeMobileView === 'outline' ? 'bg-white shadow-xs text-[#1A1A1B] font-bold' : 'text-gray-600'
-              }`}
-            >
-              Pages
-            </button>
-            <button
-              onClick={() => setActiveMobileView('status')}
-              className={`px-2.5 py-1 rounded-md transition-colors ${
-                activeMobileView === 'status' ? 'bg-white shadow-xs text-[#1A1A1B] font-bold' : 'text-gray-600'
-              }`}
-            >
-              Status
-            </button>
-          </div>
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2 shrink-0">
+          {!frozen && (
+            <>
+              {currentMember && (
+                <button
+                  type="button"
+                  disabled={statusBusy}
+                  onClick={() => handleStatusAction(currentMember.status === 'done' ? 'reopen' : 'done')}
+                  className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                    currentMember.status === 'done'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{currentMember.status === 'done' ? 'You: Done' : 'Mark Done'}</span>
+                </button>
+              )}
 
-          {/* Sync Telemetry */}
-          <div className="flex items-center gap-2">
-            {connStatus === 'connected' ? (
-              <div className="flex items-center gap-1.5 bg-[#0047FF]/5 px-2.5 py-1 rounded-md border border-[#0047FF]/15">
-                <span className="w-2 h-2 rounded-full bg-[#0047FF] animate-pulse" />
-                <span className="text-[10px] font-mono font-bold text-[#0047FF] uppercase tracking-widest hidden sm:inline">
-                  Drafting Session Active
-                </span>
-              </div>
-            ) : (
-              <span className="text-[10px] font-mono text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                {connStatus}
-              </span>
-            )}
-          </div>
+              {isLeader && (
+                <button
+                  type="button"
+                  onClick={() => setSubmitDialog({ override: !summary.allDone })}
+                  className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-xl shadow-xs transition-all cursor-pointer active:scale-95"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Submit Group</span>
+                </button>
+              )}
+            </>
+          )}
 
-          {/* User Identicon Avatar */}
           {user && (
-            <UserAvatar
-              user={user}
-              size={28}
-              className="ring-1 ring-black/5"
-            />
+            <div className="hidden sm:block pl-1 border-l border-gray-200 ml-1">
+              <UserAvatar user={user} size={28} className="ring-1 ring-black/5" />
+            </div>
           )}
         </div>
       </header>
 
-      {/* Full-Height 3-Pane Body */}
+      {/* ============================================================ */}
+      {/* 2. MAIN 3-PANE / MOBILE ACTIVE TAB WORKSPACE                */}
+      {/* ============================================================ */}
       <div className="flex-1 flex overflow-hidden">
         
         {/* Left Pane: Document Outline / Pages */}
         <aside
           className={`w-64 sm:w-72 border-r border-gray-200 p-4 bg-[#F9F8F6] flex-col justify-between shrink-0 overflow-y-auto ${
-            activeMobileView === 'outline' ? 'flex w-full md:w-64 sm:md:w-72' : 'hidden md:flex'
+            activeMobileTab === 'outline' ? 'flex w-full md:w-64 sm:w-72' : 'hidden md:flex'
           }`}
         >
           <div className="space-y-3">
@@ -457,12 +438,6 @@ export default function GroupEditor() {
                         {sec.displayTitle}
                       </div>
                     )}
-
-                    {users.length > 0 && (
-                      <div className="text-[10px] font-mono text-[#0047FF] truncate">
-                        {users.map((u) => u.name).join(', ')} typing
-                      </div>
-                    )}
                   </button>
                 );
               })}
@@ -471,216 +446,169 @@ export default function GroupEditor() {
             {!frozen && (
               <button
                 type="button"
-                onClick={() => editor?.chain().focus('end').addSectionAfter().run()}
-                className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 text-xs font-mono font-bold text-[#0047FF] bg-white hover:bg-[#0047FF]/5 border border-dashed border-[#0047FF]/30 rounded-lg transition-colors cursor-pointer shadow-xs"
+                onClick={() => {
+                  editor?.chain().focus('end').addSectionAfter().run();
+                  setActiveMobileTab('editor');
+                }}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 text-xs font-mono font-bold text-[#0047FF] bg-white hover:bg-[#0047FF]/5 border border-dashed border-[#0047FF]/30 rounded-xl transition-colors cursor-pointer shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Page</span>
               </button>
             )}
           </div>
-
-          {/* Self-Organized Sections Notice */}
-          <div className="mt-4 p-3.5 bg-white border border-gray-200 rounded-xl text-[11px] text-gray-500 shadow-xs space-y-1">
-            <div className="font-bold text-[#1A1A1B] font-sans flex items-center gap-1">
-              <Layers className="w-3.5 h-3.5 text-[#0047FF]" />
-              Multi-Page Workspace
-            </div>
-            <div className="leading-relaxed font-sans">
-              Each page is a dedicated workspace sheet. Drag page handles to reorder.
-            </div>
-          </div>
         </aside>
 
-        {/* Center Pane: Realistic Document Editor */}
+        {/* Center Pane: Word Collaborative TipTap Editor */}
         <main
-          className={`flex-1 flex flex-col bg-white overflow-hidden ${
-            activeMobileView === 'editor' ? 'flex' : 'hidden md:flex'
+          className={`flex-1 flex-col overflow-hidden relative ${
+            activeMobileTab === 'editor' ? 'flex' : 'hidden md:flex'
           }`}
         >
-          {/* Active Page Kicker */}
-          <div className="px-6 py-2 bg-white border-b border-gray-200 flex items-center justify-between text-xs shrink-0 z-10">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-gray-500 font-bold truncate">
-              {`PAGE ${String(activeSectionIndex + 1).padStart(2, '0')} OF ${String(sectionsList.length || 1).padStart(2, '0')}`}
-            </span>
-
-            {activeTypingUser ? (
-              <span className="font-mono text-[10px] text-[#0047FF] bg-[#0047FF]/5 px-2.5 py-0.5 rounded-full border border-[#0047FF]/15 font-bold flex items-center gap-1.5 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#0047FF] animate-pulse" />
-                {activeTypingUser.name} typing
-              </span>
-            ) : (
-              <span className="font-mono text-[10px] text-gray-500">
-                {totalWords} words total
-              </span>
-            )}
-          </div>
-
-          {/* Editor Canvas */}
-          <div className="flex-1 overflow-hidden bg-[#ECEAE5]">
-            {!showSkeleton && isCollabReady ? (
-              <Editor
-                submissionId={anchorId}
-                editable={!frozen}
-                collab={{ ydoc: collab.ydoc, provider: collab.provider, user: cursorUser }}
-                extraExtensions={[AuthorOverride.configure({ authorId: user?.id })]}
-                onReady={setEditor}
-                onToggleFocus={() => setIsFocusMode(!isFocusMode)}
-                isFocus={isFocusMode}
-              />
-            ) : (
-              <EditorSkeleton />
-            )}
-          </div>
+          {collab && anchorId && (
+            <Editor
+              ydoc={collab.ydoc}
+              provider={collab.provider}
+              submissionId={anchorId}
+              onReady={(ed) => setEditor(ed)}
+              editable={!frozen}
+              onToggleFocus={() => setIsFocusMode(!isFocusMode)}
+              isFocus={isFocusMode}
+              extraExtensions={extraExtensions}
+              authorColors={authorColors}
+              isGroup={true}
+            />
+          )}
         </main>
 
-        {/* Right Pane: Telemetry, Contribution & Record Status */}
+        {/* Right Pane: Team Contribution Roster */}
         <aside
-          className={`w-64 sm:w-72 border-l border-gray-200 bg-[#F9F8F6] p-4 flex-col justify-between shrink-0 overflow-y-auto ${
-            activeMobileView === 'status' ? 'flex w-full md:w-64 sm:md:w-72' : 'hidden lg:flex'
+          className={`w-72 sm:w-80 border-l border-gray-200 p-4 bg-[#F9F8F6] flex-col justify-between shrink-0 overflow-y-auto ${
+            activeMobileTab === 'team' ? 'flex w-full md:w-72 sm:w-80' : 'hidden lg:flex'
           }`}
         >
-          <div className="space-y-5">
-            {/* Contribution Section */}
-            <div>
-              <h4 className="text-[10px] font-mono uppercase tracking-widest text-gray-400 mb-3 font-bold">
-                CONTRIBUTION
-              </h4>
-              <div className="space-y-2.5">
-                {(group?.members || []).map((m, idx) => {
-                  const authorColor = AUTHOR_PALETTE[colorMap[m.student_id] || idx % AUTHOR_PALETTE.length];
-                  return (
-                    <div key={m.student_id} className="space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-[#1A1A1B] font-semibold truncate max-w-[130px] flex items-center gap-1">
-                          {m.student_name}
-                          {m.is_leader == 1 && <Crown className="w-3 h-3 text-amber-500 shrink-0" />}
-                        </span>
-                        <span className="font-mono text-gray-500 text-[11px] font-bold">
-                          {m.status === 'done' ? '100% Done' : STATUS_LABEL[m.status] || 'Active'}
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: m.status === 'done' ? '100%' : '50%',
-                            backgroundColor: authorColor.replace(/[\d.]+\)$/, '1)'),
-                          }}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+              <div className="flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-[#0047FF]" />
+                <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 font-bold">
+                  TEAM ROSTER ({group?.members?.length || 0})
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-gray-500 font-bold">
+                {summary.doneCount}/{summary.totalCount} Done
+              </span>
+            </div>
+
+            {/* Member Cards */}
+            <div className="space-y-2">
+              {(group?.members || []).map((m) => {
+                const color = authorColors[m.student_id] || '#6B7280';
+                const isMe = m.student_id === user?.id;
+                const isLeaderMember = m.student_id === group.leader_id;
+
+                return (
+                  <div
+                    key={m.student_id}
+                    className="bg-white p-3 rounded-2xl border border-gray-200 shadow-xs space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="w-3 h-3 rounded-full shrink-0 ring-1 ring-white"
+                          style={{ backgroundColor: color }}
                         />
+                        <span className="text-xs font-bold text-gray-800 truncate">
+                          {m.student_name} {isMe ? '(You)' : ''}
+                        </span>
+                        {isLeaderMember && <Crown className="w-3 h-3 text-amber-500 shrink-0" />}
                       </div>
+                      <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border uppercase ${
+                        m.status === 'done'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          : 'bg-amber-50 text-amber-800 border-amber-200'
+                      }`}>
+                        {STATUS_LABEL[m.status] || 'Active'}
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
 
-            {/* Record Status Section */}
-            <div className="pt-3 border-t border-gray-200">
-              <h4 className="text-[10px] font-mono uppercase tracking-widest text-gray-400 mb-2.5 font-bold">
-                RECORD STATUS
-              </h4>
-              <div className="space-y-1.5 text-xs">
-                <div className="flex justify-between py-0.5">
-                  <span className="text-gray-500 font-sans">Autosave:</span>
-                  <span className="font-mono text-emerald-700 font-bold">Continuous</span>
-                </div>
-                <div className="flex justify-between py-0.5">
-                  <span className="text-gray-500 font-sans">Team Ready:</span>
-                  <span className="font-mono text-[#0047FF] font-bold">
-                    {summary.doneCount}/{summary.total} Done
-                  </span>
-                </div>
-                <div className="flex justify-between py-0.5">
-                  <span className="text-gray-500 font-sans">Submission:</span>
-                  <span className="font-mono text-gray-800 font-semibold">
-                    {frozen ? 'Sealed' : summary.allDone ? 'Ready to seal' : 'In progress'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Member Action: Mark Done / Reopen */}
-            {!frozen && myMember && (
-              <div className="pt-3 border-t border-gray-200 space-y-2">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 font-bold block">
-                  YOUR WORK STATUS
-                </span>
-                {myMember.status === 'done' ? (
-                  <button
-                    onClick={() => handleStatusAction('reopen')}
-                    disabled={statusBusy}
-                    className="w-full py-2 px-3 text-xs font-mono font-bold text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg shadow-xs transition-colors cursor-pointer"
-                  >
-                    Reopen My Work
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleStatusAction('done')}
-                    disabled={statusBusy}
-                    className="w-full py-2.5 px-3 text-xs font-mono font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Mark My Section Done</span>
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Leader Submission Gate */}
-            {isLeader && !frozen && (
-              <div className="pt-3 border-t border-gray-200 space-y-2">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 font-bold block">
-                  LEADER SUBMISSION
-                </span>
-                {summary.allDone ? (
-                  <button
-                    onClick={() => setSubmitDialog('normal')}
-                    className="w-full py-2.5 px-3 text-xs font-bold bg-[#0047FF] hover:bg-[#0038CC] text-white rounded-lg shadow-md shadow-blue-200 transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Submit Group Work</span>
-                  </button>
-                ) : (
-                  <div className="space-y-1.5">
-                    <button
-                      disabled
-                      className="w-full py-2 px-3 text-xs font-semibold bg-gray-100 text-gray-400 border border-gray-200 rounded-lg cursor-not-allowed"
-                    >
-                      Submit ({summary.doneCount}/{summary.total} Done)
-                    </button>
-                    <button
-                      onClick={() => setSubmitDialog('override')}
-                      className="w-full py-2 px-3 text-[11px] font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-lg transition-colors cursor-pointer"
-                    >
-                      Submit Anyway as Leader
-                    </button>
+                    {isMe && !frozen && (
+                      <button
+                        type="button"
+                        onClick={() => handleStatusAction(m.status === 'done' ? 'reopen' : 'done')}
+                        className={`w-full py-1.5 text-center text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
+                          m.status === 'done'
+                            ? 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                            : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 font-bold'
+                        }`}
+                      >
+                        {m.status === 'done' ? 'Reopen for editing' : 'Mark as Done'}
+                      </button>
+                    )}
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Bottom Proof of Work Stamp */}
-          <div className="mt-auto pt-3 border-t border-gray-200 text-center">
-            <span className="text-[10px] font-mono text-gray-400 leading-tight block">
-              Preserved automatically as students write.
-            </span>
+                );
+              })}
+            </div>
           </div>
         </aside>
       </div>
 
+      {/* ============================================================ */}
+      {/* 3. MOBILE BOTTOM NAVIGATION BAR                              */}
+      {/* ============================================================ */}
+      <nav className="md:hidden h-16 bg-white border-t border-gray-200 px-4 flex items-center justify-around shrink-0 z-30 shadow-lg pb-safe">
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab('editor')}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
+            activeMobileTab === 'editor'
+              ? 'text-[#0047FF] font-bold'
+              : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <FileText className="w-5 h-5" />
+          <span className="text-[11px] font-sans">Editor</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab('outline')}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
+            activeMobileTab === 'outline'
+              ? 'text-[#0047FF] font-bold'
+              : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <Layers className="w-5 h-5" />
+          <span className="text-[11px] font-sans">Pages ({sectionsList.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab('team')}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
+            activeMobileTab === 'team'
+              ? 'text-[#0047FF] font-bold'
+              : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <Users className="w-5 h-5" />
+          <span className="text-[11px] font-sans">Team ({summary.doneCount}/{summary.totalCount})</span>
+        </button>
+      </nav>
+
+      {/* Submit Confirmation Dialog */}
       {submitDialog && (
         <GroupSubmitDialog
-          summary={summary}
-          isOverride={submitDialog === 'override'}
+          group={group}
+          isOpen={true}
+          override={submitDialog.override}
           busy={submitBusy}
-          onClose={() => !submitBusy && setSubmitDialog(null)}
-          onConfirm={handleSubmit}
+          onClose={() => setSubmitDialog(null)}
+          onSubmit={handleSubmit}
         />
       )}
 
-      {editor && !frozen && <SectionPresenceChips editor={editor} presence={presence} />}
     </div>
   );
 }

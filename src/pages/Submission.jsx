@@ -26,6 +26,7 @@ import {
   Activity,
   X,
   FileText,
+  HelpCircle,
 } from 'lucide-react';
 
 function normalizeForEditor(raw) {
@@ -53,7 +54,7 @@ export default function Submission() {
   const [editor, setEditor] = useState(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const [activeMobileView, setActiveMobileView] = useState('editor'); // 'editor' | 'outline' | 'status'
+  const [activeMobileTab, setActiveMobileTab] = useState('editor'); // 'editor' | 'outline' | 'status'
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [, setTick] = useState(0);
 
@@ -150,92 +151,84 @@ export default function Submission() {
         if (currentJson && currentJson !== submission.content) {
           api.put(`submissions/${submission.id}`, { content: currentJson })
             .then(() => {
-              setSavedMsg('Autosaved');
+              setSavedMsg('Saved');
               setTimeout(() => setSavedMsg(''), 2000);
             })
             .catch(() => {});
         }
       } catch {}
     }, 4000);
-    return () => clearTimeout(timer);
-  }, [content, submission?.id, submission?.status, editor]);
 
+    return () => clearTimeout(timer);
+  }, [editor, submission, content]);
+
+  // Derive outline sections
   const sectionsList = useMemo(() => {
     if (!editor) return [];
     try {
-      const list = listSections(editor.getJSON());
-      const doc = editor.state.doc;
-      return list.map((sec, idx) => {
-        let snippet = '';
-        try {
-          doc.forEach((child) => {
-            if (child.attrs.id === sec.id) {
-              const text = (child.textBetween ? child.textBetween(0, child.content.size, ' ', ' ') : child.textContent).trim();
-              if (text) snippet = text.slice(0, 32);
-            }
-          });
-        } catch {}
-        return {
-          ...sec,
-          pageLabel: `Page ${idx + 1}`,
-          displayTitle: snippet || sec.title || `Page ${idx + 1}`,
-        };
-      });
+      return listSections(editor.state.doc).map((sec, idx) => ({
+        id: sec.id,
+        pos: sec.pos,
+        title: sec.title || '',
+        pageLabel: `Page ${idx + 1}`,
+        displayTitle: sec.title ? `${sec.title}` : `Page ${idx + 1}`,
+      }));
     } catch {
       return [];
     }
-  }, [editor, editor?.state?.doc]);
+  }, [editor, content]);
 
+  // Find active section based on editor cursor position
   const activeSectionIndex = useMemo(() => {
-    if (!editor) return 0;
-    const doc = editor.state.doc;
-    const pos = editor.state.selection.$from.pos;
-    let offset = 0;
-    for (let i = 0; i < doc.childCount; i++) {
-      offset += doc.child(i).nodeSize;
-      if (pos < offset) return i;
+    if (!editor || !sectionsList.length) return 0;
+    try {
+      const { from } = editor.state.selection;
+      let activeIdx = 0;
+      for (let i = 0; i < sectionsList.length; i++) {
+        if (sectionsList[i].pos <= from) {
+          activeIdx = i;
+        } else {
+          break;
+        }
+      }
+      return activeIdx;
+    } catch {
+      return 0;
     }
-    return 0;
-  }, [editor, editor?.state?.selection]);
-
-  const activeSectionObj = sectionsList[activeSectionIndex] || sectionsList[0];
-
-  const totalWords = useMemo(() => {
-    if (!editor) return 0;
-    const doc = editor.state.doc;
-    const text = (doc.textBetween ? doc.textBetween(0, doc.content.size, '\n', '\n') : doc.textContent).trim();
-    return text ? text.split(/\s+/).filter(Boolean).length : 0;
-  }, [editor, editor?.state?.doc]);
+  }, [editor, sectionsList]);
 
   function jumpToSection(sectionId) {
     if (!editor) return;
-    const doc = editor.state.doc;
-    let offset = 0;
-    let found = -1;
-    doc.forEach((child) => {
-      if (found === -1) {
-        if (child.attrs.id === sectionId) found = offset;
-        offset += child.nodeSize;
-      }
-    });
-    if (found === -1) return;
-    const tr = editor.state.tr.setSelection(
-      TextSelection.near(editor.state.doc.resolve(found + 2)),
-    ).scrollIntoView();
-    editor.view.dispatch(tr);
-    editor.view.focus();
+    try {
+      const sec = sectionsList.find((s) => s.id === sectionId);
+      if (!sec) return;
+      const targetPos = Math.min(sec.pos + 1, editor.state.doc.content.size);
+      const tr = editor.state.tr.setSelection(TextSelection.create(editor.state.doc, targetPos));
+      editor.view.dispatch(tr);
+      editor.view.focus();
+      setActiveMobileTab('editor');
+
+      setTimeout(() => {
+        const el = document.querySelector(`[data-section-id="${sectionId}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 50);
+    } catch {}
   }
 
-  if (loading) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#ECEAE5] p-4">
-        <div className="max-w-md w-full text-center bg-white rounded-2xl border border-gray-200 p-8 shadow-xl">
-          <div className="skeleton h-8 w-1/3 rounded mx-auto mb-4" />
-          <div className="skeleton h-4 w-2/3 rounded mx-auto mb-6" />
-          <div className="skeleton h-32 rounded-xl" />
-        </div>
-      </div>
-    );
+  const totalWords = useMemo(() => {
+    if (!editor) return 0;
+    try {
+      const text = editor.getText();
+      return text.trim() ? text.trim().split(/\s+/).length : 0;
+    } catch {
+      return 0;
+    }
+  }, [editor, content]);
+
+  if (showSkeleton) {
+    return <EditorSkeleton />;
   }
 
   if (!submission) {
@@ -260,137 +253,118 @@ export default function Submission() {
   }
 
   const isSubmitted = submission?.status === 'submitted';
-  const userInitials = user?.name
-    ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
-    : 'ME';
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#ECEAE5] text-[#1A1A1B] overflow-hidden font-sans antialiased">
+    <div className="h-screen w-screen flex flex-col bg-[#ECEAE5] text-[#1A1A1B] overflow-hidden font-sans antialiased select-none">
       
-      {/* Full-Width Workspace Header */}
-      <header className="h-14 bg-white border-b border-gray-200 px-4 sm:px-6 flex items-center justify-between shrink-0 z-30 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-        {/* Left: Brand + Back Button + Document Title */}
-        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+      {/* ============================================================ */}
+      {/* 1. TOP APP BAR (Standard 64px / h-16)                        */}
+      {/* ============================================================ */}
+      <header className="h-16 bg-white border-b border-gray-200 px-3 sm:px-6 flex items-center justify-between shrink-0 z-30 shadow-2xs">
+        {/* Left: Back Arrow & Document Title */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Link
             to={`/assignments/${id}`}
-            className="flex items-center gap-1.5 text-xs font-bold text-gray-600 hover:text-[#0047FF] transition-colors pr-2 border-r border-gray-200 py-1"
+            className="p-2 rounded-xl text-gray-500 hover:text-[#1A1A1B] hover:bg-gray-100 transition-colors cursor-pointer shrink-0"
             title="Return to Assignment Hub"
           >
-            <BrandMark className="w-5 h-5 text-[#0047FF]" />
-            <ArrowLeft className="w-3.5 h-3.5 ml-1" />
-            <span className="hidden sm:inline">Hub</span>
+            <ArrowLeft className="w-5 h-5 sm:w-4 sm:h-4" />
           </Link>
-
-          <UserAvatar
-            user={user}
-            size={28}
-            className="ring-1 ring-black/5 shrink-0"
-          />
-
-          <div className="min-w-0 flex items-center gap-2">
-            <span className="text-xs sm:text-sm font-bold text-[#1A1A1B] truncate max-w-[180px] sm:max-w-md">
-              {assignment?.title || 'Individual Assignment'}
+          <div className="h-5 w-px bg-gray-200 hidden sm:block shrink-0" />
+          <BrandMark variant="wordmark" className="h-4.5 hidden sm:block shrink-0" />
+          
+          <div className="flex flex-col min-w-0 justify-center">
+            <span className="text-xs sm:text-sm font-bold text-[#1A1A1B] truncate max-w-[160px] sm:max-w-xs md:max-w-md leading-tight">
+              {assignment?.title || 'Assignment Workspace'}
             </span>
-            {isSubmitted ? (
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 shrink-0">
-                <Lock className="w-2.5 h-2.5" /> Sealed Snapshot
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-[10px] text-gray-500 font-mono truncate">
+                {totalWords} words
               </span>
-            ) : (
-              <span className="hidden md:inline-flex text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                {savedMsg ? 'Saved' : 'Autosaved'}
-              </span>
-            )}
+              <span className="text-gray-300">·</span>
+              {isSubmitted ? (
+                <span className="text-[9px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 flex items-center gap-1 shrink-0">
+                  <Lock className="w-2.5 h-2.5" /> Sealed
+                </span>
+              ) : (
+                <span className="text-[9px] font-mono text-emerald-600 bg-emerald-50/70 px-1.5 py-0.2 rounded shrink-0">
+                  {savedMsg ? 'Saved to cloud' : 'Autosaving'}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Right: Prompt Drawer Toggle + Live Session Indicator + User Avatar */}
-        <div className="flex items-center gap-3">
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2 shrink-0">
           {assignment?.description && (
             <button
               type="button"
               onClick={() => setShowPrompt(!showPrompt)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-[#F9F8F6] hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-gray-700 bg-[#F9F8F6] hover:bg-gray-100 border border-gray-200 rounded-xl transition-colors cursor-pointer"
             >
-              <BookOpen className="w-3.5 h-3.5 text-[#0047FF]" />
-              <span className="hidden sm:inline">Guidelines</span>
+              <BookOpen className="w-4 h-4 text-[#0047FF]" />
+              <span className="hidden md:inline">Guidelines</span>
             </button>
           )}
 
-          {/* Mobile View Switcher */}
-          <div className="flex md:hidden items-center gap-1 bg-gray-100 p-0.5 rounded-lg text-xs font-medium">
+          {!isSubmitted ? (
             <button
-              onClick={() => setActiveMobileView('editor')}
-              className={`px-2.5 py-1 rounded-md transition-colors ${
-                activeMobileView === 'editor' ? 'bg-white shadow-xs text-[#1A1A1B] font-bold' : 'text-gray-600'
-              }`}
+              type="button"
+              onClick={() => setShowSubmitModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-xl shadow-xs transition-all cursor-pointer active:scale-95"
             >
-              Editor
+              <Send className="w-3.5 h-3.5" />
+              <span>Turn In</span>
             </button>
-            <button
-              onClick={() => setActiveMobileView('outline')}
-              className={`px-2.5 py-1 rounded-md transition-colors ${
-                activeMobileView === 'outline' ? 'bg-white shadow-xs text-[#1A1A1B] font-bold' : 'text-gray-600'
-              }`}
+          ) : (
+            <Link
+              to={`/review/${submission.id}`}
+              className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold text-[#0047FF] bg-[#0047FF]/10 hover:bg-[#0047FF]/20 rounded-xl transition-all cursor-pointer"
             >
-              Pages
-            </button>
-            <button
-              onClick={() => setActiveMobileView('status')}
-              className={`px-2.5 py-1 rounded-md transition-colors ${
-                activeMobileView === 'status' ? 'bg-white shadow-xs text-[#1A1A1B] font-bold' : 'text-gray-600'
-              }`}
-            >
-              Status
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-[#0047FF]/5 px-2.5 py-1 rounded-md border border-[#0047FF]/15">
-              <span className="w-2 h-2 rounded-full bg-[#0047FF] animate-pulse" />
-              <span className="text-[10px] font-mono font-bold text-[#0047FF] uppercase tracking-widest hidden sm:inline">
-                Drafting Session Active
-              </span>
-            </div>
-          </div>
+              <FileCheck className="w-3.5 h-3.5" />
+              <span>View Record</span>
+            </Link>
+          )}
 
           {user && (
-            <UserAvatar
-              user={user}
-              size={28}
-              className="ring-1 ring-black/5"
-            />
+            <div className="hidden sm:block pl-1 border-l border-gray-200 ml-1">
+              <UserAvatar user={user} size={28} className="ring-1 ring-black/5" />
+            </div>
           )}
         </div>
       </header>
 
       {/* Guidelines Modal/Drawer */}
       {showPrompt && assignment?.description && (
-        <div className="bg-white border-b border-gray-200 p-4 px-6 shadow-xs flex items-start justify-between gap-4 animate-in fade-in duration-150 shrink-0 z-20">
+        <div className="bg-white border-b border-gray-200 p-4 px-4 sm:px-6 shadow-md flex items-start justify-between gap-4 animate-in fade-in duration-150 shrink-0 z-20">
           <div className="space-y-1 min-w-0">
             <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
               <BookOpen className="w-4 h-4 text-[#0047FF]" />
               Assignment Guidelines & Instructions
             </h3>
-            <div className="text-xs text-gray-600 font-sans leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto">
+            <div className="text-xs text-gray-600 font-sans leading-relaxed whitespace-pre-wrap max-h-36 overflow-y-auto">
               {assignment.description}
             </div>
           </div>
           <button
             onClick={() => setShowPrompt(false)}
-            className="text-gray-400 hover:text-gray-600 text-xs font-mono shrink-0 cursor-pointer"
+            className="p-1 rounded-lg text-gray-400 hover:text-gray-600 text-xs font-mono shrink-0 cursor-pointer"
           >
-            ✕ Close
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Full-Height 3-Pane Body */}
+      {/* ============================================================ */}
+      {/* 2. MAIN 3-PANE / MOBILE ACTIVE TAB WORKSPACE                */}
+      {/* ============================================================ */}
       <div className="flex-1 flex overflow-hidden">
         
         {/* Left Pane: Document Outline / Pages */}
         <aside
           className={`w-64 sm:w-72 border-r border-gray-200 p-4 bg-[#F9F8F6] flex-col justify-between shrink-0 overflow-y-auto ${
-            activeMobileView === 'outline' ? 'flex w-full md:w-64 sm:md:w-72' : 'hidden md:flex'
+            activeMobileTab === 'outline' ? 'flex w-full md:w-64 sm:w-72' : 'hidden md:flex'
           }`}
         >
           <div className="space-y-3">
@@ -442,224 +416,173 @@ export default function Submission() {
             {!isSubmitted && (
               <button
                 type="button"
-                onClick={() => editor?.chain().focus('end').addSectionAfter().run()}
-                className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 text-xs font-mono font-bold text-[#0047FF] bg-white hover:bg-[#0047FF]/5 border border-dashed border-[#0047FF]/30 rounded-lg transition-colors cursor-pointer shadow-xs"
+                onClick={() => {
+                  editor?.chain().focus('end').addSectionAfter().run();
+                  setActiveMobileTab('editor');
+                }}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 text-xs font-mono font-bold text-[#0047FF] bg-white hover:bg-[#0047FF]/5 border border-dashed border-[#0047FF]/30 rounded-xl transition-colors cursor-pointer shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Page</span>
               </button>
             )}
           </div>
-
-          {/* Multi-Page Notice */}
-          <div className="mt-4 p-3.5 bg-white border border-gray-200 rounded-xl text-[11px] text-gray-500 shadow-xs space-y-1">
-            <div className="font-bold text-[#1A1A1B] font-sans flex items-center gap-1">
-              <Layers className="w-3.5 h-3.5 text-[#0047FF]" />
-              Multi-Page Workspace
-            </div>
-            <div className="leading-relaxed font-sans">
-              Each page is a dedicated workspace sheet. Drag page handles to reorder.
-            </div>
-          </div>
         </aside>
 
-        {/* Center Pane: Realistic Document Editor */}
+        {/* Center Pane: Word TipTap Editor */}
         <main
-          className={`flex-1 flex flex-col bg-white overflow-hidden ${
-            activeMobileView === 'editor' ? 'flex' : 'hidden md:flex'
+          className={`flex-1 flex-col overflow-hidden relative ${
+            activeMobileTab === 'editor' ? 'flex' : 'hidden md:flex'
           }`}
         >
-          {/* Active Page Kicker */}
-          <div className="px-6 py-2 bg-white border-b border-gray-200 flex items-center justify-between text-xs shrink-0 z-10">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-gray-500 font-bold truncate">
-              {`PAGE ${String(activeSectionIndex + 1).padStart(2, '0')} OF ${String(sectionsList.length || 1).padStart(2, '0')}`}
-            </span>
-
-            <span className="font-mono text-[10px] text-gray-500">
-              {totalWords} words total
-            </span>
-          </div>
-
-          {/* Editor Canvas with Desk Surface */}
-          <div className="flex-1 overflow-hidden bg-[#ECEAE5]">
-            {!showSkeleton && submission ? (
-              <Editor
-                submissionId={submission.id}
-                initialContent={normalizeForEditor(submission.content)}
-                onContentChange={setContent}
-                editable={!isSubmitted}
-                onReady={setEditor}
-                onToggleFocus={() => setIsFocusMode(!isFocusMode)}
-                isFocus={isFocusMode}
-              />
-            ) : (
-              <EditorSkeleton />
-            )}
-          </div>
+          <Editor
+            content={content}
+            submissionId={submission.id}
+            onReady={(ed) => setEditor(ed)}
+            editable={!isSubmitted}
+            onToggleFocus={() => setIsFocusMode(!isFocusMode)}
+            isFocus={isFocusMode}
+            onSave={handleSave}
+            saving={saving}
+          />
         </main>
 
-        {/* Right Pane: Telemetry & Submission */}
+        {/* Right Pane: Live Telemetry & Process Overview */}
         <aside
-          className={`w-64 sm:w-72 border-l border-gray-200 bg-[#F9F8F6] p-4 flex-col justify-between shrink-0 overflow-y-auto ${
-            activeMobileView === 'status' ? 'flex w-full md:w-64 sm:md:w-72' : 'hidden lg:flex'
+          className={`w-72 sm:w-80 border-l border-gray-200 p-4 bg-[#F9F8F6] flex-col justify-between shrink-0 overflow-y-auto ${
+            activeMobileTab === 'status' ? 'flex w-full md:w-72 sm:w-80' : 'hidden lg:flex'
           }`}
         >
-          <div className="space-y-5">
-            {/* Telemetry Section */}
-            <div>
-              <h4 className="text-[10px] font-mono uppercase tracking-widest text-gray-400 mb-3 font-bold">
-                DOCUMENT TELEMETRY
-              </h4>
-              <div className="space-y-2.5 text-xs">
-                <div className="flex justify-between py-1 border-b border-gray-200">
-                  <span className="text-gray-500 font-sans">Word Count:</span>
-                  <span className="font-mono font-bold text-[#1A1A1B]">{totalWords} words</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-gray-200">
-                  <span className="text-gray-500 font-sans">Total Pages:</span>
-                  <span className="font-mono font-bold text-[#1A1A1B]">{sectionsList.length} pages</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-gray-200">
-                  <span className="text-gray-500 font-sans">Autosave:</span>
-                  <span className="font-mono text-emerald-700 font-bold">Continuous</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Record Status Section */}
-            <div className="pt-3 border-t border-gray-200">
-              <h4 className="text-[10px] font-mono uppercase tracking-widest text-gray-400 mb-2.5 font-bold">
-                RECORD STATUS
-              </h4>
-              <div className="space-y-1.5 text-xs">
-                <div className="flex justify-between py-0.5">
-                  <span className="text-gray-500 font-sans">Snapshot:</span>
-                  <span className="font-mono text-gray-800 font-semibold">
-                    {isSubmitted ? 'Sealed & Locked' : 'Live Editing'}
-                  </span>
-                </div>
-                <div className="flex justify-between py-0.5">
-                  <span className="text-gray-500 font-sans">History:</span>
-                  <span className="font-mono text-emerald-700 font-semibold">Preserved</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Submission Actions */}
-            {!isSubmitted && (
-              <div className="pt-3 border-t border-gray-200 space-y-2">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 font-bold block">
-                  WORKSPACE ACTIONS
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-[#0047FF]" />
+                <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 font-bold">
+                  WORKSPACE INTEGRITY
                 </span>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="w-full py-2 px-3 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Save Draft</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowSubmitModal(true)}
-                  disabled={saving}
-                  className="w-full py-2.5 px-3 text-xs font-bold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-lg shadow-md shadow-blue-200 transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Submit Assignment</span>
-                </button>
               </div>
-            )}
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
 
-            {isSubmitted && (
-              <div className="pt-3 border-t border-gray-200 p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 space-y-1">
-                <div className="font-bold flex items-center gap-1">
-                  <ShieldCheck className="w-4 h-4 text-emerald-700" />
-                  Submission Sealed
-                </div>
-                <p className="text-[11px] text-emerald-800">
-                  Your final document and writing history are permanently preserved.
-                </p>
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">Draft Status</span>
+                <span className="text-xs font-mono font-bold text-gray-800 uppercase">
+                  {isSubmitted ? 'Sealed' : 'In Progress'}
+                </span>
               </div>
-            )}
-          </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">Words Written</span>
+                <span className="text-xs font-mono font-bold text-[#0047FF]">
+                  {totalWords.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">Pages</span>
+                <span className="text-xs font-mono font-bold text-gray-800">
+                  {sectionsList.length}
+                </span>
+              </div>
+            </div>
 
-          {/* Bottom Proof of Work Stamp */}
-          <div className="mt-auto pt-3 border-t border-gray-200 text-center">
-            <span className="text-[10px] font-mono text-gray-400 leading-tight block">
-              Preserved automatically as students write.
-            </span>
+            <div className="bg-blue-50/50 rounded-2xl border border-blue-200/60 p-4 space-y-1.5 text-xs text-blue-900 font-sans leading-relaxed">
+              <div className="font-bold flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-[#0047FF]" />
+                Connected Telemetry
+              </div>
+              <p className="text-[11px] text-blue-800/80">
+                Keystrokes and drafts are automatically stamped and saved to your cloud record. No manual saving required.
+              </p>
+            </div>
           </div>
         </aside>
       </div>
 
-      {/* Two-Stage Sealing Confirmation Modal */}
+      {/* ============================================================ */}
+      {/* 3. MOBILE BOTTOM NAVIGATION BAR                              */}
+      {/* ============================================================ */}
+      <nav className="md:hidden h-16 bg-white border-t border-gray-200 px-4 flex items-center justify-around shrink-0 z-30 shadow-lg pb-safe">
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab('editor')}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
+            activeMobileTab === 'editor'
+              ? 'text-[#0047FF] font-bold'
+              : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <FileText className="w-5 h-5" />
+          <span className="text-[11px] font-sans">Editor</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab('outline')}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
+            activeMobileTab === 'outline'
+              ? 'text-[#0047FF] font-bold'
+              : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <Layers className="w-5 h-5" />
+          <span className="text-[11px] font-sans">Pages ({sectionsList.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab('status')}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
+            activeMobileTab === 'status'
+              ? 'text-[#0047FF] font-bold'
+              : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <Activity className="w-5 h-5" />
+          <span className="text-[11px] font-sans">Status</span>
+        </button>
+      </nav>
+
+      {/* Submit Confirmation Modal */}
       {showSubmitModal && (
-        typeof document !== 'undefined' ? createPortal(
-          <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[100] p-4 animate-in fade-in duration-150"
-            role="dialog"
-            aria-modal="true"
-          >
-            <div
-              className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-md w-full p-6 space-y-5"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#0047FF]/10 text-[#0047FF] border border-[#0047FF]/20 flex items-center justify-center font-bold">
-                    <FileCheck className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-base text-[#1A1A1B]">Submit Final Assignment?</h3>
-                    <p className="text-xs text-gray-500 font-sans">This action permanently seals your work record.</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowSubmitModal(false)}
-                  className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+              <div className="w-10 h-10 rounded-xl bg-[#0047FF]/10 flex items-center justify-center text-[#0047FF]">
+                <Send className="w-5 h-5" />
               </div>
-
-              <div className="p-4 bg-[#F9F8F6] rounded-xl border border-gray-200 text-xs text-gray-600 space-y-2 leading-relaxed">
-                <p className="font-bold text-[#1A1A1B] flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-[#0047FF]" />
-                  What happens upon submission:
+              <div>
+                <h3 className="text-sm font-bold text-[#1A1A1B]">Submit Assignment</h3>
+                <p className="text-xs text-gray-500 font-mono">
+                  {totalWords} words across {sectionsList.length} pages
                 </p>
-                <ul className="list-disc list-inside space-y-1 text-gray-600 pl-1 font-sans">
-                  <li>Your final document snapshot is frozen and sealed on the server.</li>
-                  <li>Your full development history, typing sessions, and revisions remain preserved with your submission.</li>
-                  <li>Your lecturer receives instant access to evaluate your paper.</li>
-                </ul>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowSubmitModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-[#1A1A1B] hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-                >
-                  Continue Editing
-                </button>
-                <button
-                  type="button"
-                  onClick={executeSubmit}
-                  disabled={saving}
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-[#0047FF] text-white text-xs font-bold rounded-lg hover:bg-[#0038CC] shadow-md shadow-blue-200 disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer"
-                >
-                  <Lock className="w-3.5 h-3.5" />
-                  <span>{saving ? 'Sealing...' : 'Confirm & Seal Submission'}</span>
-                </button>
               </div>
             </div>
-          </div>,
-          document.body
-        ) : null
+
+            <p className="text-xs text-gray-600 font-sans leading-relaxed">
+              Submitting permanently seals your work and delivers it to your lecturer with proof-of-work analytics. Once sealed, no further edits can be made.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowSubmitModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={executeSubmit}
+                disabled={saving}
+                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-[#0047FF] hover:bg-[#0038CC] shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {saving ? 'Submitting...' : 'Confirm Submission'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
+
     </div>
   );
 }
