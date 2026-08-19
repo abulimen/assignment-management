@@ -36,6 +36,7 @@ import ContributionXray from '../components/ContributionXray';
 import MemberWorkload from '../components/MemberWorkload';
 import MemberActivityChart from '../components/MemberActivityChart';
 import CopiedTextViewer from '../components/CopiedTextViewer';
+import { countDocWords } from '../utils/sectionDoc';
 
 export default function Review() {
   const { id } = useParams();
@@ -124,18 +125,14 @@ export default function Review() {
     return strings;
   }, [data?.events, data?.pasted_texts]);
 
-  // Compute final document word count
+  // Compute final document word count accurately matching Editor / ProseMirror
   const wordCount = useMemo(() => {
-    if (!data?.content) return 0;
-    try {
-      const text = typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
-      const clean = text.replace(/<[^>]*>/g, ' ').replace(/[{}":[\],]/g, ' ');
-      const words = clean.trim().split(/\s+/).filter(Boolean);
-      return words.length;
-    } catch {
-      return 0;
+    if (typeof data?.stats?.word_count === 'number' && data.stats.word_count > 0) {
+      return data.stats.word_count;
     }
-  }, [data?.content]);
+    if (!data?.content) return 0;
+    return countDocWords(data.content);
+  }, [data?.content, data?.stats?.word_count]);
 
   // Check if there are notable concerns in lower widgets
   const patternConcerns = useMemo(() => {

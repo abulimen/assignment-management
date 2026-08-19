@@ -84,3 +84,49 @@ export function planSectionMove(ids, draggedId, targetId, place) {
   if (to === from) return null;
   return { from, to };
 }
+
+// Extract human-readable plain text from ProseMirror/TipTap JSON or HTML/string
+export function extractDocPlainText(doc) {
+  if (!doc) return '';
+  let docObj = doc;
+  if (typeof doc === 'string') {
+    try {
+      docObj = JSON.parse(doc);
+    } catch {
+      return doc.replace(/<[^>]*>/g, ' ').trim();
+    }
+  }
+  if (!docObj || typeof docObj !== 'object') return '';
+  const blocks = [];
+  function walk(node) {
+    if (!node) return;
+    if (node.type === 'sectionTitle') return;
+    if (typeof node.text === 'string') {
+      blocks.push(node.text);
+      return;
+    }
+    if (Array.isArray(node.content)) {
+      for (const child of node.content) walk(child);
+      if (
+        node.type === 'paragraph' ||
+        node.type === 'heading' ||
+        node.type === 'section' ||
+        node.type === 'blockquote' ||
+        node.type === 'listItem' ||
+        node.type === 'codeBlock'
+      ) {
+        blocks.push('\n');
+      }
+    }
+  }
+  walk(docObj);
+  return blocks.join('');
+}
+
+// Accurate word count matching ProseMirror / TipTap word counting
+export function countDocWords(doc) {
+  const text = extractDocPlainText(doc);
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  return words.length;
+}
+

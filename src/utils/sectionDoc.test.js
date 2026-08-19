@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { wrapFlatContent, emptySectionedDoc, listSections, planSectionMove } from './sectionDoc';
+import { wrapFlatContent, emptySectionedDoc, listSections, planSectionMove, countDocWords } from './sectionDoc';
 
 const flat = {
   type: 'doc',
@@ -130,3 +130,35 @@ describe('planSectionMove — drag-and-drop target computation', () => {
     expect(planSectionMove(ids, 'intro', 'nope', 'before')).toBeNull();
   });
 });
+
+describe('extractDocPlainText and countDocWords', () => {
+  it('extracts plain text and counts words from ProseMirror JSON accurately', () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'section',
+          content: [
+            { type: 'sectionTitle' },
+            { type: 'heading', content: [{ type: 'text', text: 'Quantum Computing Defined' }] },
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: 'Quantum computing is an emergent field of computer science.' },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(countDocWords(doc)).toBe(12);
+    expect(countDocWords(JSON.stringify(doc))).toBe(12);
+  });
+
+  it('handles null, undefined, empty and string inputs gracefully', () => {
+    expect(countDocWords(null)).toBe(0);
+    expect(countDocWords('')).toBe(0);
+    expect(countDocWords('<p>Hello world from html</p>')).toBe(4);
+  });
+});
+
