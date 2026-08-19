@@ -99,32 +99,62 @@ class SourceMap {
     return false;
   }
 
-  // Generate ProseMirror decorations for the current ranges
+  // Generate ProseMirror inline decorations for all ranges.
+  // ONLY highlights ranges where characters actually exist in doc.
+  // Never places decorations on structural/block boundaries.
   getDecorations(state) {
     const decos = [];
+    const docSize = state.doc.content.size;
+
     for (const r of this.ranges) {
-      const safeFrom = Math.max(0, Math.min(r.from, state.doc.content.size));
-      const safeTo = Math.max(safeFrom, Math.min(r.to, state.doc.content.size));
-      if (safeTo > safeFrom) {
-        const cls = r.type === 'typed' ? 'hl-typed' : 'hl-pasted';
-        const label = r.type === 'typed' ? 'Typed' : 'Pasted from external source';
-        decos.push(Decoration.inline(safeFrom, safeTo, {
-          class: cls,
-          'data-label': label,
-        }));
+      if (r.from >= docSize || r.to <= 0) continue;
+      const start = Math.max(0, r.from);
+      const end = Math.min(docSize, r.to);
+      if (start >= end) continue;
+
+      const cls = r.type === 'typed' ? 'hl-typed'
+                : r.type === 'pasted' ? 'hl-pasted'
+                : 'hl-edited';
+      const label = r.type === 'typed' ? 'Typed'
+                  : r.type === 'pasted' ? 'Pasted from external source'
+                  : 'Edited / Modified';
+
+      // Iterate through text nodes in range to avoid block-boundary decorations
+      try {
+        state.doc.nodesBetween(start, end, (node, pos) => {
+          if (node.isText) {
+            const nodeFrom = Math.max(start, pos);
+            const nodeTo = Math.min(end, pos + node.nodeSize);
+            if (nodeFrom < nodeTo) {
+              decos.push(
+                Decoration.inline(nodeFrom, nodeTo, {
+                  class: cls,
+                  'data-source': r.type,
+                  'data-label': label,
+                })
+              );
+            }
+          }
+        });
+      } catch (e) {
+        // Fallback: safe single decoration if within doc
+        if (start < end && end <= docSize) {
+          decos.push(
+            Decoration.inline(start, end, {
+              class: cls,
+              'data-source': r.type,
+              'data-label': label,
+            })
+          );
+        }
       }
     }
     return decos;
   }
 }
 
-// Stable option objects — new identities each render would make useEditor's
-// instance manager re-apply/re-create the editor unnecessarily.
-// The default permissive document (block+) is kept on purpose: replay must
-// load BOTH legacy flat documents and new sectioned ones, so Section nodes
-// are available without enforcing the strict section+ model.
 const PLAYBACK_EXTENSIONS = [
-  StarterKit,
+  StarterKit.configure({ history: false }),
   Underline,
   TextAlign.configure({ types: ['heading', 'paragraph'] }),
   Link.configure({ openOnClick: false }),
@@ -135,39 +165,41 @@ const PLAYBACK_EDITOR_PROPS = {
   attributes: { class: 'word-document focus:outline-none' },
 };
 
-export default function Playback({ events, finalContent, initialMode, externalHighlight, seekStepIndex }) {
+export default function Playback({
+  events,
+  finalContent,
+  initialData,
+  mode: propMode,
+  initialMode,
+  highlightPasted,
+  externalHighlight,
+  seekStepIndex,
+  onSeekHandled,
+}) {
+  const resolvedEvents = events || initialData?.events || [];
+  const resolvedFinalContent = finalContent || initialData?.content;
+  const activeMode = propMode || initialMode || (resolvedFinalContent ? 'final' : 'playback');
+  const activeHighlight = highlightPasted !== undefined ? highlightPasted : (externalHighlight !== undefined ? externalHighlight : false);
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
-  const [mode, setMode] = useState(initialMode || (finalContent ? 'final' : 'playback'));
-  const [highlight, setHighlight] = useState(externalHighlight !== undefined ? externalHighlight : true);
+  const [mode, setMode] = useState(activeMode);
+  const [highlight, setHighlight] = useState(activeHighlight);
   const intervalRef = useRef(null);
   const contentRef = useRef(null);
   const isDispatching = useRef(false);
   const lastIndexRef = useRef(-1);
 
-  // Sync mode if initialMode changes
+  // Sync mode if prop changes
   useEffect(() => {
-    if (initialMode) setMode(initialMode);
-  }, [initialMode]);
+    if (activeMode) setMode(activeMode);
+  }, [activeMode]);
 
-  // Sync highlight if externalHighlight changes
+  // Sync highlight if prop changes
   useEffect(() => {
-    if (externalHighlight !== undefined) {
-      setHighlight(externalHighlight);
-    }
-  }, [externalHighlight]);
-
-  // Seek to specific step index when requested from ProcessTimeline
-  useEffect(() => {
-    if (seekStepIndex != null && stepEvents.length > 0) {
-      setPlaying(false);
-      setMode('playback');
-      // Find the closest step event at or before the requested index
-      const targetIdx = Math.max(0, Math.min(seekStepIndex, stepEvents.length - 1));
-      setCurrentIndex(targetIdx);
-    }
-  }, [seekStepIndex]);
+    setHighlight(activeHighlight);
+  }, [activeHighlight]);
 
   // SourceMap instance — tracks typed/pasted/edited ranges
   const sourceMap = useRef(new SourceMap());
@@ -177,21 +209,29 @@ export default function Playback({ events, finalContent, initialMode, externalHi
 
   const stepEvents = useMemo(
     () => {
-      const list = (events || []).filter(e => e.steps && e.steps.length > 0);
+      const list = (resolvedEvents || []).filter(e => e.steps && e.steps.length > 0);
       return list.slice().sort((a, b) => (Number(a.occurred_at) || 0) - (Number(b.occurred_at) || 0));
     },
-    [events]
+    [resolvedEvents]
   );
+
+  // Seek to specific step index when requested from ProcessTimeline
+  useEffect(() => {
+    if (seekStepIndex != null && stepEvents.length > 0) {
+      setPlaying(false);
+      setMode('playback');
+      const targetIdx = Math.max(0, Math.min(seekStepIndex, stepEvents.length - 1));
+      setCurrentIndex(targetIdx);
+      onSeekHandled?.();
+    }
+  }, [seekStepIndex, stepEvents.length, onSeekHandled]);
 
   // Replay must start from the SAME document shape the recording was made
   // against, or every recorded position is out of range and nothing renders.
-  // Sectioned documents record positions inside doc > section > [title, para];
-  // legacy documents are flat. Detect from the final content and seed the
-  // matching empty structure.
   const seedContent = useMemo(() => {
-    if (!finalContent) return null;
+    if (!resolvedFinalContent) return null;
     try {
-      const parsed = typeof finalContent === 'string' ? JSON.parse(finalContent) : finalContent;
+      const parsed = typeof resolvedFinalContent === 'string' ? JSON.parse(resolvedFinalContent) : resolvedFinalContent;
       if (parsed?.content?.[0]?.type === 'section') {
         return JSON.stringify({
           type: 'doc',
@@ -204,7 +244,7 @@ export default function Playback({ events, finalContent, initialMode, externalHi
       }
     } catch { /* fall through to flat seed */ }
     return null;
-  }, [finalContent]);
+  }, [resolvedFinalContent]);
 
   const editor = useEditor({
     extensions: PLAYBACK_EXTENSIONS,
@@ -215,9 +255,6 @@ export default function Playback({ events, finalContent, initialMode, externalHi
 
   // Decoration plugin: cursor caret + source highlighting
   useEffect(() => {
-    // useEditor's instance manager can destroy/recreate the editor between
-    // commits (StrictMode, scheduled destroy); registerPlugin has no
-    // isDestroyed guard of its own, so skip stale instances.
     if (!editor || editor.isDestroyed) return;
 
     const plugin = new Plugin({
@@ -268,7 +305,6 @@ export default function Playback({ events, finalContent, initialMode, externalHi
     }
 
     // Update source map BEFORE dispatching
-    // Map existing ranges through this transaction's mapping
     sourceMap.current.mapRanges(tr.mapping);
 
     // Process each step in the event
@@ -278,26 +314,20 @@ export default function Playback({ events, finalContent, initialMode, externalHi
         const to = stepJson.to ?? 0;
         const deleted = to - from;
 
-        // Compute inserted size using ProseMirror content size
-        // (NOT text length — includes paragraph boundary tokens)
-        let insertedSize = 0;
-        if (stepJson.slice?.content) {
-          insertedSize = getSliceContentSize(stepJson.slice.content);
+        // If characters were deleted, shrink overlapping pasted ranges
+        if (deleted > 0) {
+          sourceMap.current.markDeleted(from, to);
         }
 
-        if (insertedSize > 0 && deleted === 0) {
-          // Pure insertion
-          const type = (event.type === 'paste' && event.data?.external_paste)
-                     ? 'pasted' : 'typed';
-          sourceMap.current.addRange(from, from + insertedSize, type);
-        } else if (deleted > 0 && insertedSize === 0) {
-          // Pure deletion — shrink overlapping pasted ranges
-          sourceMap.current.markDeleted(from, to);
-        } else if (deleted > 0 && insertedSize > 0) {
-          // Replace: delete pasted text then type new text at same position
-          sourceMap.current.markDeleted(from, to);
-          const type = (event.type === 'paste' && event.data?.external_paste)
-                     ? 'pasted' : 'typed';
+        // Check if slice content was inserted
+        const sliceContent = stepJson.slice?.content;
+        if (sliceContent && sliceContent.length > 0) {
+          const insertedSize = getSliceContentSize(sliceContent);
+          const isPasted = event.type === 'paste';
+          const isEditingPasted = !isPasted && sourceMap.current.isInPastedRange(from);
+          const type = isPasted ? 'pasted'
+                     : isEditingPasted ? 'edited'
+                     : 'typed';
           sourceMap.current.addRange(from, from + insertedSize, type);
         }
       }
@@ -364,10 +394,10 @@ export default function Playback({ events, finalContent, initialMode, externalHi
     if (mode === 'final') {
       if (stepEvents.length > 0) {
         rebuildToIndex(stepEvents.length - 1);
-      } else if (finalContent) {
+      } else if (resolvedFinalContent) {
         isDispatching.current = true;
-        try { editor.commands.setContent(JSON.parse(finalContent)); }
-        catch (e) { editor.commands.setContent(finalContent); }
+        try { editor.commands.setContent(JSON.parse(resolvedFinalContent)); }
+        catch (e) { editor.commands.setContent(resolvedFinalContent); }
         isDispatching.current = false;
         lastIndexRef.current = -1;
         sourceMap.current.reset();
@@ -377,7 +407,7 @@ export default function Playback({ events, finalContent, initialMode, externalHi
         rebuildToIndex(currentIndex);
       }
     }
-  }, [mode, editor, finalContent, currentIndex, stepEvents.length, rebuildToIndex]);
+  }, [mode, editor, resolvedFinalContent, currentIndex, stepEvents.length, rebuildToIndex]);
 
   // Force decoration re-evaluation when highlight toggles
   useEffect(() => {
@@ -388,74 +418,7 @@ export default function Playback({ events, finalContent, initialMode, externalHi
     }
   }, [highlight, editor]);
 
-  // Hover tooltips for highlighted text
-  useEffect(() => {
-    if (!editor || editor.isDestroyed || !highlight) return;
-    const pmEl = editor.view.dom;
-    let tooltipEl = null;
-
-    const getHighlightTarget = (e) => {
-      let el = e.target;
-      // Walk up to find the element with hl- class
-      while (el && el !== pmEl) {
-        if (el.classList && el.matches('.hl-typed, .hl-pasted, .hl-edited')) return el;
-        el = el.parentElement;
-      }
-      return null;
-    };
-
-    const onMouseMove = (e) => {
-      const target = getHighlightTarget(e);
-
-      if (!target) {
-        if (tooltipEl) { tooltipEl.remove(); tooltipEl = null; }
-        return;
-      }
-
-      const label = target.getAttribute('data-label');
-      if (!label) return;
-
-      const type = target.classList.contains('hl-typed') ? 'typed'
-                 : target.classList.contains('hl-edited') ? 'edited'
-                 : 'pasted';
-
-      if (!tooltipEl) {
-        tooltipEl = document.createElement('div');
-        tooltipEl.className = `hl-tooltip hl-tooltip-${type}`;
-        tooltipEl.textContent = label;
-        document.body.appendChild(tooltipEl);
-      } else {
-        tooltipEl.className = `hl-tooltip hl-tooltip-${type}`;
-        tooltipEl.textContent = label;
-      }
-
-      // Position tooltip near cursor, above the element
-      tooltipEl.style.left = `${e.clientX}px`;
-      tooltipEl.style.top = `${e.clientY - 35}px`;
-      // Clamp to viewport
-      const rect = tooltipEl.getBoundingClientRect();
-      if (rect.left + rect.width > window.innerWidth) {
-        tooltipEl.style.left = `${window.innerWidth - rect.width - 10}px`;
-      }
-      if (rect.top < 0) {
-        tooltipEl.style.top = `${e.clientY + 20}px`;
-      }
-    };
-
-    const onMouseLeave = () => {
-      if (tooltipEl) { tooltipEl.remove(); tooltipEl = null; }
-    };
-
-    pmEl.addEventListener('mousemove', onMouseMove);
-    pmEl.addEventListener('mouseleave', onMouseLeave);
-    return () => {
-      pmEl.removeEventListener('mousemove', onMouseMove);
-      pmEl.removeEventListener('mouseleave', onMouseLeave);
-      if (tooltipEl) tooltipEl.remove();
-    };
-  }, [editor, highlight, currentIndex]);
-
-  // Playback loop
+  // Playback timer
   useEffect(() => {
     if (playing && stepEvents.length > 0) {
       const delay = 200 / speed;
@@ -477,11 +440,15 @@ export default function Playback({ events, finalContent, initialMode, externalHi
     }
   }, [currentIndex, mode]);
 
-  const hasFinal = !!finalContent;
+  const hasFinal = !!resolvedFinalContent;
   const hasEvents = stepEvents.length > 0;
 
   if (!hasEvents && !hasFinal) {
-    return <div className="bg-surface rounded-xl border border-line p-8 text-center text-gray-600">No data to display.</div>;
+    return (
+      <div className="flex items-center justify-center h-full p-8 text-center text-gray-500 font-sans text-xs">
+        No document content or keystroke events recorded for this submission.
+      </div>
+    );
   }
 
   return (
@@ -611,9 +578,6 @@ export default function Playback({ events, finalContent, initialMode, externalHi
 }
 
 // Compute ProseMirror content size from a JSON slice content array.
-// Text nodes: text.length
-// Block nodes (paragraph, heading, etc.): 2 (open/close) + children sizes
-// This gives the EXACT ProseMirror position count, including structural tokens.
 function getSliceContentSize(content) {
   if (!content || !Array.isArray(content)) return 0;
   let size = 0;
@@ -621,7 +585,6 @@ function getSliceContentSize(content) {
     if (node.text) {
       size += node.text.length;
     } else if (node.content) {
-      // Block node: open tag (1) + close tag (1) + children
       size += 2 + getSliceContentSize(node.content);
     }
   }

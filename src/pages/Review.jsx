@@ -380,6 +380,8 @@ export default function Review() {
               key={`${id}-${canvasMode}`}
               submissionId={id}
               initialData={data}
+              events={data?.events}
+              finalContent={data?.content}
               mode={canvasMode}
               highlightPasted={highlightPasted}
               seekStepIndex={seekStepIndex}
