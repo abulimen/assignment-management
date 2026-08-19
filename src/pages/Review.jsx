@@ -9,9 +9,6 @@ import {
   PanelRightOpen,
   AlertTriangle,
   BarChart2,
-  Clock,
-  Layers,
-  Sparkles,
 } from 'lucide-react';
 import { api } from '../api';
 import { AuthContext } from '../context/AuthContext';
@@ -49,7 +46,7 @@ export default function Review() {
   // Evidence Sidebar Tab: 'overview' | 'pattern' | 'timeline' | 'sources'
   const [sidebarTab, setSidebarTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [highlightPasted, setHighlightPasted] = useState(false);
+  const [highlightPasted, setHighlightPasted] = useState(false); // DEFAULT OFF
   const [seekStepIndex, setSeekStepIndex] = useState(null);
 
   useEffect(() => {
@@ -123,10 +120,10 @@ export default function Review() {
   if (showSkeleton) {
     return (
       <div role="status" aria-label="Loading review" className="h-screen w-screen flex flex-col bg-[#ECEAE5] overflow-hidden">
-        <div className="h-14 bg-white border-b border-gray-200 px-4 sm:px-6 flex items-center justify-between shrink-0">
-          <div className="skeleton h-5 w-32 sm:w-48 rounded" />
-          <div className="skeleton h-8 w-40 sm:w-64 rounded-xl" />
-          <div className="skeleton h-6 w-16 sm:w-24 rounded-full" />
+        <div className="h-16 bg-white border-b border-gray-200 px-4 sm:px-6 flex items-center justify-between shrink-0">
+          <div className="skeleton h-5 w-36 sm:w-48 rounded" />
+          <div className="skeleton h-8 w-44 sm:w-64 rounded-xl" />
+          <div className="skeleton h-6 w-20 sm:w-24 rounded-full" />
         </div>
         <div className="flex-1 flex overflow-hidden">
           <div className="flex-1 flex items-center justify-center p-4 sm:p-8">
@@ -163,34 +160,32 @@ export default function Review() {
   }
 
   const isGroup = !!(data.group_id || (Array.isArray(data.sections) && data.sections.length > 0));
-
-  // Determine current active player mode (desktop vs mobile)
   const effectivePlaybackMode = canvasMode === 'playback' || mobileTab === 'replay';
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[#ECEAE5] overflow-hidden select-none">
       
       {/* ============================================================ */}
-      {/* 1. TOP APP BAR (Native App Feel on Mobile, Clean on Desktop) */}
+      {/* 1. TOP APP BAR (h-16 / 64px standard height)                */}
       {/* ============================================================ */}
-      <header className="h-13 sm:h-14 bg-white border-b border-gray-200 px-3 sm:px-6 flex items-center justify-between shrink-0 z-20 shadow-2xs">
+      <header className="h-16 bg-white border-b border-gray-200 px-4 sm:px-6 flex items-center justify-between shrink-0 z-20 shadow-2xs">
         {/* Left: Back & Title */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
           <Link
             to={`/assignments/${data.assignment_id}`}
-            className="p-1.5 rounded-lg text-gray-500 hover:text-[#1A1A1B] hover:bg-gray-100 transition-colors cursor-pointer shrink-0"
+            className="p-2 rounded-xl text-gray-500 hover:text-[#1A1A1B] hover:bg-gray-100 transition-colors cursor-pointer shrink-0"
             title="Back to Assignment"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-5 h-5 sm:w-4 sm:h-4" />
           </Link>
-          <div className="h-4 w-px bg-gray-200 hidden sm:block shrink-0" />
-          <BrandMark variant="wordmark" className="h-4 hidden sm:block shrink-0" />
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs sm:text-sm font-bold text-[#1A1A1B] truncate max-w-[170px] sm:max-w-xs">
+          <div className="h-5 w-px bg-gray-200 hidden sm:block shrink-0" />
+          <BrandMark variant="wordmark" className="h-4.5 hidden sm:block shrink-0" />
+          <div className="flex flex-col min-w-0 justify-center">
+            <span className="text-sm font-bold text-[#1A1A1B] truncate max-w-[200px] sm:max-w-xs leading-tight">
               {data.assignment_title || 'Submission Review'}
             </span>
-            <span className="text-[10px] text-gray-500 font-mono truncate">
-              {data.student_name || (isGroup ? 'Group' : 'Student')} · {wordCount} words
+            <span className="text-[11px] text-gray-500 font-mono truncate leading-tight mt-0.5">
+              {data.student_name || (isGroup ? 'Group Submission' : 'Individual Student')} · {wordCount} words
             </span>
           </div>
         </div>
@@ -202,6 +197,7 @@ export default function Review() {
             aria-label="Document View"
             onClick={() => {
               setCanvasMode('final');
+              setHighlightPasted(false);
               setSeekStepIndex(null);
             }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
@@ -219,7 +215,6 @@ export default function Review() {
             aria-label="Process Record"
             onClick={() => {
               setCanvasMode('playback');
-              setHighlightPasted(true);
             }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               canvasMode === 'playback'
@@ -233,21 +228,21 @@ export default function Review() {
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Highlight Toggle (Works on both mobile & desktop) */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Highlight Toggle (Manual toggle for document view) */}
           {pastedStrings.length > 0 && (
             <button
               type="button"
               onClick={() => setHighlightPasted(!highlightPasted)}
-              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                 highlightPasted
                   ? 'bg-amber-50 text-amber-950 border-amber-300 ring-1 ring-amber-300/40'
                   : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
               }`}
               title={highlightPasted ? 'Hide Pasted Highlights' : 'Highlight Pasted Text'}
             >
-              <Highlighter className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-              <span className="hidden md:inline text-[11px]">
+              <Highlighter className="w-4 h-4 text-amber-700 shrink-0" />
+              <span className="hidden md:inline text-xs">
                 {highlightPasted ? 'Highlights: ON' : 'Highlights: OFF'}
               </span>
             </button>
@@ -257,7 +252,7 @@ export default function Review() {
           <button
             type="button"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className={`hidden lg:flex p-1.5 rounded-lg border transition-colors cursor-pointer ${
+            className={`hidden lg:flex p-2 rounded-xl border transition-colors cursor-pointer ${
               sidebarOpen
                 ? 'bg-[#0047FF]/5 text-[#0047FF] border-[#0047FF]/20'
                 : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
@@ -268,8 +263,8 @@ export default function Review() {
           </button>
 
           {user && (
-            <div className="pl-1 border-l border-gray-200 ml-0.5">
-              <UserAvatar user={user} size={26} className="ring-1 ring-black/5" />
+            <div className="pl-1 border-l border-gray-200 ml-1">
+              <UserAvatar user={user} size={30} className="ring-1 ring-black/5" />
             </div>
           )}
         </div>
@@ -277,7 +272,7 @@ export default function Review() {
 
       {/* Leader Override Alert Banner */}
       {data.override?.used && (
-        <div className="bg-amber-50 border-b border-amber-300 px-3 sm:px-6 py-2 shadow-xs flex items-center justify-between gap-4 text-xs text-amber-900 shrink-0 z-20">
+        <div className="bg-amber-50 border-b border-amber-300 px-4 sm:px-6 py-2.5 shadow-xs flex items-center justify-between gap-4 text-xs text-amber-900 shrink-0 z-20">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
             <span className="truncate">
@@ -288,7 +283,7 @@ export default function Review() {
       )}
 
       {/* ============================================================ */}
-      {/* 2. MAIN WORKSPACE (Desktop: Side-by-Side, Mobile: Active Tab) */}
+      {/* 2. MAIN WORKSPACE                                           */}
       {/* ============================================================ */}
       <div className="flex-1 flex overflow-hidden relative">
         
@@ -382,7 +377,6 @@ export default function Review() {
                   setSidebarTab('timeline');
                   setCanvasMode('playback');
                   setMobileTab('replay');
-                  setHighlightPasted(true);
                 }}
                 isGroup={isGroup}
               />
@@ -440,23 +434,24 @@ export default function Review() {
       </div>
 
       {/* ============================================================ */}
-      {/* 3. MOBILE BOTTOM NAVIGATION (Native App Navigation Bar)      */}
+      {/* 3. MOBILE BOTTOM NAVIGATION                                  */}
       {/* ============================================================ */}
-      <nav className="lg:hidden h-14 bg-white border-t border-gray-200 px-4 flex items-center justify-around shrink-0 z-30 shadow-lg">
+      <nav className="lg:hidden h-16 bg-white border-t border-gray-200 px-4 flex items-center justify-around shrink-0 z-30 shadow-lg pb-safe">
         <button
           type="button"
           onClick={() => {
             setMobileTab('doc');
             setCanvasMode('final');
+            setHighlightPasted(false);
           }}
-          className={`flex flex-col items-center justify-center gap-0.5 flex-1 py-1 transition-colors cursor-pointer ${
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
             mobileTab === 'doc'
               ? 'text-[#0047FF] font-bold'
               : 'text-gray-500 hover:text-gray-900'
           }`}
         >
-          <FileText className="w-4 h-4" />
-          <span className="text-[10px] font-sans">Document</span>
+          <FileText className="w-5 h-5" />
+          <span className="text-[11px] font-sans">Document</span>
         </button>
 
         <button
@@ -464,16 +459,15 @@ export default function Review() {
           onClick={() => {
             setMobileTab('replay');
             setCanvasMode('playback');
-            setHighlightPasted(true);
           }}
-          className={`flex flex-col items-center justify-center gap-0.5 flex-1 py-1 transition-colors cursor-pointer ${
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
             mobileTab === 'replay'
               ? 'text-[#0047FF] font-bold'
               : 'text-gray-500 hover:text-gray-900'
           }`}
         >
-          <Film className="w-4 h-4" />
-          <span className="text-[10px] font-sans">Replay</span>
+          <Film className="w-5 h-5" />
+          <span className="text-[11px] font-sans">Replay</span>
         </button>
 
         <button
@@ -481,14 +475,14 @@ export default function Review() {
           onClick={() => {
             setMobileTab('analytics');
           }}
-          className={`flex flex-col items-center justify-center gap-0.5 flex-1 py-1 transition-colors cursor-pointer ${
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
             mobileTab === 'analytics'
               ? 'text-[#0047FF] font-bold'
               : 'text-gray-500 hover:text-gray-900'
           }`}
         >
-          <BarChart2 className="w-4 h-4" />
-          <span className="text-[10px] font-sans">Analytics</span>
+          <BarChart2 className="w-5 h-5" />
+          <span className="text-[11px] font-sans">Analytics</span>
         </button>
       </nav>
 
