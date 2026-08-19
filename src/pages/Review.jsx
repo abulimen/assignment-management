@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft,
-  Lock,
   FileText,
   Film,
   Highlighter,
@@ -14,6 +13,7 @@ import {
   TrendingUp,
   Clock,
   Clipboard,
+  Info,
 } from 'lucide-react';
 import { api } from '../api';
 import { AuthContext } from '../context/AuthContext';
@@ -46,12 +46,13 @@ export default function Review() {
   const [loading, setLoading] = useState(true);
   const showSkeleton = useMinLoading(loading, 280);
 
-  // Layout & View State
-  const [activeMode, setActiveMode] = useState('document'); // 'document' | 'replay'
+  // Canvas Mode: 'final' (completed document) | 'playback' (interactive step scrubber)
+  const [canvasMode, setCanvasMode] = useState('final');
+  // Sidebar State: 'overview' | 'pattern' | 'timeline' | 'sources'
+  const [sidebarTab, setSidebarTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [highlightPasted, setHighlightPasted] = useState(false); // DEFAULT OFF (Level 0 clean document)
+  const [highlightPasted, setHighlightPasted] = useState(false); // DEFAULT OFF
   const [seekStepIndex, setSeekStepIndex] = useState(null);
-  const [processTab, setProcessTab] = useState('timeline'); // 'timeline' | 'pattern' | 'sources'
 
   useEffect(() => {
     api.get(`submissions/${id}/playback`)
@@ -140,7 +141,7 @@ export default function Review() {
               </div>
             </div>
           </div>
-          <div className="w-80 border-l border-gray-200 bg-white p-6 space-y-6 shrink-0">
+          <div className="w-84 border-l border-gray-200 bg-white p-6 space-y-6 shrink-0">
             <div className="skeleton h-20 w-full rounded-2xl" />
             <div className="skeleton h-32 w-full rounded-2xl" />
             <div className="skeleton h-40 w-full rounded-2xl" />
@@ -172,7 +173,7 @@ export default function Review() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[#ECEAE5] overflow-hidden select-none">
-      {/* Top Header: Clean Breadcrumb & Primary Mode Switch */}
+      {/* Top Header */}
       <header className="h-14 bg-white border-b border-gray-200 px-4 sm:px-6 flex items-center justify-between shrink-0 z-20 shadow-2xs">
         <div className="flex items-center gap-3 min-w-0">
           <Link
@@ -194,17 +195,17 @@ export default function Review() {
           </div>
         </div>
 
-        {/* Center Mode Switcher: Document View vs Process Record */}
+        {/* Center Canvas Mode Toggle: Final Document vs Process Replay */}
         <div className="flex items-center bg-[#F9F8F6] p-1 rounded-xl border border-gray-200 shadow-2xs">
           <button
             type="button"
             aria-label="Document View"
             onClick={() => {
-              setActiveMode('document');
+              setCanvasMode('final');
               setSeekStepIndex(null);
             }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              activeMode === 'document'
+              canvasMode === 'final'
                 ? 'bg-white text-[#0047FF] shadow-xs font-bold'
                 : 'text-gray-600 hover:text-[#1A1A1B]'
             }`}
@@ -217,24 +218,24 @@ export default function Review() {
             type="button"
             aria-label="Process Record"
             onClick={() => {
-              setActiveMode('replay');
+              setCanvasMode('playback');
               setHighlightPasted(true);
             }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              activeMode === 'replay'
+              canvasMode === 'playback'
                 ? 'bg-[#0047FF] text-white shadow-xs font-bold'
                 : 'text-gray-600 hover:text-[#1A1A1B]'
             }`}
           >
             <Film className="w-3.5 h-3.5" />
-            <span>Process Record & Replay</span>
+            <span>Replay</span>
           </button>
         </div>
 
         {/* Right Tools & Collapse Toggle */}
         <div className="flex items-center gap-2">
-          {/* Highlight Toggle in Document View */}
-          {activeMode === 'document' && pastedStrings.length > 0 && (
+          {/* Highlight Toggle */}
+          {pastedStrings.length > 0 && (
             <button
               type="button"
               onClick={() => setHighlightPasted(!highlightPasted)}
@@ -289,7 +290,7 @@ export default function Review() {
         </div>
       )}
 
-      {/* Main Workspace: Centered Paper Document + Single Evidence Sidebar */}
+      {/* Main Workspace: Centered Paper Document + Unified Evidence Sidebar */}
       <div className="flex-1 flex overflow-hidden relative">
         
         {/* CENTER MAIN CANVAS: Realistic Paper Taking Full Available Space */}
@@ -298,32 +299,81 @@ export default function Review() {
             <GroupFinalDoc content={data.content} sections={sections} />
           ) : (
             <Playback
-              key={`review-view-${id}-${activeMode}`}
+              key={`review-view-${id}-${canvasMode}`}
               events={data.events}
               finalContent={data.content}
-              initialMode={activeMode === 'replay' ? 'playback' : 'final'}
+              initialMode={canvasMode}
               externalHighlight={highlightPasted}
               seekStepIndex={seekStepIndex}
             />
           )}
         </main>
 
-        {/* RIGHT COLLAPSIBLE SIDEBAR: Submission Record (Doc View) / Process Record & Visualizations (Replay View) */}
+        {/* RIGHT COLLAPSIBLE SIDEBAR: Always Accessible Multi-Tab Evidence Center */}
         <aside
           className={`${
             sidebarOpen ? 'w-84 sm:w-96' : 'w-0 hidden'
           } border-l border-gray-200 bg-[#F9F8F6] flex flex-col shrink-0 overflow-y-auto transition-all duration-200 z-10 p-4 space-y-4`}
         >
-          {activeMode === 'document' ? (
-            <>
-              {/* Level 1: Factual Submission Record */}
+          {/* Universal 4-Tab Evidence Navigation */}
+          <div className="flex items-center bg-white p-1 rounded-xl border border-gray-200 shadow-2xs text-xs font-mono shrink-0">
+            <button
+              type="button"
+              onClick={() => setSidebarTab('overview')}
+              className={`flex-1 py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
+                sidebarTab === 'overview'
+                  ? 'bg-[#0047FF] text-white shadow-xs'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Overview
+            </button>
+            <button
+              type="button"
+              onClick={() => setSidebarTab('pattern')}
+              className={`flex-1 py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
+                sidebarTab === 'pattern'
+                  ? 'bg-[#0047FF] text-white shadow-xs'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Pattern
+            </button>
+            <button
+              type="button"
+              onClick={() => setSidebarTab('timeline')}
+              className={`flex-1 py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
+                sidebarTab === 'timeline'
+                  ? 'bg-[#0047FF] text-white shadow-xs'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Timeline
+            </button>
+            <button
+              type="button"
+              onClick={() => setSidebarTab('sources')}
+              className={`flex-1 py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
+                sidebarTab === 'sources'
+                  ? 'bg-[#0047FF] text-white shadow-xs'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Sources
+            </button>
+          </div>
+
+          {/* TAB 1: OVERVIEW & SUBMISSION RECORD */}
+          {sidebarTab === 'overview' && (
+            <div className="space-y-4">
               <SubmissionRecord
                 data={data}
                 wordCount={wordCount}
                 highlightPasted={highlightPasted}
                 onToggleHighlights={() => setHighlightPasted(!highlightPasted)}
                 onViewProcessRecord={() => {
-                  setActiveMode('replay');
+                  setSidebarTab('timeline');
+                  setCanvasMode('playback');
                   setHighlightPasted(true);
                 }}
                 isGroup={isGroup}
@@ -336,92 +386,57 @@ export default function Review() {
                   {data.insights && <MemberWorkload insights={data.insights} members={sections} />}
                 </div>
               )}
-            </>
-          ) : (
-            <>
-              {/* Level 2 & 3: Visual Process Analytics Sub-Tabs */}
-              <div className="flex items-center bg-white p-1 rounded-xl border border-gray-200 shadow-2xs text-xs font-mono">
-                <button
-                  type="button"
-                  onClick={() => setProcessTab('pattern')}
-                  className={`flex-1 py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
-                    processTab === 'pattern'
-                      ? 'bg-[#0047FF] text-white shadow-xs'
-                      : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  Pattern
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setProcessTab('timeline')}
-                  className={`flex-1 py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
-                    processTab === 'timeline'
-                      ? 'bg-[#0047FF] text-white shadow-xs'
-                      : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  Timeline
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setProcessTab('sources')}
-                  className={`flex-1 py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
-                    processTab === 'sources'
-                      ? 'bg-[#0047FF] text-white shadow-xs'
-                      : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  Sources
-                </button>
-              </div>
+            </div>
+          )}
 
-              {processTab === 'pattern' && (
-                <div className="space-y-4">
-                  {/* 1. Holistic Writing Pattern Summary */}
-                  <WritingPatternSummary events={data.events} />
+          {/* TAB 2: WRITING PATTERN & GROWTH VISUALS */}
+          {sidebarTab === 'pattern' && (
+            <div className="space-y-4">
+              {/* 1. Holistic Writing Pattern Summary */}
+              <WritingPatternSummary events={data.events} />
 
-                  {/* 2. Document Growth Chart */}
-                  <DocumentGrowthChart events={data.events} finalWordCount={wordCount} />
+              {/* 2. Document Growth Chart */}
+              <DocumentGrowthChart events={data.events} finalWordCount={wordCount} />
 
-                  {/* 3. Writing Rhythm & Velocity */}
-                  <WritingRhythmChart events={data.events} />
+              {/* 3. Writing Rhythm & Velocity */}
+              <WritingRhythmChart events={data.events} />
 
-                  {/* 4. Editing & Revision Breakdown */}
-                  <EditingActivity events={data.events} />
-                </div>
-              )}
+              {/* 4. Editing & Revision Breakdown */}
+              <EditingActivity events={data.events} />
+            </div>
+          )}
 
-              {processTab === 'timeline' && (
-                <div className="space-y-4">
-                  {/* Chronological Process Timeline with Seeking */}
-                  <ProcessTimeline
-                    events={data.events}
-                    onSeekToEvent={(stepIdx) => {
-                      setSeekStepIndex(stepIdx);
-                    }}
-                  />
-                </div>
-              )}
+          {/* TAB 3: NARRATIVE PROCESS TIMELINE */}
+          {sidebarTab === 'timeline' && (
+            <div className="space-y-4">
+              {/* Chronological Process Timeline with Seeking */}
+              <ProcessTimeline
+                events={data.events}
+                onSeekToEvent={(stepIdx) => {
+                  setCanvasMode('playback');
+                  setSeekStepIndex(stepIdx);
+                }}
+              />
+            </div>
+          )}
 
-              {processTab === 'sources' && (
-                <div className="space-y-4">
-                  {/* Text Sources & Links */}
-                  <SourcesAndLinks events={data.events} rawContent={data.content} />
+          {/* TAB 4: TEXT SOURCES & INSERTED SNIPPETS */}
+          {sidebarTab === 'sources' && (
+            <div className="space-y-4">
+              {/* Text Sources & Links */}
+              <SourcesAndLinks events={data.events} rawContent={data.content} />
 
-                  {/* Factual Pasted Snippets Viewer */}
-                  <PasteAnalysis events={data.events} />
-                </div>
-              )}
+              {/* Factual Pasted Snippets Viewer */}
+              <PasteAnalysis events={data.events} />
+            </div>
+          )}
 
-              {/* Group Activity Charts if group submission */}
-              {isGroup && data.insights && (
-                <div className="space-y-4 pt-2 border-t border-gray-200">
-                  <MemberActivityChart insights={data.insights} members={sections} />
-                  <CopiedTextViewer insights={data.insights} members={sections} />
-                </div>
-              )}
-            </>
+          {/* Group Activity Charts (if group submission) */}
+          {isGroup && data.insights && sidebarTab !== 'overview' && (
+            <div className="space-y-4 pt-2 border-t border-gray-200">
+              <MemberActivityChart insights={data.insights} members={sections} />
+              <CopiedTextViewer insights={data.insights} members={sections} />
+            </div>
           )}
         </aside>
       </div>

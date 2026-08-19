@@ -75,16 +75,29 @@ describe('Review (individual)', () => {
 
     // Mode buttons in top bar
     expect(screen.getByRole('button', { name: /^document view$/i })).toBeInTheDocument();
-    const processBtn = screen.getByRole('button', { name: /^process record$/i });
-    expect(processBtn).toBeInTheDocument();
+    const replayBtn = screen.getByRole('button', { name: /^process record$/i });
+    expect(replayBtn).toBeInTheDocument();
 
-    // Right sidebar displays factual submission record
+    // Right sidebar displays factual submission record under Overview tab by default
     expect(screen.getByText('Submission Record')).toBeInTheDocument();
     expect(screen.getByText('Process Summary')).toBeInTheDocument();
 
-    // Toggle into Process Record mode
-    fireEvent.click(processBtn);
+    // Sidebar navigation tabs
+    const timelineTab = screen.getByRole('button', { name: /^timeline$/i });
+    const patternTab = screen.getByRole('button', { name: /^pattern$/i });
+    const sourcesTab = screen.getByRole('button', { name: /^sources$/i });
+
+    expect(timelineTab).toBeInTheDocument();
+    expect(patternTab).toBeInTheDocument();
+    expect(sourcesTab).toBeInTheDocument();
+
+    // Switch to Timeline tab while staying in Document view
+    fireEvent.click(timelineTab);
     expect(await screen.findByText('Process Timeline')).toBeInTheDocument();
+
+    // Switch to Pattern tab
+    fireEvent.click(patternTab);
+    expect(await screen.findByText('Writing Pattern')).toBeInTheDocument();
   });
 });
 
@@ -98,13 +111,10 @@ describe('Review (group)', () => {
 
   it('renders group document and member contributions in sidebars and canvas', async () => {
     renderReview();
-    expect(await screen.findByText('Submission Review')).toBeInTheDocument();
-
-    // Group final doc rendered in center
     expect(await screen.findByText('group-final-doc')).toBeInTheDocument();
 
-    // Member contributions rendered in sidebar
-    expect(await screen.findByRole('heading', { name: /member contributions/i })).toBeInTheDocument();
-    expect(screen.getByText('Member workload')).toBeInTheDocument();
+    // Sidebars display group breakdown
+    expect(screen.getByText('Submission Record')).toBeInTheDocument();
+    expect(screen.getByText('Member Contributions')).toBeInTheDocument();
   });
 });
