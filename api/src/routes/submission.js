@@ -48,6 +48,40 @@ export default async function submission(ctx) {
     const [secRows] = await ctx.pool.query('SELECT merged FROM group_sections WHERE submission_id = ?', [id]);
     sub.section_merged = secRows.length ? Number(secRows[0].merged) === 1 : false;
     sub.pasted_texts = await sectionPastedTexts(ctx.pool, id);
+
+    // Compute session-based active time and work periods matching review playback
+    const [eventTimes] = await ctx.pool.query(
+      "SELECT occurred_at, type FROM events WHERE submission_id = ? AND type != 'snapshot' ORDER BY occurred_at ASC",
+      [id],
+    );
+    let activeSec = 0;
+    let workPeriods = 1;
+    if (eventTimes.length) {
+      const timed = eventTimes.filter((e) => Number.isFinite(Number(e.occurred_at)));
+      if (timed.length) {
+        const GAP = 120;
+        const sessions = [];
+        let curSession = [timed[0]];
+        for (let i = 1; i < timed.length; i++) {
+          if (Number(timed[i].occurred_at) - Number(timed[i - 1].occurred_at) > GAP) {
+            sessions.push(curSession);
+            curSession = [];
+          }
+          curSession.push(timed[i]);
+        }
+        if (curSession.length) sessions.push(curSession);
+        workPeriods = sessions.length;
+        activeSec = sessions.reduce((sum, s) => {
+          const start = Number(s[0].occurred_at);
+          const end = Number(s[s.length - 1].occurred_at);
+          return sum + Math.max(end - start, 1);
+        }, 0);
+      }
+    }
+    const activeMinFromEvents = Math.max(Math.round(activeSec / 60), eventTimes.length > 0 ? 1 : 0);
+    sub.active_minutes = activeMinFromEvents || Math.max(1, Math.round((sub.active_time_ms || 0) / 60000));
+    sub.work_periods = workPeriods;
+
     return sendJson(ctx, 200, { submission: sub });
   }
 

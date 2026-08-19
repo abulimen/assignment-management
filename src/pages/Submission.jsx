@@ -266,21 +266,18 @@ export default function Submission() {
     }
   }, [submission?.submitted_at, submission?.created_at]);
 
-  // Work time & revision metrics
+  // Work time & revision metrics matching review record
   const activeTimeDisplay = useMemo(() => {
-    const ms = submission?.active_time_ms || submission?.total_time_ms || 0;
-    const mins = Math.max(1, Math.round(ms / 60000));
+    const mins = submission?.active_minutes || Math.max(1, Math.round((submission?.active_time_ms || 0) / 60000));
     if (mins >= 60) {
       return `${Math.floor(mins / 60)}h ${mins % 60}m recorded`;
     }
     return `${mins} min recorded`;
-  }, [submission?.active_time_ms, submission?.total_time_ms]);
+  }, [submission?.active_minutes, submission?.active_time_ms]);
 
   const workPeriodsCount = useMemo(() => {
-    const ms = submission?.active_time_ms || submission?.total_time_ms || 0;
-    const mins = Math.round(ms / 60000);
-    return Math.max(1, Math.min(Math.ceil(mins / 4), 8));
-  }, [submission?.active_time_ms, submission?.total_time_ms]);
+    return submission?.work_periods || 1;
+  }, [submission?.work_periods]);
 
   const revisionsCount = useMemo(() => {
     return (submission?.delete_count || 0) + (submission?.cursor_jumps || 0) || 4;
