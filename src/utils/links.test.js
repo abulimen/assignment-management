@@ -19,6 +19,11 @@ describe('assignmentLink — dashboard routing by role', () => {
     expect(assignmentLink(individualWithSub, 'student')).toBe(`/submissions/${encodeId(8)}`);
   });
 
+  it('routes submitted individual assignment to reviewLink for students', () => {
+    const submitted = { id: 8, is_group_work: 0, submission_id: 42, submission_status: 'submitted' };
+    expect(assignmentLink(submitted, 'student')).toBe(`/review/${encodeId(42)}`);
+  });
+
   it('opens the assignment page when nothing exists yet', () => {
     expect(assignmentLink(individualNoSub, 'student')).toBe(`/assignments/${encodeId(9)}`);
     expect(assignmentLink(individualNoSub, 'lecturer')).toBe(`/assignments/${encodeId(9)}`);

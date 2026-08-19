@@ -71,7 +71,15 @@ export default async function assignments(ctx) {
       JOIN courses c ON c.id = a.course_id
       JOIN course_members cm ON cm.course_id = c.id AND cm.user_id = ? AND cm.role = 'student'
       LEFT JOIN assignment_participants ap ON ap.assignment_id = a.id AND ap.user_id = ?
-      LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = ?
+      LEFT JOIN (
+        SELECT s1.id, s1.assignment_id, s1.student_id, s1.status
+        FROM submissions s1
+        INNER JOIN (
+          SELECT assignment_id, student_id, MAX(CASE WHEN status = 'submitted' THEN id + 1000000000 ELSE id END) AS max_key
+          FROM submissions
+          GROUP BY assignment_id, student_id
+        ) s2 ON (CASE WHEN s1.status = 'submitted' THEN s1.id + 1000000000 ELSE s1.id END) = s2.max_key
+      ) s ON s.assignment_id = a.id AND s.student_id = ?
       WHERE (a.target_type = 'all' OR ap.user_id IS NOT NULL)
     `;
     const params = [user.sub, user.sub, user.sub];

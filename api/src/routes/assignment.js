@@ -85,7 +85,7 @@ export default async function assignment(ctx) {
       JOIN users u ON u.id = s.student_id
       LEFT JOIN submission_stats st ON st.submission_id = s.id
       WHERE s.assignment_id = ? AND s.student_id = ?
-      ORDER BY s.created_at DESC
+      ORDER BY CASE WHEN s.status = 'submitted' THEN 1 ELSE 2 END, s.created_at DESC
     `, [id, user.sub]);
     assignmentObj.submissions = subs;
 

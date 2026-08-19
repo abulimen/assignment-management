@@ -158,7 +158,7 @@ describe('Dashboard (student)', () => {
     expect(screen.getByText('Group work')).toBeInTheDocument();
 
     const hrefs = screen.getAllByRole('link').map((l) => l.getAttribute('href'));
-    expect(hrefs).toContain(`/submissions/${encodeId(3)}`);
+    expect(hrefs).toContain(`/review/${encodeId(10)}`);
     expect(hrefs).toContain(`/assignments/${encodeId(4)}`);
     expect(hrefs).toContain(`/group/${encodeId(5)}`);
   });

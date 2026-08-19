@@ -8,6 +8,9 @@ export function assignmentLink(a, role) {
   if (isGroup) {
     return role === 'lecturer' ? `/assignments/${encId}` : `/group/${encId}`;
   }
+  if (role === 'student' && a.submission_status === 'submitted' && a.submission_id) {
+    return `/review/${encodeId(a.submission_id)}`;
+  }
   return a.submission_id ? `/submissions/${encId}` : `/assignments/${encId}`;
 }
 
