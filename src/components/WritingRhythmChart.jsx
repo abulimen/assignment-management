@@ -8,12 +8,12 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
-import { Zap } from 'lucide-react';
+import { Zap, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 
 export default function WritingRhythmChart({ events }) {
-  const { data, avgWpm, rhythmSummary, hasAbnormalPoint } = useMemo(() => {
+  const { data, avgWpm, rhythmSummary, hasAbnormalPoint, maxRecordedWpm } = useMemo(() => {
     if (!events || !events.length) {
-      return { data: [], avgWpm: 0, rhythmSummary: 'No writing velocity data recorded.', hasAbnormalPoint: false };
+      return { data: [], avgWpm: 0, rhythmSummary: 'No typing velocity data recorded.', hasAbnormalPoint: false, maxRecordedWpm: 0 };
     }
 
     const timed = events
@@ -22,7 +22,7 @@ export default function WritingRhythmChart({ events }) {
       .sort((a, b) => Number(a.occurred_at) - Number(b.occurred_at));
 
     if (!timed.length) {
-      return { data: [], avgWpm: 0, rhythmSummary: 'No writing velocity data recorded.', hasAbnormalPoint: false };
+      return { data: [], avgWpm: 0, rhythmSummary: 'No typing velocity data recorded.', hasAbnormalPoint: false, maxRecordedWpm: 0 };
     }
 
     // Group typing events by active minute buckets
@@ -51,6 +51,7 @@ export default function WritingRhythmChart({ events }) {
     const activePoints = [];
     const validSpeeds = [];
     let abnormalCount = 0;
+    let maxRecordedWpm = 0;
 
     for (const [minuteSec, bucket] of minuteBuckets.entries()) {
       if (bucket.typedChars === 0) continue;
@@ -67,6 +68,7 @@ export default function WritingRhythmChart({ events }) {
       const wpm = Math.max(2, Math.min(180, Math.round(words / minutesActive)));
 
       validSpeeds.push(wpm);
+      if (wpm > maxRecordedWpm) maxRecordedWpm = wpm;
 
       // Flag speed points: normal (12-70 WPM) vs high burst (> 85 WPM) vs very low (< 6 WPM)
       const isAbnormalHigh = wpm > 85;
@@ -85,7 +87,7 @@ export default function WritingRhythmChart({ events }) {
         timestamp: minuteSec,
         isAbnormalHigh,
         isAbnormalLow,
-        status: isAbnormalHigh ? 'High velocity burst' : (isAbnormalLow ? 'Slow input' : 'Normal typing rhythm'),
+        status: isAbnormalHigh ? `Spike burst (${wpm} WPM)` : (isAbnormalLow ? 'Slow input' : 'Natural human speed'),
         dotColor: isAbnormalHigh ? '#EF4444' : '#0047FF',
       });
     }
@@ -104,13 +106,13 @@ export default function WritingRhythmChart({ events }) {
       variance = Math.sqrt(sqDiffs.reduce((a, b) => a + b, 0) / validSpeeds.length);
     }
 
-    let rhythmSummary = 'Typing speed naturally varied during the active writing sessions.';
+    let rhythmSummary = 'Typing speed naturally varied during the active writing sessions (healthy student pacing).';
     if (validSpeeds.length < 2) {
       rhythmSummary = 'Short writing duration recorded.';
     } else if (abnormalCount > 0) {
-      rhythmSummary = 'Rapid typing burst detected in a specific writing interval (highlighted in red).';
+      rhythmSummary = `High velocity burst of ${maxRecordedWpm} WPM recorded during drafting (highlighted with red node). Typically indicates pasting or automated typing.`;
     } else if (variance < 3 && calculatedAvgWpm > 40) {
-      rhythmSummary = 'Typing speed remained unusually uniform throughout the session.';
+      rhythmSummary = 'Typing speed remained unusually uniform without expected natural human speed variations.';
     }
 
     return {
@@ -118,6 +120,7 @@ export default function WritingRhythmChart({ events }) {
       avgWpm: calculatedAvgWpm,
       rhythmSummary,
       hasAbnormalPoint: abnormalCount > 0,
+      maxRecordedWpm,
     };
   }, [events]);
 
@@ -133,14 +136,14 @@ export default function WritingRhythmChart({ events }) {
     if (payload.isAbnormalHigh) {
       return (
         <g>
-          <circle cx={cx} cy={cy} r={7} fill="#EF4444" fillOpacity={0.25} />
-          <circle cx={cx} cy={cy} r={4} fill="#EF4444" stroke="#FFFFFF" strokeWidth={1.5} />
+          <circle cx={cx} cy={cy} r={8} fill="#EF4444" fillOpacity={0.3} className="animate-pulse" />
+          <circle cx={cx} cy={cy} r={4.5} fill="#EF4444" stroke="#FFFFFF" strokeWidth={1.5} />
         </g>
       );
     }
 
     return (
-      <circle cx={cx} cy={cy} r={3} fill="#0047FF" stroke="#FFFFFF" strokeWidth={1} />
+      <circle cx={cx} cy={cy} r={3.5} fill="#0047FF" stroke="#FFFFFF" strokeWidth={1} />
     );
   };
 
@@ -148,20 +151,28 @@ export default function WritingRhythmChart({ events }) {
     <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs space-y-3">
       <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          <Zap className="w-4 h-4 text-amber-600" />
-          <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-gray-700">
-            Writing Rhythm
-          </h3>
+          <Zap className="w-4 h-4 text-amber-500" />
+          <div>
+            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-gray-800">
+              Writing Rhythm
+            </h3>
+            <span className="text-[10px] text-gray-500 font-sans">
+              Typing Speed & Keystroke Velocity
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          {hasAbnormalPoint && (
-            <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-700 uppercase tracking-wider">
-              Burst Spike
+          {hasAbnormalPoint ? (
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-rose-50 border border-rose-300 text-rose-700 flex items-center gap-1 shadow-2xs">
+              <AlertTriangle className="w-3 h-3 text-rose-600" />
+              <span>{maxRecordedWpm} WPM Spike</span>
+            </span>
+          ) : (
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-300 text-emerald-700 flex items-center gap-1 shadow-2xs">
+              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              <span>Avg {avgWpm} WPM (Natural)</span>
             </span>
           )}
-          <span className="text-[11px] font-mono font-bold text-gray-700">
-            Avg {avgWpm} WPM
-          </span>
         </div>
       </div>
 
@@ -217,18 +228,21 @@ export default function WritingRhythmChart({ events }) {
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1 text-blue-700">
             <span className="w-2 h-2 rounded-full bg-[#0047FF]" />
-            Natural rhythm
+            Natural (15–65 WPM)
           </span>
-          <span className="flex items-center gap-1 text-rose-700">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-rose-200" />
-            High burst (&gt;85 WPM)
-          </span>
+          {hasAbnormalPoint && (
+            <span className="flex items-center gap-1 text-rose-700 font-bold">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-rose-200" />
+              High Burst (&gt;85 WPM)
+            </span>
+          )}
         </div>
       </div>
 
-      <p className="text-[11px] text-gray-600 font-sans leading-snug">
-        {rhythmSummary}
-      </p>
+      <div className="text-[11px] text-gray-600 font-sans leading-relaxed flex items-start gap-1.5 pt-1">
+        <Info className="w-3.5 h-3.5 text-[#0047FF] shrink-0 mt-0.5" />
+        <span>{rhythmSummary}</span>
+      </div>
     </div>
   );
 }

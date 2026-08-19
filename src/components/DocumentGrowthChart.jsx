@@ -8,7 +8,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
-import { TrendingUp, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { TrendingUp, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 
 export default function DocumentGrowthChart({ events, finalWordCount = 0 }) {
   const { data, isSurge, growthSummary } = useMemo(() => {
@@ -19,7 +19,7 @@ export default function DocumentGrowthChart({ events, finalWordCount = 0 }) {
           { time: 'Final', words: finalWordCount },
         ],
         isSurge: false,
-        growthSummary: 'Gradual organic progression.',
+        growthSummary: 'Gradual organic progression of content formulation across time.',
       };
     }
 
@@ -36,7 +36,7 @@ export default function DocumentGrowthChart({ events, finalWordCount = 0 }) {
           { time: 'Final', words: finalWordCount },
         ],
         isSurge: false,
-        growthSummary: 'Gradual organic progression.',
+        growthSummary: 'Gradual organic progression of content formulation across time.',
       };
     }
 
@@ -103,14 +103,14 @@ export default function DocumentGrowthChart({ events, finalWordCount = 0 }) {
     }
 
     const totalChars = Math.max(typedChars + pastedChars, 1);
-    const isSurge = pastedChars / totalChars > 0.65 || (typedChars < 80 && finalTargetWords > 150);
+    const isSurge = pastedChars / totalChars > 0.50 || (typedChars < 80 && finalTargetWords > 120);
 
     return {
       data: points,
       isSurge,
       growthSummary: isSurge
-        ? 'Rapid vertical surge: a significant portion of words appeared in a single step.'
-        : `Steady progressive growth across writing time (${finalWordCount} words).`,
+        ? 'Rapid vertical surge: a substantial volume of words appeared in a single step or short burst.'
+        : `Steady progressive growth: words accumulated gradually across the writing session (${finalTargetWords} total words).`,
     };
   }, [events, finalWordCount]);
 
@@ -123,16 +123,21 @@ export default function DocumentGrowthChart({ events, finalWordCount = 0 }) {
       <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-4 h-4" style={{ color: themeColor }} />
-          <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-gray-700">
-            Document Growth
-          </h3>
+          <div>
+            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-gray-800">
+              Document Growth
+            </h3>
+            <span className="text-[10px] text-gray-500 font-sans">
+              Word Count Over Time
+            </span>
+          </div>
         </div>
-        <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${
+        <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-md border flex items-center gap-1.5 shadow-2xs ${
           isSurge
             ? 'text-amber-800 bg-amber-50 border-amber-300'
             : 'text-emerald-800 bg-emerald-50 border-emerald-300'
         }`}>
-          {isSurge ? <AlertTriangle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+          {isSurge ? <AlertTriangle className="w-3 h-3 text-amber-600" /> : <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
           <span>{isSurge ? 'Sudden Surge' : 'Gradual Expansion'}</span>
         </span>
       </div>
@@ -186,9 +191,11 @@ export default function DocumentGrowthChart({ events, finalWordCount = 0 }) {
         </ResponsiveContainer>
       </div>
 
-      <p className="text-[11px] text-gray-600 font-sans leading-relaxed">
-        {growthSummary}
-      </p>
+      {/* Explanation Note */}
+      <div className="text-[11px] text-gray-600 font-sans leading-relaxed pt-1 border-t border-gray-100 flex items-start gap-1.5">
+        <Info className="w-3.5 h-3.5 text-[#0047FF] shrink-0 mt-0.5" />
+        <span>{growthSummary}</span>
+      </div>
     </div>
   );
 }

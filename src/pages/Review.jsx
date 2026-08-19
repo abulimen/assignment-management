@@ -12,6 +12,8 @@ import {
   ChevronDown,
   Sparkles,
   Zap,
+  TrendingUp,
+  Edit3,
 } from 'lucide-react';
 import { api } from '../api';
 import { AuthContext } from '../context/AuthContext';
@@ -70,7 +72,7 @@ export default function Review() {
   // Handle sidebar scroll to dismiss or re-show floating amber indicator
   function handleSidebarScroll(e) {
     const top = e.target.scrollTop;
-    if (top > 160) {
+    if (top > 100) {
       if (!sidebarScrolledDown) setSidebarScrolledDown(true);
     } else {
       if (sidebarScrolledDown) setSidebarScrolledDown(false);
@@ -164,27 +166,36 @@ export default function Review() {
 
     const reasons = [];
     if (maxWpm > 85) {
-      reasons.push(`High velocity burst of ${maxWpm} WPM recorded in Writing Rhythm.`);
+      reasons.push({
+        title: `${maxWpm} WPM Velocity Spike`,
+        desc: `High velocity burst of ${maxWpm} WPM in Writing Rhythm.`,
+      });
     }
     if (pasteRatio > 0.40) {
-      reasons.push(`Significant external paste volume (${Math.round(pasteRatio * 100)}%) detected.`);
+      reasons.push({
+        title: `${Math.round(pasteRatio * 100)}% External Pasted Input`,
+        desc: 'Sudden vertical step detected in Document Growth curve.',
+      });
     }
     if (deleteChars < 20 && typedChars > 250) {
-      reasons.push(`Minimal revisions recorded across drafting.`);
+      reasons.push({
+        title: 'Minimal In-line Revisions',
+        desc: 'Single-pass drafting recorded in Editing Activity.',
+      });
     }
 
     if (!reasons.length) return null;
 
     return {
-      title: `${reasons.length} Notable ${reasons.length === 1 ? 'Pattern' : 'Patterns'} Below`,
-      detail: reasons[0],
-      maxWpm,
+      title: `${reasons.length} Notable ${reasons.length === 1 ? 'Pattern' : 'Patterns'} Detected Below`,
+      detail: reasons[0].desc,
+      reasons,
     };
   }, [data?.events]);
 
   function scrollToCharts() {
     if (sidebarRef.current) {
-      sidebarRef.current.scrollTo({ top: 380, behavior: 'smooth' });
+      sidebarRef.current.scrollTo({ top: 360, behavior: 'smooth' });
     }
   }
 
@@ -300,54 +311,43 @@ export default function Review() {
                 setCanvasMode('final');
                 setHighlightPasted(false);
               }}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                 canvasMode === 'final'
-                  ? 'bg-white text-[#0047FF] shadow-2xs'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-[#1A1A1B] shadow-xs font-bold'
+                  : 'text-gray-600 hover:text-[#1A1A1B]'
               }`}
             >
-              <FileText className="w-3.5 h-3.5" />
+              <FileText className="w-3.5 h-3.5 text-[#0047FF]" />
               <span>Document</span>
             </button>
-
             <button
               type="button"
               aria-label="Process record"
               onClick={() => {
                 setCanvasMode('playback');
+                setHighlightPasted(true);
               }}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                 canvasMode === 'playback'
-                  ? 'bg-white text-[#0047FF] shadow-2xs'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-[#1A1A1B] shadow-xs font-bold'
+                  : 'text-gray-600 hover:text-[#1A1A1B]'
               }`}
             >
-              <Film className="w-3.5 h-3.5" />
-              <span>Replay Scrubber</span>
+              <Film className="w-3.5 h-3.5 text-[#0047FF]" />
+              <span>Replay</span>
             </button>
           </div>
 
-          {/* Sidebar Toggle (Desktop) */}
+          {/* Toggle Sidebar Collapse (Desktop) */}
           <button
             type="button"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl transition-all cursor-pointer shadow-2xs"
-            title={sidebarOpen ? 'Collapse evidence sidebar' : 'Expand evidence sidebar'}
+            className="hidden lg:inline-flex p-2 rounded-xl text-gray-500 hover:text-[#1A1A1B] hover:bg-gray-100 transition-colors cursor-pointer"
+            title={sidebarOpen ? 'Hide Evidence Sidebar' : 'Show Evidence Sidebar'}
           >
-            {sidebarOpen ? (
-              <>
-                <PanelRightClose className="w-3.5 h-3.5 text-gray-500" />
-                <span>Hide Analytics</span>
-              </>
-            ) : (
-              <>
-                <PanelRightOpen className="w-3.5 h-3.5 text-[#0047FF]" />
-                <span className="text-[#0047FF] font-bold">Show Analytics</span>
-              </>
-            )}
+            {sidebarOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
           </button>
 
-          {/* User Avatar */}
           {user && (
             <div className="hidden sm:block pl-1 border-l border-gray-200 ml-1">
               <UserAvatar user={user} size={28} className="ring-1 ring-black/5" />
@@ -357,44 +357,34 @@ export default function Review() {
       </header>
 
       {/* ============================================================ */}
-      {/* 2. MAIN 2-PANE WORKSPACE: CANVAS + EVIDENCE SIDEBAR          */}
+      {/* 2. MAIN SPLIT CANVAS & EVIDENCE WORKSPACE                    */}
       {/* ============================================================ */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden">
         
-        {/* Canvas Pane (Document Reading or Interactive Step Replay) */}
+        {/* Main Canvas Area */}
         <main
-          className={`flex-1 flex flex-col bg-[#ECEAE5] overflow-y-auto ${
+          className={`flex-1 overflow-hidden relative ${
             mobileTab === 'analytics' ? 'hidden lg:flex' : 'flex'
           }`}
         >
-          {canvasMode === 'playback' || mobileTab === 'replay' ? (
-            <div className="flex-1 flex flex-col p-2 sm:p-6 max-w-5xl mx-auto w-full">
-              <Playback
-                events={data.events}
-                rawContent={data.content}
-                initialStepIndex={seekStepIndex}
-                onStepChange={() => {}}
-              />
-            </div>
+          {isGroup ? (
+            <GroupFinalDoc
+              assignmentId={data.assignment_id}
+              groupId={data.group_id}
+              title={data.assignment_title}
+              highlightPasted={highlightPasted}
+              pastedTexts={pastedStrings}
+            />
           ) : (
-            <div className="flex-1 flex flex-col items-center p-3 sm:p-6 overflow-y-auto">
-              {isGroup ? (
-                <GroupFinalDoc
-                  content={data.content}
-                  sections={sections}
-                  pastedStrings={pastedStrings}
-                  highlightPasted={highlightPasted}
-                />
-              ) : (
-                <GroupFinalDoc
-                  content={data.content}
-                  sections={[]}
-                  pastedStrings={pastedStrings}
-                  highlightPasted={highlightPasted}
-                  authorName={student.name || 'Student'}
-                />
-              )}
-            </div>
+            <Playback
+              key={`${id}-${canvasMode}`}
+              submissionId={id}
+              initialData={data}
+              mode={canvasMode}
+              highlightPasted={highlightPasted}
+              seekStepIndex={seekStepIndex}
+              onSeekHandled={() => setSeekStepIndex(null)}
+            />
           )}
         </main>
 
@@ -521,7 +511,7 @@ export default function Review() {
           )}
 
           {/* ============================================================ */}
-          {/* FLOATING AMBER CONCERN INDICATOR                             */}
+          {/* FLOATING AMBER CONCERN INDICATOR (Dismisses upon scroll)     */}
           {/* ============================================================ */}
           {sidebarTab === 'pattern' && patternConcerns && !sidebarScrolledDown && (
             <div
@@ -563,7 +553,7 @@ export default function Review() {
             setHighlightPasted(false);
           }}
           className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
-            mobileTab === 'doc'
+            mobileTab === 'doc' && canvasMode === 'final'
               ? 'text-[#0047FF] font-bold'
               : 'text-gray-500 hover:text-gray-900'
           }`}
@@ -577,9 +567,10 @@ export default function Review() {
           onClick={() => {
             setMobileTab('replay');
             setCanvasMode('playback');
+            setHighlightPasted(true);
           }}
           className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
-            mobileTab === 'replay'
+            mobileTab === 'replay' || canvasMode === 'playback'
               ? 'text-[#0047FF] font-bold'
               : 'text-gray-500 hover:text-gray-900'
           }`}
@@ -590,9 +581,7 @@ export default function Review() {
 
         <button
           type="button"
-          onClick={() => {
-            setMobileTab('analytics');
-          }}
+          onClick={() => setMobileTab('analytics')}
           className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
             mobileTab === 'analytics'
               ? 'text-[#0047FF] font-bold'
@@ -603,6 +592,7 @@ export default function Review() {
           <span className="text-[11px] font-sans">Analytics</span>
         </button>
       </nav>
+
     </div>
   );
 }
