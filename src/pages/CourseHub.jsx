@@ -32,6 +32,7 @@ import {
   Circle,
   CheckCircle2,
   Search,
+  X,
 } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 6;
@@ -49,7 +50,7 @@ function PaginationControls({ currentPage, totalPages, onPageChange, label }) {
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}
           aria-label={`Previous ${label} page`}
-          className="p-1.5 rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+          className="p-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -57,7 +58,7 @@ function PaginationControls({ currentPage, totalPages, onPageChange, label }) {
           <button
             key={p}
             onClick={() => onPageChange(p)}
-            className={`w-7 h-7 rounded-md font-semibold text-xs transition-colors cursor-pointer ${
+            className={`w-7 h-7 rounded-lg font-semibold text-xs transition-colors cursor-pointer ${
               p === currentPage
                 ? 'bg-[#0047FF] text-white'
                 : 'text-gray-600 hover:bg-gray-100'
@@ -70,7 +71,7 @@ function PaginationControls({ currentPage, totalPages, onPageChange, label }) {
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage === totalPages}
           aria-label={`Next ${label} page`}
-          className="p-1.5 rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+          className="p-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -155,25 +156,25 @@ export default function CourseHub() {
     if (!window.confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`)) return;
     try {
       await api.delete(`assignments/${assignId}`);
+      toast.success('Assignment deleted');
       setAssignments((prev) => prev.filter((a) => a.id !== assignId));
-      toast.success(`Deleted "${title}"`);
     } catch (err) {
       toast.error(err.message || 'Failed to delete assignment');
     }
   }
 
-  async function handleRemoveMember(memberUserId, memberName) {
+  async function handleRemoveMember(userId, memberName) {
     if (!window.confirm(`Remove ${memberName} from this course?`)) return;
     try {
-      await api.delete(`courses/${id}/members/${memberUserId}`);
-      setMembers((prev) => prev.filter((m) => m.user_id !== memberUserId));
-      toast.success(`Removed ${memberName} from course`);
+      await api.delete(`courses/${id}/members/${userId}`);
+      toast.success(`${memberName} removed from course`);
+      setMembers((prev) => prev.filter((m) => m.user_id !== userId));
     } catch (err) {
       toast.error(err.message || 'Failed to remove member');
     }
   }
 
-  // Filtered & Paginated Assignments
+  // Filtered Assignments
   const filteredAssignments = useMemo(() => {
     return assignments.filter((a) => {
       const matchSearch =
@@ -181,9 +182,10 @@ export default function CourseHub() {
         (a.description || '').toLowerCase().includes(assignSearch.toLowerCase());
       if (!matchSearch) return false;
 
-      const isGrp = Boolean(a.is_group_work);
-      if (assignTypeFilter === 'individual') return !isGrp;
-      if (assignTypeFilter === 'group') return isGrp;
+      const isGroup = a.is_group_work == 1 || a.is_group_work === true;
+      if (assignTypeFilter === 'individual' && isGroup) return false;
+      if (assignTypeFilter === 'group' && !isGroup) return false;
+
       return true;
     });
   }, [assignments, assignSearch, assignTypeFilter]);
@@ -194,7 +196,7 @@ export default function CourseHub() {
     return filteredAssignments.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredAssignments, assignPage]);
 
-  // Filtered & Paginated Members
+  // Filtered Members
   const filteredMembers = useMemo(() => {
     return members.filter((m) => {
       const matchSearch =
@@ -217,37 +219,16 @@ export default function CourseHub() {
 
   if (showSkeleton) {
     return (
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8" role="status" aria-label="Loading course">
+      <div className="max-w-6xl mx-auto space-y-6" role="status" aria-label="Loading course">
         <div className="skeleton h-4 w-24 rounded" />
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 space-y-6 shadow-xs">
-          <div className="flex justify-between items-start">
-            <div className="space-y-3 w-2/3">
-              <div className="flex gap-2">
-                <div className="skeleton h-6 w-20 rounded" />
-                <div className="skeleton h-6 w-24 rounded" />
-              </div>
-              <div className="skeleton h-8 w-3/4 rounded-lg" />
-              <div className="skeleton h-4 w-full rounded" />
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-6 shadow-xs">
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <div className="skeleton h-6 w-20 rounded" />
+              <div className="skeleton h-6 w-24 rounded" />
             </div>
-            <div className="skeleton h-9 w-32 rounded-lg" />
-          </div>
-          <div className="pt-4 border-t border-gray-100 flex gap-6">
-            <div className="skeleton h-10 w-48 rounded-lg" />
-            <div className="skeleton h-10 w-48 rounded-lg" />
-          </div>
-        </div>
-        <div className="space-y-4">
-          <div className="flex gap-4 border-b border-gray-200 pb-2">
-            <div className="skeleton h-6 w-32 rounded" />
-            <div className="skeleton h-6 w-28 rounded" />
-          </div>
-          <div className="grid grid-cols-1 gap-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3 shadow-xs">
-                <div className="skeleton h-5 w-1/3 rounded" />
-                <div className="skeleton h-4 w-1/4 rounded" />
-              </div>
-            ))}
+            <div className="skeleton h-8 w-3/4 rounded-lg" />
+            <div className="skeleton h-4 w-full rounded" />
           </div>
         </div>
       </div>
@@ -257,7 +238,7 @@ export default function CourseHub() {
   if (error || !course) {
     return (
       <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
-        <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+        <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto">
           <ShieldAlert className="w-6 h-6" />
         </div>
         <h2 className="text-xl font-bold text-gray-900">Unable to load course</h2>
@@ -277,7 +258,8 @@ export default function CourseHub() {
   const lecturers = members.filter((m) => m.role === 'lecturer');
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-150">
+      
       {/* Top Breadcrumb */}
       <div>
         <Link
@@ -285,113 +267,113 @@ export default function CourseHub() {
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-[#0047FF] transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>My Courses</span>
+          <span>Back to Dashboard</span>
         </Link>
       </div>
 
       {/* Course Header Banner */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs p-5 sm:p-8 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-5">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs p-5 sm:p-7 space-y-5">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-mono font-bold px-2.5 py-1 bg-[#0047FF]/10 text-[#0047FF] rounded-md border border-[#0047FF]/20 uppercase">
+              <span className="text-xs font-mono font-bold px-2.5 py-0.5 bg-[#0047FF]/10 text-[#0047FF] rounded-md border border-[#0047FF]/20 uppercase">
                 {course.code}
               </span>
               {course.semester && (
-                <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-md">
+                <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2.5 py-0.5 rounded-md">
                   {course.semester}
                 </span>
               )}
-              <span className="text-xs text-gray-400 font-sans">
-                {course.organization_name || 'Draftly'}
-              </span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1A1B] tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#1A1A1B] tracking-tight">
               {course.title}
             </h1>
 
             {course.description && (
-              <p className="text-sm text-gray-600 max-w-3xl leading-relaxed">
+              <p className="text-xs sm:text-sm text-gray-600 max-w-3xl leading-relaxed font-sans">
                 {course.description}
               </p>
             )}
           </div>
 
-          {/* Action Buttons for Lecturer */}
+          {/* Lecturer Actions */}
           {isLecturer && (
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto shrink-0">
-              <button
-                onClick={() => setShowEditCourse(true)}
-                className="flex-1 sm:flex-none justify-center px-3.5 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-                <span>Edit</span>
-              </button>
-              <button
-                onClick={() => setShowDeleteCourse(true)}
-                title="Delete this course with password confirmation"
-                className="flex-1 sm:flex-none justify-center px-3.5 py-2 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete</span>
-              </button>
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto shrink-0 pt-2 md:pt-0">
               <button
                 onClick={() => setShowNewAssignment(true)}
-                className="w-full sm:w-auto justify-center px-4 py-2 text-xs font-bold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-lg shadow-sm shadow-blue-200 transition-all active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto justify-center px-4 py-2 text-xs font-bold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-xl shadow-xs transition-all active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>New Assignment</span>
               </button>
+              
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={() => setShowEditCourse(true)}
+                  className="flex-1 sm:flex-none justify-center px-3.5 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Edit</span>
+                </button>
+                <button
+                  onClick={() => setShowDeleteCourse(true)}
+                  title="Delete course"
+                  className="flex-1 sm:flex-none justify-center px-3.5 py-2 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
 
         {/* Course Meta & Invite Code Ribbon */}
-        <div className="pt-5 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs text-gray-600">
-            <div className="flex items-center gap-1.5">
+        <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+          <div className="grid grid-cols-3 sm:flex sm:items-center gap-2 sm:gap-6 text-xs text-gray-600">
+            <div className="flex items-center gap-1.5 bg-[#F9F8F6] sm:bg-transparent p-2 sm:p-0 rounded-xl justify-center sm:justify-start">
               <GraduationCap className="w-4 h-4 text-gray-400" />
               <span>
                 <strong>{lecturers.length}</strong> {lecturers.length === 1 ? 'Lecturer' : 'Lecturers'}
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 bg-[#F9F8F6] sm:bg-transparent p-2 sm:p-0 rounded-xl justify-center sm:justify-start">
               <Users className="w-4 h-4 text-gray-400" />
               <span>
                 <strong>{students.length}</strong> {students.length === 1 ? 'Student' : 'Students'}
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 bg-[#F9F8F6] sm:bg-transparent p-2 sm:p-0 rounded-xl justify-center sm:justify-start">
               <FileText className="w-4 h-4 text-gray-400" />
               <span>
-                <strong>{assignments.length}</strong> {assignments.length === 1 ? 'Assignment' : 'Assignments'}
+                <strong>{assignments.length}</strong> {assignments.length === 1 ? 'Task' : 'Tasks'}
               </span>
             </div>
           </div>
 
           {/* Student Invite Code Box */}
-          <div className="flex items-center justify-between sm:justify-start gap-2 bg-[#F9F8F6] border border-gray-200/80 rounded-xl px-3.5 py-1.5 w-full sm:w-auto">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-mono text-gray-500 uppercase tracking-wider font-semibold">
-                Invite:
+          <div className="flex items-center justify-between sm:justify-start gap-2 bg-[#F9F8F6] border border-gray-200/80 rounded-xl px-3.5 py-2 w-full sm:w-auto shadow-2xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[10px] font-mono text-gray-500 uppercase tracking-wider font-semibold">
+                INVITE:
               </span>
-              <code className="text-xs font-mono font-bold text-[#0047FF]">
+              <code className="text-xs font-mono font-bold text-[#0047FF] truncate">
                 {course.invite_code}
               </code>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={handleCopyCode}
                 title="Copy code"
-                className="p-1.5 text-gray-400 hover:text-[#1A1A1B] transition-colors rounded cursor-pointer"
+                className="p-1.5 text-gray-500 hover:text-[#1A1A1B] hover:bg-white rounded-lg transition-colors cursor-pointer"
               >
                 {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
               <button
                 onClick={handleCopyLink}
                 title="Copy direct invite link"
-                className="p-1.5 text-gray-400 hover:text-[#1A1A1B] transition-colors rounded cursor-pointer"
+                className="p-1.5 text-gray-500 hover:text-[#1A1A1B] hover:bg-white rounded-lg transition-colors cursor-pointer"
               >
                 {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5" />}
               </button>
@@ -401,13 +383,13 @@ export default function CourseHub() {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-gray-200 pb-px">
+      <div className="flex items-center bg-gray-100 p-1 rounded-2xl gap-1">
         <button
           onClick={() => setActiveTab('assignments')}
-          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+          className={`flex-1 py-2.5 px-3 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 ${
             activeTab === 'assignments'
-              ? 'border-[#0047FF] text-[#0047FF]'
-              : 'border-transparent text-gray-500 hover:text-gray-900'
+              ? 'bg-white text-[#0047FF] shadow-xs'
+              : 'text-gray-600 hover:text-[#1A1A1B]'
           }`}
         >
           <FileText className="w-4 h-4" />
@@ -415,10 +397,10 @@ export default function CourseHub() {
         </button>
         <button
           onClick={() => setActiveTab('members')}
-          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+          className={`flex-1 py-2.5 px-3 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 ${
             activeTab === 'members'
-              ? 'border-[#0047FF] text-[#0047FF]'
-              : 'border-transparent text-gray-500 hover:text-gray-900'
+              ? 'bg-white text-[#0047FF] shadow-xs'
+              : 'text-gray-600 hover:text-[#1A1A1B]'
           }`}
         >
           <Users className="w-4 h-4" />
@@ -430,25 +412,27 @@ export default function CourseHub() {
       {activeTab === 'assignments' && (
         <div className="space-y-4">
           {assignments.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   value={assignSearch}
                   onChange={(e) => { setAssignSearch(e.target.value); setAssignPage(1); }}
                   placeholder="Filter coursework..."
-                  className="pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0047FF]/20 focus:border-[#0047FF]"
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0047FF]/20 focus:border-[#0047FF]"
                 />
               </div>
 
-              <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg text-xs font-medium">
+              <div className="flex items-center gap-1 bg-white border border-gray-200 p-1 rounded-xl text-xs font-medium self-start sm:self-auto">
                 {['all', 'individual', 'group'].map((f) => (
                   <button
                     key={f}
                     onClick={() => { setAssignTypeFilter(f); setAssignPage(1); }}
-                    className={`px-2.5 py-1 rounded-md transition-colors capitalize ${
-                      assignTypeFilter === f ? 'bg-white shadow-xs text-[#1A1A1B] font-bold' : 'text-gray-500 hover:text-gray-900'
+                    className={`px-3 py-1.5 rounded-lg transition-colors capitalize text-xs font-semibold ${
+                      assignTypeFilter === f
+                        ? 'bg-[#0047FF]/10 text-[#0047FF]'
+                        : 'text-gray-500 hover:text-gray-900'
                     }`}
                   >
                     {f}
@@ -458,49 +442,26 @@ export default function CourseHub() {
             </div>
           )}
 
-          {assignments.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center space-y-4">
-              <div className="w-12 h-12 rounded-xl bg-gray-100 text-gray-400 flex items-center justify-center mx-auto">
-                <FileText className="w-6 h-6" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-base font-bold text-gray-900">No assignments created yet</h3>
-                <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                  {isLecturer
-                    ? `Create coursework for ${course.code}. Students will write, collaborate, and submit in Draftly.`
-                    : 'Your lecturer has not posted any assignments in this course yet.'}
-                </p>
-              </div>
-              {isLecturer && (
-                <button
-                  onClick={() => setShowNewAssignment(true)}
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-lg shadow-sm transition-all active:scale-[0.98] inline-flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Create First Assignment</span>
-                </button>
-              )}
-            </div>
-          ) : filteredAssignments.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-xs text-gray-500">
-              No assignments match your search or filter.
+          {filteredAssignments.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center space-y-2 text-xs text-gray-500">
+              No assignments found matching your filter.
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="grid grid-cols-1 gap-3">
                 {paginatedAssignments.map((a) => {
-                  const isGroup = Boolean(a.is_group_work);
+                  const isGroup = a.is_group_work == 1 || a.is_group_work === true;
                   const hasDue = Boolean(a.due_date);
 
                   return (
                     <div
                       key={a.id}
-                      className="bg-white rounded-xl border border-gray-200 shadow-xs hover:shadow-md transition-all p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                      className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                     >
-                      <div className="space-y-2">
+                      <div className="space-y-2 min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span
-                            className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded ${
+                            className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-md ${
                               isGroup
                                 ? 'bg-purple-50 text-purple-700 border border-purple-200'
                                 : 'bg-blue-50 text-[#0047FF] border border-blue-200'
@@ -508,23 +469,18 @@ export default function CourseHub() {
                           >
                             {isGroup ? 'Group Work' : 'Individual'}
                           </span>
-                          {a.target_type === 'selected' && (
-                            <span className="text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
-                              Targeted Cohort
-                            </span>
-                          )}
                           {hasDue && (
                             <span className="flex items-center gap-1 text-xs text-gray-500 font-mono">
-                              <Calendar className="w-3 h-3 text-gray-400" />
+                              <Calendar className="w-3.5 h-3.5 text-gray-400" />
                               <span>Due {new Date(a.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
                             </span>
                           )}
                         </div>
 
                         <div>
-                          <h3 className="font-bold text-base text-[#1A1A1B]">{a.title}</h3>
+                          <h3 className="font-bold text-sm sm:text-base text-[#1A1A1B]">{a.title}</h3>
                           {a.description && (
-                            <p className="text-xs text-gray-600 line-clamp-1 mt-0.5 font-sans">
+                            <p className="text-xs text-gray-500 line-clamp-1 mt-0.5 font-sans">
                               {a.description}
                             </p>
                           )}
@@ -532,15 +488,12 @@ export default function CourseHub() {
 
                         {/* Lecturer stats or Student status */}
                         {isLecturer ? (
-                          <div className="flex items-center gap-4 text-xs text-gray-500 font-sans">
+                          <div className="flex items-center gap-3 text-xs text-gray-500 font-sans">
                             {isGroup ? (
                               <>
                                 <span><strong>{a.group_count || 0}</strong> groups</span>
                                 <span>·</span>
                                 <span><strong>{a.submitted_group_count || 0}</strong> submitted</span>
-                                {a.flagged_group_count > 0 && (
-                                  <span className="text-amber-600 font-semibold">({a.flagged_group_count} override)</span>
-                                )}
                               </>
                             ) : (
                               <span><strong>{a.submitted_count || 0}</strong> submissions</span>
@@ -549,18 +502,18 @@ export default function CourseHub() {
                         ) : (
                           <div className="flex items-center gap-1.5 text-xs font-medium">
                             {a.submission_status === 'submitted' ? (
-                              <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                <CheckCircle2 className="w-3 h-3" />
+                              <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
                                 <span>Submitted</span>
                               </span>
                             ) : a.submission_status === 'draft' ? (
-                              <span className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                                <Clock className="w-3 h-3" />
+                              <span className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                <Clock className="w-3.5 h-3.5" />
                                 <span>Draft in progress</span>
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                                <Circle className="w-3 h-3 text-gray-400" />
+                              <span className="inline-flex items-center gap-1 text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+                                <Circle className="w-3.5 h-3.5 text-gray-400" />
                                 <span>Not started</span>
                               </span>
                             )}
@@ -569,19 +522,19 @@ export default function CourseHub() {
                       </div>
 
                       {/* Actions */}
-                      <div className="flex items-center gap-2 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                      <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-gray-100">
                         {isLecturer ? (
                           <>
                             <button
                               onClick={() => setDuplicateTargetAssignment(a)}
                               title="Assign to another course"
-                              className="px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-[#0047FF] bg-gray-100 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                              className="px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-[#0047FF] bg-gray-100 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer"
                             >
                               <span>Duplicate</span>
                             </button>
                             <Link
                               to={assignmentLink(a, 'lecturer')}
-                              className="px-4 py-1.5 text-xs font-bold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-lg shadow-xs transition-all active:scale-[0.98] inline-flex items-center gap-1"
+                              className="px-4 py-2 text-xs font-bold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-xl shadow-xs transition-all active:scale-[0.98] inline-flex items-center gap-1"
                             >
                               <span>Submissions</span>
                               <ChevronRight className="w-3.5 h-3.5" />
@@ -589,7 +542,7 @@ export default function CourseHub() {
                             <button
                               onClick={() => handleDeleteAssignment(a.id, a.title)}
                               title="Delete assignment"
-                              className="p-1.5 text-gray-400 hover:text-red-600 rounded-md transition-colors cursor-pointer"
+                              className="p-2 text-gray-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -597,7 +550,7 @@ export default function CourseHub() {
                         ) : (
                           <Link
                             to={assignmentLink(a, 'student')}
-                            className="px-4 py-2 text-xs font-bold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-lg shadow-xs transition-all active:scale-[0.98] inline-flex items-center gap-1"
+                            className="w-full sm:w-auto text-center px-4 py-2 text-xs font-bold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-xl shadow-xs transition-all active:scale-[0.98] inline-flex items-center justify-center gap-1"
                           >
                             <span>{a.submission_status === 'submitted' ? 'View Work' : 'Open Workspace'}</span>
                             <ChevronRight className="w-3.5 h-3.5" />
@@ -622,23 +575,23 @@ export default function CourseHub() {
 
       {/* TAB 2: MEMBERS & ROSTER */}
       {activeTab === 'members' && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-[#0047FF]" />
                 <h3 className="font-bold text-base text-[#1A1A1B]">Course Members ({members.length})</h3>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-48">
-                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
                     value={memberSearch}
                     onChange={(e) => { setMemberSearch(e.target.value); setMemberPage(1); }}
                     placeholder="Search members..."
-                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0047FF]/20 focus:border-[#0047FF]"
+                    className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0047FF]/20 focus:border-[#0047FF]"
                   />
                 </div>
 
@@ -646,7 +599,7 @@ export default function CourseHub() {
                   <select
                     value={memberRoleFilter}
                     onChange={(e) => { setMemberRoleFilter(e.target.value); setMemberPage(1); }}
-                    className="flex-1 sm:flex-none px-2.5 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0047FF]/20 font-medium"
+                    className="flex-1 sm:flex-none px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0047FF]/20 font-medium"
                   >
                     <option value="all">All Roles</option>
                     <option value="lecturer">Lecturers</option>
@@ -656,7 +609,7 @@ export default function CourseHub() {
                   {isLecturer && (
                     <button
                       onClick={() => setShowInviteMember(true)}
-                      className="flex-1 sm:flex-none justify-center px-3.5 py-1.5 text-xs font-semibold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-lg shadow-xs transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                      className="flex-1 sm:flex-none justify-center px-3.5 py-2 text-xs font-semibold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                     >
                       <UserPlus className="w-3.5 h-3.5" />
                       <span>Add Member</span>
@@ -671,47 +624,47 @@ export default function CourseHub() {
                 No members found matching your search.
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="divide-y divide-gray-100">
                   {paginatedMembers.map((m) => {
                     const isLec = m.role === 'lecturer';
                     return (
-                      <div key={m.user_id} className="py-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                      <div key={m.user_id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
                           <UserAvatar
                             user={{ email: m.email, name: m.name, id: m.user_id }}
-                            size={32}
-                            className="shadow-2xs"
+                            size={36}
+                            className="shadow-2xs rounded-xl ring-1 ring-black/5 shrink-0"
                           />
-                          <div>
-                            <div className="font-semibold text-sm text-[#1A1A1B] flex items-center gap-2">
-                              <span>{m.name}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-bold text-sm text-[#1A1A1B] truncate">{m.name}</span>
                               {m.student_id && (
-                                <span className="text-[10px] font-mono font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                                <span className="text-[10px] font-mono font-bold text-gray-700 bg-gray-100 px-1.5 py-0.2 rounded-md border border-gray-200">
                                   ID: {m.student_id}
                                 </span>
                               )}
-                              <span className={`text-[10px] font-mono px-2 py-0.2 rounded font-semibold ${
+                              <span className={`text-[10px] font-mono px-2 py-0.2 rounded-md font-semibold ${
                                 isLec ? 'bg-gray-100 text-gray-700' : 'bg-blue-50 text-[#0047FF]'
                               }`}>
                                 {isLec ? 'Lecturer' : 'Student'}
                               </span>
                             </div>
-                            <div className="text-xs text-gray-500">{m.email}</div>
+                            <div className="text-xs text-gray-500 font-mono truncate mt-0.5">{m.email}</div>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-between sm:justify-end gap-3 pl-12 sm:pl-0">
                           <span className="text-[11px] text-gray-400 font-mono">
                             Joined {new Date(m.joined_at).toLocaleDateString()}
                           </span>
                           {isLecturer && m.role === 'student' && (
                             <button
                               onClick={() => handleRemoveMember(m.user_id, m.name)}
-                              className="text-gray-400 hover:text-red-600 p-1 transition-colors cursor-pointer"
+                              className="text-gray-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
                               title="Remove student from course"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           )}
                         </div>
@@ -735,11 +688,12 @@ export default function CourseHub() {
       {/* Modals */}
       {showNewAssignment && (
         <AssignmentForm
-          initialCourseId={id}
+          courseId={course.id}
           onClose={() => setShowNewAssignment(false)}
-          onCreated={(newAssignment) => {
+          onCreated={(newA) => {
             setShowNewAssignment(false);
-            setAssignments((prev) => [newAssignment, ...prev]);
+            setAssignments((prev) => [newA, ...prev]);
+            toast.success(`Assignment "${newA.title}" created successfully!`);
           }}
         />
       )}
@@ -747,46 +701,51 @@ export default function CourseHub() {
       {showEditCourse && (
         <CourseForm
           course={course}
-          onSave={(updated) => {
+          onClose={() => setShowEditCourse(false)}
+          onSaved={(updated) => {
             setShowEditCourse(false);
-            setCourse((prev) => ({ ...prev, ...updated }));
+            setCourse(updated);
+            toast.success('Course updated');
           }}
-          onCancel={() => setShowEditCourse(false)}
-        />
-      )}
-
-      {showDeleteCourse && (
-        <DeleteCourseModal
-          course={course}
-          onDeleted={() => {
-            setShowDeleteCourse(false);
-            navigate('/dashboard', { replace: true });
-          }}
-          onCancel={() => setShowDeleteCourse(false)}
         />
       )}
 
       {showInviteMember && (
         <InviteMemberModal
-          courseId={id}
+          courseId={course.id}
+          onClose={() => setShowInviteMember(false)}
           onMemberAdded={(newMember) => {
             setShowInviteMember(false);
-            setMembers((prev) => [...prev, { ...newMember, joined_at: new Date().toISOString() }]);
+            setMembers((prev) => [...prev, newMember]);
+            toast.success(`${newMember.name} added to course`);
           }}
-          onCancel={() => setShowInviteMember(false)}
+        />
+      )}
+
+      {showDeleteCourse && (
+        <DeleteCourseModal
+          courseId={course.id}
+          courseTitle={course.title}
+          onClose={() => setShowDeleteCourse(false)}
+          onDeleted={() => {
+            setShowDeleteCourse(false);
+            navigate('/dashboard');
+          }}
         />
       )}
 
       {duplicateTargetAssignment && (
         <DuplicateAssignmentModal
           assignment={duplicateTargetAssignment}
-          onDuplicated={(newAssignment) => {
+          currentCourseId={course.id}
+          onClose={() => setDuplicateTargetAssignment(null)}
+          onSuccess={(newAssign) => {
             setDuplicateTargetAssignment(null);
-            alert(`Assignment successfully duplicated to course ID ${newAssignment.course_id}!`);
+            toast.success(`Assigned "${newAssign.title}" to destination course`);
           }}
-          onCancel={() => setDuplicateTargetAssignment(null)}
         />
       )}
+
     </div>
   );
 }
