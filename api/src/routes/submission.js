@@ -6,7 +6,7 @@ const FULL_SUB_QUERY = `
   SELECT s.id, s.assignment_id, s.student_id, s.content, s.status, s.submitted_at, s.created_at,
          u.name AS student_name, u.email AS student_email,
          st.keystroke_count, st.paste_count, st.delete_count, st.cursor_jumps,
-         st.avg_wpm, st.total_time_ms, st.paste_ratio
+         st.avg_wpm, st.total_time_ms, st.active_time_ms, st.paste_ratio, st.word_count
   FROM submissions s
   JOIN users u ON u.id = s.student_id
   LEFT JOIN submission_stats st ON st.submission_id = s.id

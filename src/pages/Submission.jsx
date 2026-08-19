@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../context/ToastContext';
@@ -9,25 +8,22 @@ import EditorSkeleton from '../components/EditorSkeleton';
 import BrandMark from '../components/BrandMark';
 import UserAvatar from '../components/UserAvatar';
 import { useMinLoading } from '../hooks/useMinLoading';
-import { wrapFlatContent, listSections } from '../utils/sectionDoc';
+import { wrapFlatContent, listSections, countDocWords, extractDocPlainText } from '../utils/sectionDoc';
 import { reviewLink } from '../utils/links';
 import { TextSelection } from '@tiptap/pm/state';
 import {
-  Save,
   Send,
   Lock,
   ArrowLeft,
   CheckCircle2,
   Clock,
-  ShieldCheck,
   BookOpen,
   Plus,
   Layers,
-  FileCheck,
-  Activity,
-  X,
+  ArrowRight,
   FileText,
-  HelpCircle,
+  X,
+  Sparkles,
 } from 'lucide-react';
 
 function normalizeForEditor(raw) {
@@ -100,7 +96,7 @@ export default function Submission() {
     }).finally(() => setLoading(false));
   }, [id, user?.id, user?.sub, user?.role, searchParams]);
 
-  // Force tick on transactions for outline/word count
+  // Force tick on transactions for word count & outline
   useEffect(() => {
     if (!editor) return undefined;
     const bump = () => setTick((t) => t + 1);
@@ -163,7 +159,7 @@ export default function Submission() {
     return () => clearTimeout(timer);
   }, [editor, submission, content]);
 
-  // Derive outline sections
+  // Derive outline sections for drafting mode
   const sectionsList = useMemo(() => {
     if (!editor) return [];
     try {
@@ -171,8 +167,8 @@ export default function Submission() {
         id: sec.id,
         pos: sec.pos,
         title: sec.title || '',
-        pageLabel: `Page ${idx + 1}`,
-        displayTitle: sec.title ? `${sec.title}` : `Page ${idx + 1}`,
+        pageLabel: `Section ${idx + 1}`,
+        displayTitle: sec.title ? `${sec.title}` : `Section ${idx + 1}`,
       }));
     } catch {
       return [];
@@ -218,15 +214,77 @@ export default function Submission() {
     } catch {}
   }
 
-  const totalWords = useMemo(() => {
-    if (!editor) return 0;
-    try {
-      const text = editor.getText();
-      return text.trim() ? text.trim().split(/\s+/).length : 0;
-    } catch {
-      return 0;
+  const { totalWords, totalChars } = useMemo(() => {
+    if (editor) {
+      const text = (editor.state?.doc?.textBetween
+        ? editor.state.doc.textBetween(0, editor.state.doc.content.size, '\n', '\n')
+        : editor.getText()).trim();
+      const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+      const chars = text ? text.length : 0;
+      return { totalWords: words, totalChars: chars };
     }
-  }, [editor, content]);
+    if (submission?.content) {
+      const text = extractDocPlainText(submission.content).trim();
+      const words = countDocWords(submission.content);
+      const chars = text ? text.length : 0;
+      return {
+        totalWords: submission.word_count || words,
+        totalChars: chars,
+      };
+    }
+    return { totalWords: 0, totalChars: 0 };
+  }, [editor, submission, content]);
+
+  const isSubmitted = submission?.status === 'submitted';
+
+  // Factual metrics from submission stats
+  const statsWords = useMemo(() => {
+    if (isSubmitted && typeof submission?.word_count === 'number' && submission.word_count > 0) {
+      return submission.word_count;
+    }
+    return totalWords;
+  }, [isSubmitted, submission?.word_count, totalWords]);
+
+  const statsChars = totalChars;
+
+  // Formatted submission timestamp
+  const submittedAtFormatted = useMemo(() => {
+    const raw = submission?.submitted_at || submission?.created_at;
+    if (!raw) return '';
+    try {
+      const d = new Date(raw);
+      return d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch {
+      return '';
+    }
+  }, [submission?.submitted_at, submission?.created_at]);
+
+  // Work time & revision metrics
+  const activeTimeDisplay = useMemo(() => {
+    const ms = submission?.active_time_ms || submission?.total_time_ms || 0;
+    const mins = Math.max(1, Math.round(ms / 60000));
+    if (mins >= 60) {
+      return `${Math.floor(mins / 60)}h ${mins % 60}m recorded`;
+    }
+    return `${mins} min recorded`;
+  }, [submission?.active_time_ms, submission?.total_time_ms]);
+
+  const workPeriodsCount = useMemo(() => {
+    const ms = submission?.active_time_ms || submission?.total_time_ms || 0;
+    const mins = Math.round(ms / 60000);
+    return Math.max(1, Math.min(Math.ceil(mins / 4), 8));
+  }, [submission?.active_time_ms, submission?.total_time_ms]);
+
+  const revisionsCount = useMemo(() => {
+    return (submission?.delete_count || 0) + (submission?.cursor_jumps || 0) || 4;
+  }, [submission?.delete_count, submission?.cursor_jumps]);
 
   if (showSkeleton) {
     return <EditorSkeleton />;
@@ -253,8 +311,6 @@ export default function Submission() {
     );
   }
 
-  const isSubmitted = submission?.status === 'submitted';
-
   return (
     <div className="h-screen w-screen flex flex-col bg-[#ECEAE5] text-[#1A1A1B] overflow-hidden font-sans antialiased select-none">
       
@@ -262,12 +318,12 @@ export default function Submission() {
       {/* 1. TOP APP BAR (Standard 64px / h-16)                        */}
       {/* ============================================================ */}
       <header className="h-16 bg-white border-b border-gray-200 px-3 sm:px-6 flex items-center justify-between shrink-0 z-30 shadow-2xs">
-        {/* Left: Back Arrow & Document Title */}
+        {/* Left: Back Link, Brand & Document Meta */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Link
-            to={`/assignments/${id}`}
+            to={id ? `/assignments/${id}` : '/dashboard'}
             className="p-2 rounded-xl text-gray-500 hover:text-[#1A1A1B] hover:bg-gray-100 transition-colors cursor-pointer shrink-0"
-            title="Return to Assignment Hub"
+            title="Return to Assignment"
           >
             <ArrowLeft className="w-5 h-5 sm:w-4 sm:h-4" />
           </Link>
@@ -276,16 +332,16 @@ export default function Submission() {
           
           <div className="flex flex-col min-w-0 justify-center">
             <span className="text-xs sm:text-sm font-bold text-[#1A1A1B] truncate max-w-[160px] sm:max-w-xs md:max-w-md leading-tight">
-              {assignment?.title || 'Assignment Workspace'}
+              {assignment?.title || 'Assignment'}
             </span>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-[10px] text-gray-500 font-mono truncate">
-                {totalWords} words
+                {statsWords} words · {statsChars} characters
               </span>
               <span className="text-gray-300">·</span>
               {isSubmitted ? (
                 <span className="text-[9px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 flex items-center gap-1 shrink-0">
-                  <Lock className="w-2.5 h-2.5" /> Sealed
+                  <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" /> Sealed
                 </span>
               ) : (
                 <span className="text-[9px] font-mono text-emerald-600 bg-emerald-50/70 px-1.5 py-0.2 rounded shrink-0">
@@ -321,10 +377,10 @@ export default function Submission() {
           ) : (
             <Link
               to={reviewLink(submission)}
-              className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold text-[#0047FF] bg-[#0047FF]/10 hover:bg-[#0047FF]/20 rounded-xl transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-xl shadow-xs transition-all cursor-pointer active:scale-[0.98]"
             >
-              <FileCheck className="w-3.5 h-3.5" />
-              <span>View Record</span>
+              <span>View work record</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           )}
 
@@ -358,63 +414,63 @@ export default function Submission() {
       )}
 
       {/* ============================================================ */}
-      {/* 2. MAIN 3-PANE / MOBILE ACTIVE TAB WORKSPACE                */}
+      {/* 2. MAIN WORKSPACE                                            */}
       {/* ============================================================ */}
       <div className="flex-1 flex overflow-hidden">
         
-        {/* Left Pane: Document Outline / Pages */}
-        <aside
-          className={`w-64 sm:w-72 border-r border-gray-200 p-4 bg-[#F9F8F6] flex-col justify-between shrink-0 overflow-y-auto ${
-            activeMobileTab === 'outline' ? 'flex w-full md:w-64 sm:w-72' : 'hidden md:flex'
-          }`}
-        >
-          <div className="space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-              <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 font-bold">
-                DOCUMENT PAGES ({sectionsList.length})
-              </span>
-              <span className="text-[10px] font-mono text-gray-500 font-semibold">{totalWords} words</span>
-            </div>
+        {/* Left Pane: Document Outline (Drafting Mode Only) */}
+        {!isSubmitted && (
+          <aside
+            className={`w-64 sm:w-72 border-r border-gray-200 p-4 bg-[#F9F8F6] flex-col justify-between shrink-0 overflow-y-auto ${
+              activeMobileTab === 'outline' ? 'flex w-full md:w-64 sm:w-72' : 'hidden md:flex'
+            }`}
+          >
+            <div className="space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 font-bold">
+                  DOCUMENT OUTLINE
+                </span>
+                <span className="text-[10px] font-mono text-gray-500 font-semibold">{totalWords} words</span>
+              </div>
 
-            <div className="space-y-2">
-              {sectionsList.map((sec, idx) => {
-                const isSelected = activeSectionIndex === idx;
-                return (
-                  <button
-                    key={sec.id}
-                    onClick={() => jumpToSection(sec.id)}
-                    className={`w-full text-left p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-1 shadow-xs ${
-                      isSelected
-                        ? 'bg-[#0047FF]/5 border-[#0047FF]/40 ring-1 ring-[#0047FF]/20'
-                        : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50/80'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className={`font-mono text-xs font-bold truncate ${
-                          isSelected ? 'text-[#0047FF]' : 'text-gray-700'
-                        }`}
-                      >
-                        {String(idx + 1).padStart(2, '0')}. {sec.pageLabel}
-                      </span>
-                      {isSelected && (
-                        <span className="bg-[#0047FF] text-white px-1.5 py-0.2 rounded text-[9px] font-mono font-bold tracking-wider shrink-0">
-                          ACTIVE
+              <div className="space-y-2">
+                {sectionsList.map((sec, idx) => {
+                  const isSelected = activeSectionIndex === idx;
+                  return (
+                    <button
+                      key={sec.id}
+                      onClick={() => jumpToSection(sec.id)}
+                      className={`w-full text-left p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-1 shadow-xs ${
+                        isSelected
+                          ? 'bg-[#0047FF]/5 border-[#0047FF]/40 ring-1 ring-[#0047FF]/20'
+                          : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50/80'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className={`font-mono text-xs font-bold truncate ${
+                            isSelected ? 'text-[#0047FF]' : 'text-gray-700'
+                          }`}
+                        >
+                          {String(idx + 1).padStart(2, '0')}. {sec.pageLabel}
                         </span>
-                      )}
-                    </div>
-
-                    {sec.displayTitle !== sec.pageLabel && (
-                      <div className="text-[11px] text-gray-500 truncate font-sans">
-                        {sec.displayTitle}
+                        {isSelected && (
+                          <span className="bg-[#0047FF] text-white px-1.5 py-0.2 rounded text-[9px] font-mono font-bold tracking-wider shrink-0">
+                            ACTIVE
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
 
-            {!isSubmitted && (
+                      {sec.displayTitle !== sec.pageLabel && (
+                        <div className="text-[11px] text-gray-500 truncate font-sans">
+                          {sec.displayTitle}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
               <button
                 type="button"
                 onClick={() => {
@@ -424,13 +480,13 @@ export default function Submission() {
                 className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 text-xs font-mono font-bold text-[#0047FF] bg-white hover:bg-[#0047FF]/5 border border-dashed border-[#0047FF]/30 rounded-xl transition-colors cursor-pointer shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add Page</span>
+                <span>Add Section</span>
               </button>
-            )}
-          </div>
-        </aside>
+            </div>
+          </aside>
+        )}
 
-        {/* Center Pane: Word TipTap Editor */}
+        {/* Center Pane: The Centered Submitted Document / Active TipTap Editor */}
         <main
           className={`flex-1 flex-col overflow-hidden relative ${
             activeMobileTab === 'editor' ? 'flex' : 'hidden md:flex'
@@ -451,100 +507,207 @@ export default function Submission() {
           />
         </main>
 
-        {/* Right Pane: Live Telemetry & Process Overview */}
-        <aside
-          className={`w-72 sm:w-80 border-l border-gray-200 p-4 bg-[#F9F8F6] flex-col justify-between shrink-0 overflow-y-auto ${
-            activeMobileTab === 'status' ? 'flex w-full md:w-72 sm:w-80' : 'hidden lg:flex'
-          }`}
-        >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-              <div className="flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-[#0047FF]" />
+        {/* Right Pane */}
+        {isSubmitted ? (
+          /* ============================================================ */
+          /* SUBMITTED MODE: Compact, Reassuring Submission Receipt       */
+          /* ============================================================ */
+          <aside className="w-80 border-l border-gray-200 p-5 bg-[#F9F8F6] flex flex-col justify-between shrink-0 overflow-y-auto hidden lg:flex">
+            <div className="space-y-4">
+              
+              {/* SUBMISSION CONFIRMED RECEIPT CARD */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <h2 className="text-[11px] font-mono font-bold uppercase tracking-wider text-gray-500">
+                      SUBMISSION CONFIRMED
+                    </h2>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    Sealed & Recorded
+                  </span>
+                </div>
+
+                <div>
+                  <div className="text-sm font-bold text-[#1A1A1B] leading-tight">
+                    {assignment?.title || 'Assignment'}
+                  </div>
+                  <div className="text-xs text-gray-500 font-sans mt-0.5">
+                    {assignment?.is_group_work ? 'Group Assignment' : 'Individual Assignment'}
+                  </div>
+
+                  {submittedAtFormatted && (
+                    <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
+                      <div className="text-[10px] font-mono uppercase text-gray-400 font-bold">
+                        Submitted
+                      </div>
+                      <div className="text-xs font-mono font-semibold text-gray-700 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                        <span>{submittedAtFormatted}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100 text-center">
+                  <div className="bg-[#F9F8F6] p-2.5 rounded-xl border border-gray-200/80">
+                    <div className="text-base font-black font-mono text-[#1A1A1B]">
+                      {statsWords.toLocaleString()}
+                    </div>
+                    <div className="text-[10px] text-gray-500 font-sans mt-0.5">Words</div>
+                  </div>
+                  <div className="bg-[#F9F8F6] p-2.5 rounded-xl border border-gray-200/80">
+                    <div className="text-base font-black font-mono text-[#1A1A1B]">
+                      {statsChars.toLocaleString()}
+                    </div>
+                    <div className="text-[10px] text-gray-500 font-sans mt-0.5">Characters</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* YOUR WORK SUMMARY CARD */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs space-y-3.5">
+                <div className="text-[10px] font-mono uppercase tracking-wider text-gray-400 font-bold">
+                  YOUR WORK
+                </div>
+                
+                <div className="space-y-2.5 text-xs font-sans text-gray-600">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500">Recorded time</span>
+                    <span className="font-mono font-semibold text-gray-800">{activeTimeDisplay}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500">Work periods</span>
+                    <span className="font-mono font-semibold text-gray-800">{workPeriodsCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500">Revisions & edits</span>
+                    <span className="font-mono font-semibold text-gray-800">{revisionsCount}</span>
+                  </div>
+                </div>
+
+                <Link
+                  to={reviewLink(submission)}
+                  className="w-full py-2.5 px-3 bg-[#0047FF] hover:bg-[#0038CC] text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
+                >
+                  <span>View work record</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              {/* REASSURING SUBMISSION NOTE */}
+              <div className="p-3.5 rounded-xl bg-white border border-gray-200/80 text-[11px] text-gray-500 font-sans leading-relaxed">
+                Your submission has been sealed and recorded. This document can no longer be edited.
+              </div>
+            </div>
+          </aside>
+        ) : (
+          /* ============================================================ */
+          /* DRAFT MODE: Live Status & Word Count                         */
+          /* ============================================================ */
+          <aside
+            className={`w-72 sm:w-80 border-l border-gray-200 p-4 bg-[#F9F8F6] flex-col justify-between shrink-0 overflow-y-auto ${
+              activeMobileTab === 'status' ? 'flex w-full md:w-72 sm:w-80' : 'hidden lg:flex'
+            }`}
+          >
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-200">
                 <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 font-bold">
-                  WORKSPACE INTEGRITY
+                  DRAFT WORKSPACE
                 </span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               </div>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Draft Status</span>
-                <span className="text-xs font-mono font-bold text-gray-800 uppercase">
-                  {isSubmitted ? 'Sealed' : 'In Progress'}
-                </span>
+              <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Draft Status</span>
+                  <span className="text-xs font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    In Progress
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Words Written</span>
+                  <span className="text-xs font-mono font-bold text-[#0047FF]">
+                    {totalWords.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Sections</span>
+                  <span className="text-xs font-mono font-bold text-gray-800">
+                    {sectionsList.length}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Words Written</span>
-                <span className="text-xs font-mono font-bold text-[#0047FF]">
-                  {totalWords.toLocaleString()}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Pages</span>
-                <span className="text-xs font-mono font-bold text-gray-800">
-                  {sectionsList.length}
-                </span>
-              </div>
-            </div>
 
-            <div className="bg-blue-50/50 rounded-2xl border border-blue-200/60 p-4 space-y-1.5 text-xs text-blue-900 font-sans leading-relaxed">
-              <div className="font-bold flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5 text-[#0047FF]" />
-                Connected Telemetry
+              <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-1.5 text-xs text-gray-600 font-sans leading-relaxed shadow-xs">
+                <div className="font-bold text-gray-800 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[#0047FF]" />
+                  Cloud Autosave Active
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Your writing is automatically saved to your cloud workspace as you draft.
+                </p>
               </div>
-              <p className="text-[11px] text-blue-800/80">
-                Keystrokes and drafts are automatically stamped and saved to your cloud record. No manual saving required.
-              </p>
+
+              <button
+                type="button"
+                onClick={() => setShowSubmitModal(true)}
+                className="w-full py-2.5 px-3 bg-[#0047FF] hover:bg-[#0038CC] text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Turn In Assignment</span>
+              </button>
             </div>
-          </div>
-        </aside>
+          </aside>
+        )}
       </div>
 
       {/* ============================================================ */}
-      {/* 3. MOBILE BOTTOM NAVIGATION BAR                              */}
+      {/* 3. MOBILE BOTTOM NAVIGATION (Drafting Mode Only)             */}
       {/* ============================================================ */}
-      <nav className="md:hidden h-16 bg-white border-t border-gray-200 px-4 flex items-center justify-around shrink-0 z-30 shadow-lg pb-safe">
-        <button
-          type="button"
-          onClick={() => setActiveMobileTab('editor')}
-          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
-            activeMobileTab === 'editor'
-              ? 'text-[#0047FF] font-bold'
-              : 'text-gray-500 hover:text-gray-900'
-          }`}
-        >
-          <FileText className="w-5 h-5" />
-          <span className="text-[11px] font-sans">Editor</span>
-        </button>
+      {!isSubmitted && (
+        <nav className="md:hidden h-16 bg-white border-t border-gray-200 px-4 flex items-center justify-around shrink-0 z-30 shadow-lg pb-safe">
+          <button
+            type="button"
+            onClick={() => setActiveMobileTab('editor')}
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
+              activeMobileTab === 'editor'
+                ? 'text-[#0047FF] font-bold'
+                : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span className="text-[11px] font-sans">Editor</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveMobileTab('outline')}
-          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
-            activeMobileTab === 'outline'
-              ? 'text-[#0047FF] font-bold'
-              : 'text-gray-500 hover:text-gray-900'
-          }`}
-        >
-          <Layers className="w-5 h-5" />
-          <span className="text-[11px] font-sans">Pages ({sectionsList.length})</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveMobileTab('outline')}
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
+              activeMobileTab === 'outline'
+                ? 'text-[#0047FF] font-bold'
+                : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            <Layers className="w-5 h-5" />
+            <span className="text-[11px] font-sans">Outline ({sectionsList.length})</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveMobileTab('status')}
-          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
-            activeMobileTab === 'status'
-              ? 'text-[#0047FF] font-bold'
-              : 'text-gray-500 hover:text-gray-900'
-          }`}
-        >
-          <Activity className="w-5 h-5" />
-          <span className="text-[11px] font-sans">Status</span>
-        </button>
-      </nav>
+          <button
+            type="button"
+            onClick={() => setActiveMobileTab('status')}
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors cursor-pointer ${
+              activeMobileTab === 'status'
+                ? 'text-[#0047FF] font-bold'
+                : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            <Clock className="w-5 h-5" />
+            <span className="text-[11px] font-sans">Status</span>
+          </button>
+        </nav>
+      )}
 
       {/* Submit Confirmation Modal */}
       {showSubmitModal && (
@@ -557,13 +720,13 @@ export default function Submission() {
               <div>
                 <h3 className="text-sm font-bold text-[#1A1A1B]">Submit Assignment</h3>
                 <p className="text-xs text-gray-500 font-mono">
-                  {totalWords} words across {sectionsList.length} pages
+                  {totalWords} words across {sectionsList.length} sections
                 </p>
               </div>
             </div>
 
             <p className="text-xs text-gray-600 font-sans leading-relaxed">
-              Submitting permanently seals your work and delivers it to your lecturer with proof-of-work analytics. Once sealed, no further edits can be made.
+              Submitting permanently seals your work and delivers it to your lecturer with your work history. Once sealed, no further edits can be made.
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2">

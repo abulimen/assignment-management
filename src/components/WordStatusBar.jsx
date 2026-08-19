@@ -34,7 +34,7 @@ export default function WordStatusBar({ editor, editable = true, children }) {
         {editable ? (
           <span className="font-medium">Page {info.current} of {info.sections}</span>
         ) : (
-          <span className="font-medium">Read-only document</span>
+          <span className="font-medium">Final submission · Read-only</span>
         )}
         <span className="text-gray-300 hidden sm:inline">|</span>
         <span className="text-gray-500 hidden sm:inline flex items-center gap-1 font-sans">
