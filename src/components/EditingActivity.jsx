@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Edit3, CheckCircle2, RotateCcw, Trash2, PlusCircle } from 'lucide-react';
+import { Edit3, CheckCircle2, AlertTriangle, Trash2, PlusCircle } from 'lucide-react';
 
 export default function EditingActivity({ events }) {
   const metrics = useMemo(() => {
@@ -9,7 +9,8 @@ export default function EditingActivity({ events }) {
         structuralRevisions: 0,
         approxAddedWords: 0,
         approxDeletedWords: 0,
-        summary: 'No editing actions recorded.',
+        isHealthy: true,
+        summary: 'Standard iterative revision and typing flow recorded.',
       };
     }
 
@@ -48,11 +49,13 @@ export default function EditingActivity({ events }) {
     const approxDeletedWords = Math.round(deletedChars / 5.5);
 
     const totalEdits = inlineCorrections + structuralRevisions;
-    let summary = 'Document underwent standard iterative revision and in-line corrections.';
-    if (totalEdits === 0) {
-      summary = 'Document was drafted with minimal backspacing or deletions.';
+    const isLowEdit = totalEdits < 3 && approxAddedWords > 120;
+
+    let summary = 'Document underwent standard iterative revision and in-line corrections throughout the writing session.';
+    if (isLowEdit) {
+      summary = 'Document was composed with virtually no backspacing, deletions, or structural rewrites.';
     } else if (structuralRevisions >= 3) {
-      summary = `Extensive restructuring recorded with ${structuralRevisions} substantial revision cycles and ${inlineCorrections} in-line corrections.`;
+      summary = `Extensive restructuring recorded with ${structuralRevisions} revision cycles and ${inlineCorrections} in-line typo fixes.`;
     }
 
     return {
@@ -60,6 +63,7 @@ export default function EditingActivity({ events }) {
       structuralRevisions,
       approxAddedWords,
       approxDeletedWords,
+      isHealthy: !isLowEdit,
       summary,
     };
   }, [events]);
@@ -77,20 +81,27 @@ export default function EditingActivity({ events }) {
             Editing & Revisions
           </h3>
         </div>
-        <span className="text-[10px] font-mono text-gray-400">Process Breakdown</span>
+        <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${
+          metrics.isHealthy
+            ? 'text-emerald-800 bg-emerald-50 border-emerald-300'
+            : 'text-amber-800 bg-amber-50 border-amber-300'
+        }`}>
+          {metrics.isHealthy ? <CheckCircle2 className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+          <span>{metrics.isHealthy ? 'Iterative Editing' : 'Linear / Single Pass'}</span>
+        </span>
       </div>
 
       {/* Metrics Grid with Color-Coded Level Badges */}
       <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-        <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-200/70">
+        <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-200/70">
           <div className="text-[10px] text-blue-700 font-sans uppercase font-semibold">In-line Corrections</div>
           <div className="font-bold text-base text-blue-950 mt-0.5">
             {metrics.inlineCorrections.toLocaleString()}
           </div>
-          <div className="text-[9px] text-blue-600/80 font-sans mt-0.5">Typo fixes / backspaces</div>
+          <div className="text-[9px] text-blue-600/80 font-sans mt-0.5">Typo fixes & backspaces</div>
         </div>
 
-        <div className={`p-2.5 rounded-xl border ${
+        <div className={`p-3 rounded-xl border ${
           metrics.structuralRevisions > 0
             ? 'bg-purple-50/50 border-purple-200/70'
             : 'bg-gray-50 border-gray-200/80'
@@ -108,7 +119,7 @@ export default function EditingActivity({ events }) {
           <div className={`text-[9px] font-sans mt-0.5 ${
             metrics.structuralRevisions > 0 ? 'text-purple-600/80' : 'text-gray-400'
           }`}>
-            Paragraph / block rewrites
+            Paragraph & block rewrites
           </div>
         </div>
       </div>
@@ -117,11 +128,11 @@ export default function EditingActivity({ events }) {
       <div className="space-y-1.5 pt-1">
         <div className="flex items-center justify-between text-[11px] font-mono">
           <span className="text-emerald-700 font-semibold flex items-center gap-1">
-            <PlusCircle className="w-3 h-3 text-emerald-600" />
+            <PlusCircle className="w-3.5 h-3.5 text-emerald-600" />
             Added ~{metrics.approxAddedWords.toLocaleString()}w
           </span>
           <span className="text-rose-700 font-semibold flex items-center gap-1">
-            <Trash2 className="w-3 h-3 text-rose-600" />
+            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
             Deleted ~{metrics.approxDeletedWords.toLocaleString()}w
           </span>
         </div>
@@ -132,7 +143,7 @@ export default function EditingActivity({ events }) {
         </div>
       </div>
 
-      <p className="text-[11px] text-gray-600 font-sans leading-snug">
+      <p className="text-[11px] text-gray-600 font-sans leading-relaxed">
         {metrics.summary}
       </p>
     </div>

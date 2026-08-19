@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useContext } from 'react';
+import React, { useState, useEffect, useMemo, useContext, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -9,6 +9,9 @@ import {
   PanelRightOpen,
   AlertTriangle,
   BarChart2,
+  ChevronDown,
+  Sparkles,
+  Zap,
 } from 'lucide-react';
 import { api } from '../api';
 import { AuthContext } from '../context/AuthContext';
@@ -49,6 +52,10 @@ export default function Review() {
   const [highlightPasted, setHighlightPasted] = useState(false); // DEFAULT OFF
   const [seekStepIndex, setSeekStepIndex] = useState(null);
 
+  // Floating indicator scroll dismiss state
+  const sidebarRef = useRef(null);
+  const [sidebarScrolledDown, setSidebarScrolledDown] = useState(false);
+
   useEffect(() => {
     api.get(`submissions/${id}/playback`)
       .then((d) => {
@@ -59,6 +66,16 @@ export default function Review() {
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Handle sidebar scroll to dismiss or re-show floating amber indicator
+  function handleSidebarScroll(e) {
+    const top = e.target.scrollTop;
+    if (top > 160) {
+      if (!sidebarScrolledDown) setSidebarScrolledDown(true);
+    } else {
+      if (sidebarScrolledDown) setSidebarScrolledDown(false);
+    }
+  }
 
   // Extract external pasted strings
   const pastedStrings = useMemo(() => {
@@ -89,52 +106,107 @@ export default function Review() {
     return strings;
   }, [data?.events, data?.pasted_texts]);
 
-  // Total word count
+  // Compute final document word count
   const wordCount = useMemo(() => {
-    if (data?.content) {
-      try {
-        const parsed = typeof data.content === 'string' ? JSON.parse(data.content) : data.content;
-        const blocks = [];
-        const walk = (node) => {
-          if (!node) return;
-          if (node.type === 'sectionTitle') return;
-          if (typeof node.text === 'string') {
-            blocks.push(node.text);
-            return;
-          }
-          if (Array.isArray(node.content)) {
-            for (const child of node.content) walk(child);
-            if (node.type === 'paragraph' || node.type === 'heading' || node.type === 'section' || node.type === 'blockquote' || node.type === 'listItem' || node.type === 'codeBlock') {
-              blocks.push('\n');
-            }
-          }
-        };
-        walk(parsed);
-        const fullText = blocks.join('').trim();
-        if (fullText) return fullText.split(/\s+/).filter(Boolean).length;
-      } catch {}
+    if (!data?.content) return 0;
+    try {
+      const text = typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
+      const clean = text.replace(/<[^>]*>/g, ' ').replace(/[{}":[\],]/g, ' ');
+      const words = clean.trim().split(/\s+/).filter(Boolean);
+      return words.length;
+    } catch {
+      return 0;
     }
-    return data?.stats?.word_count || 0;
-  }, [data?.content, data?.stats?.word_count]);
+  }, [data?.content]);
+
+  // Check if there are notable concerns in lower widgets
+  const patternConcerns = useMemo(() => {
+    if (!data?.events || !data.events.length) return null;
+    const timed = data.events.filter((e) => Number.isFinite(Number(e?.occurred_at)));
+    
+    // Group minute typing
+    const minuteBuckets = new Map();
+    let pastedChars = 0;
+    let typedChars = 0;
+    let deleteChars = 0;
+
+    for (const ev of timed) {
+      const timeSec = Number(ev.occurred_at);
+      const minuteKey = Math.floor(timeSec / 60) * 60;
+      if (!minuteBuckets.has(minuteKey)) {
+        minuteBuckets.set(minuteKey, { typed: 0, times: [] });
+      }
+      if (ev.type === 'step' || ev.type === 'keystroke') {
+        typedChars++;
+        minuteBuckets.get(minuteKey).typed++;
+        minuteBuckets.get(minuteKey).times.push(timeSec);
+      } else if (ev.type === 'paste') {
+        const text = ev.data?.pasted_text || ev.data?.text || '';
+        pastedChars += (text.length || ev.data?.pasted_text_length || ev.data?.length || 0);
+      } else if (ev.type === 'delete') {
+        deleteChars += (Number(ev.data?.length) || 1);
+      }
+    }
+
+    let maxWpm = 0;
+    for (const [, b] of minuteBuckets.entries()) {
+      if (b.typed === 0) continue;
+      let activeSecs = 60;
+      if (b.times.length >= 2) {
+        activeSecs = Math.max(b.times[b.times.length - 1] - b.times[0], 10);
+      }
+      const wpm = Math.round((b.typed / 5) / (activeSecs / 60));
+      if (wpm > maxWpm) maxWpm = wpm;
+    }
+
+    const totalChars = Math.max(typedChars + pastedChars, 1);
+    const pasteRatio = pastedChars / totalChars;
+
+    const reasons = [];
+    if (maxWpm > 85) {
+      reasons.push(`High velocity burst of ${maxWpm} WPM recorded in Writing Rhythm.`);
+    }
+    if (pasteRatio > 0.40) {
+      reasons.push(`Significant external paste volume (${Math.round(pasteRatio * 100)}%) detected.`);
+    }
+    if (deleteChars < 20 && typedChars > 250) {
+      reasons.push(`Minimal revisions recorded across drafting.`);
+    }
+
+    if (!reasons.length) return null;
+
+    return {
+      title: `${reasons.length} Notable ${reasons.length === 1 ? 'Pattern' : 'Patterns'} Below`,
+      detail: reasons[0],
+      maxWpm,
+    };
+  }, [data?.events]);
+
+  function scrollToCharts() {
+    if (sidebarRef.current) {
+      sidebarRef.current.scrollTo({ top: 380, behavior: 'smooth' });
+    }
+  }
 
   if (showSkeleton) {
     return (
-      <div role="status" aria-label="Loading review" className="h-screen w-screen flex flex-col bg-[#ECEAE5] overflow-hidden">
-        <div className="h-16 bg-white border-b border-gray-200 px-4 sm:px-6 flex items-center justify-between shrink-0">
-          <div className="skeleton h-5 w-36 sm:w-48 rounded" />
-          <div className="skeleton h-8 w-44 sm:w-64 rounded-xl" />
-          <div className="skeleton h-6 w-20 sm:w-24 rounded-full" />
+      <div className="h-screen w-screen flex flex-col bg-[#ECEAE5] overflow-hidden">
+        <div className="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="skeleton w-8 h-8 rounded-lg" />
+            <div className="skeleton h-5 w-48 rounded" />
+          </div>
+          <div className="skeleton h-8 w-32 rounded-lg" />
         </div>
-        <div className="flex-1 flex overflow-hidden">
-          <div className="flex-1 flex items-center justify-center p-4 sm:p-8">
-            <div className="w-full max-w-[800px] h-[90%] bg-white shadow-xl rounded-sm p-6 sm:p-12 space-y-6">
-              <div className="skeleton h-8 w-3/4 rounded" />
-              <div className="space-y-3 pt-4">
-                <div className="skeleton h-4 w-full rounded" />
-                <div className="skeleton h-4 w-5/6 rounded" />
-                <div className="skeleton h-4 w-4/6 rounded" />
-              </div>
-            </div>
+        <div className="flex-1 flex p-6 gap-6">
+          <div className="flex-1 bg-white rounded-2xl border border-gray-200 p-8 space-y-4">
+            <div className="skeleton h-7 w-1/3 rounded" />
+            <div className="skeleton h-4 w-full rounded" />
+            <div className="skeleton h-4 w-5/6 rounded" />
+          </div>
+          <div className="w-96 bg-white rounded-2xl border border-gray-200 p-6 space-y-4 hidden lg:block">
+            <div className="skeleton h-6 w-1/2 rounded" />
+            <div className="skeleton h-32 w-full rounded-xl" />
           </div>
         </div>
       </div>
@@ -143,182 +215,199 @@ export default function Review() {
 
   if (!data) {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#ECEAE5] p-6 text-center">
-        <h2 className="text-xl font-bold text-[#1A1A1B]">Submission Not Found</h2>
-        <p className="text-sm text-gray-600 mt-2 font-sans max-w-md">
-          The requested submission could not be loaded or you do not have permission to view it.
-        </p>
-        <Link
-          to="/dashboard"
-          className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0047FF] text-white font-semibold text-xs shadow-xs hover:bg-[#0038CC] transition-colors cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Return to Dashboard
-        </Link>
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#ECEAE5] p-4 text-center">
+        <div className="max-w-md w-full bg-white rounded-2xl border border-gray-200 p-8 shadow-xl space-y-4">
+          <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" />
+          <h2 className="text-lg font-bold text-gray-900">Submission Unavailable</h2>
+          <p className="text-xs text-gray-500 font-sans leading-relaxed">
+            Unable to load playback or review data for this submission. It may not exist or has been removed.
+          </p>
+          <Link
+            to="/dashboard"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-[#0047FF] hover:bg-[#0038CC] rounded-lg shadow-xs transition-all"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Return to Dashboard</span>
+          </Link>
+        </div>
       </div>
     );
   }
 
-  const isGroup = !!(data.group_id || (Array.isArray(data.sections) && data.sections.length > 0));
-  const effectivePlaybackMode = canvasMode === 'playback' || mobileTab === 'replay';
+  const isGroup = Boolean(data?.is_group || sections);
+  const student = data.student || {};
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#ECEAE5] overflow-hidden select-none">
+    <div className="h-screen w-screen flex flex-col bg-[#ECEAE5] text-[#1A1A1B] overflow-hidden font-sans antialiased select-none">
       
       {/* ============================================================ */}
-      {/* 1. TOP APP BAR (h-16 / 64px standard height)                */}
+      {/* 1. TOP APP BAR (Standard 64px / h-16)                        */}
       {/* ============================================================ */}
-      <header className="h-16 bg-white border-b border-gray-200 px-4 sm:px-6 flex items-center justify-between shrink-0 z-20 shadow-2xs">
-        {/* Left: Back & Title */}
-        <div className="flex items-center gap-3 min-w-0">
+      <header className="h-16 bg-white border-b border-gray-200 px-3 sm:px-6 flex items-center justify-between shrink-0 z-30 shadow-2xs">
+        {/* Left: Brand + Back Button + Document Title */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Link
-            to={`/assignments/${data.assignment_id}`}
+            to="/dashboard"
             className="p-2 rounded-xl text-gray-500 hover:text-[#1A1A1B] hover:bg-gray-100 transition-colors cursor-pointer shrink-0"
-            title="Back to Assignment"
+            title="Return to Dashboard"
           >
             <ArrowLeft className="w-5 h-5 sm:w-4 sm:h-4" />
           </Link>
           <div className="h-5 w-px bg-gray-200 hidden sm:block shrink-0" />
           <BrandMark variant="wordmark" className="h-4.5 hidden sm:block shrink-0" />
+
           <div className="flex flex-col min-w-0 justify-center">
-            <span className="text-sm font-bold text-[#1A1A1B] truncate max-w-[200px] sm:max-w-xs leading-tight">
+            <span className="text-xs sm:text-sm font-bold text-[#1A1A1B] truncate max-w-[160px] sm:max-w-xs md:max-w-md leading-tight">
               {data.assignment_title || 'Submission Review'}
             </span>
-            <span className="text-[11px] text-gray-500 font-mono truncate leading-tight mt-0.5">
-              {data.student_name || (isGroup ? 'Group Submission' : 'Individual Student')} · {wordCount} words
-            </span>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-[10px] text-gray-500 font-mono truncate">
+                {wordCount} words
+              </span>
+              <span className="text-gray-300">·</span>
+              <span className="text-[9px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 shrink-0">
+                Sealed Record
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Center: DESKTOP ONLY Mode Switcher */}
-        <div className="hidden lg:flex items-center bg-[#F9F8F6] p-1 rounded-xl border border-gray-200 shadow-2xs">
-          <button
-            type="button"
-            aria-label="Document View"
-            onClick={() => {
-              setCanvasMode('final');
-              setHighlightPasted(false);
-              setSeekStepIndex(null);
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              canvasMode === 'final'
-                ? 'bg-white text-[#0047FF] shadow-xs font-bold'
-                : 'text-gray-600 hover:text-[#1A1A1B]'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Document</span>
-          </button>
-
-          <button
-            type="button"
-            aria-label="Process Record"
-            onClick={() => {
-              setCanvasMode('playback');
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              canvasMode === 'playback'
-                ? 'bg-[#0047FF] text-white shadow-xs font-bold'
-                : 'text-gray-600 hover:text-[#1A1A1B]'
-            }`}
-          >
-            <Film className="w-3.5 h-3.5" />
-            <span>Replay</span>
-          </button>
-        </div>
-
-        {/* Right: Actions */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Highlight Toggle (Manual toggle for document view) */}
-          {pastedStrings.length > 0 && (
+        {/* Right: Mode Switcher & Tools */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Highlight External Text Toggle (Desktop) */}
+          {pastedStrings.length > 0 && canvasMode === 'final' && (
             <button
               type="button"
               onClick={() => setHighlightPasted(!highlightPasted)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+              className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                 highlightPasted
-                  ? 'bg-amber-50 text-amber-950 border-amber-300 ring-1 ring-amber-300/40'
-                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                  ? 'bg-amber-100/80 text-amber-950 border-amber-300 shadow-2xs font-bold'
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
               }`}
-              title={highlightPasted ? 'Hide Pasted Highlights' : 'Highlight Pasted Text'}
+              title="Highlight all text pasted from external sources"
             >
-              <Highlighter className="w-4 h-4 text-amber-700 shrink-0" />
-              <span className="hidden md:inline text-xs">
-                {highlightPasted ? 'Highlights: ON' : 'Highlights: OFF'}
-              </span>
+              <Highlighter className="w-3.5 h-3.5 text-amber-700" />
+              <span>{highlightPasted ? 'Highlights On' : 'Highlight Pastes'}</span>
             </button>
           )}
 
-          {/* Desktop Sidebar Collapse Toggle */}
+          {/* Canvas Mode Switcher: Document vs Replay (Desktop) */}
+          <div className="hidden sm:flex items-center bg-gray-100 p-1 rounded-xl gap-1">
+            <button
+              type="button"
+              aria-label="Document view"
+              onClick={() => {
+                setCanvasMode('final');
+                setHighlightPasted(false);
+              }}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                canvasMode === 'final'
+                  ? 'bg-white text-[#0047FF] shadow-2xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Document</span>
+            </button>
+
+            <button
+              type="button"
+              aria-label="Process record"
+              onClick={() => {
+                setCanvasMode('playback');
+              }}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                canvasMode === 'playback'
+                  ? 'bg-white text-[#0047FF] shadow-2xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Film className="w-3.5 h-3.5" />
+              <span>Replay Scrubber</span>
+            </button>
+          </div>
+
+          {/* Sidebar Toggle (Desktop) */}
           <button
             type="button"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className={`hidden lg:flex p-2 rounded-xl border transition-colors cursor-pointer ${
-              sidebarOpen
-                ? 'bg-[#0047FF]/5 text-[#0047FF] border-[#0047FF]/20'
-                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-            }`}
-            title={sidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
+            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl transition-all cursor-pointer shadow-2xs"
+            title={sidebarOpen ? 'Collapse evidence sidebar' : 'Expand evidence sidebar'}
           >
-            {sidebarOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+            {sidebarOpen ? (
+              <>
+                <PanelRightClose className="w-3.5 h-3.5 text-gray-500" />
+                <span>Hide Analytics</span>
+              </>
+            ) : (
+              <>
+                <PanelRightOpen className="w-3.5 h-3.5 text-[#0047FF]" />
+                <span className="text-[#0047FF] font-bold">Show Analytics</span>
+              </>
+            )}
           </button>
 
+          {/* User Avatar */}
           {user && (
-            <div className="pl-1 border-l border-gray-200 ml-1">
-              <UserAvatar user={user} size={30} className="ring-1 ring-black/5" />
+            <div className="hidden sm:block pl-1 border-l border-gray-200 ml-1">
+              <UserAvatar user={user} size={28} className="ring-1 ring-black/5" />
             </div>
           )}
         </div>
       </header>
 
-      {/* Leader Override Alert Banner */}
-      {data.override?.used && (
-        <div className="bg-amber-50 border-b border-amber-300 px-4 sm:px-6 py-2.5 shadow-xs flex items-center justify-between gap-4 text-xs text-amber-900 shrink-0 z-20">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-            <span className="truncate">
-              <strong>Override:</strong> {data.override.by_name} (<em>"{data.override.reason}"</em>)
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* ============================================================ */}
-      {/* 2. MAIN WORKSPACE                                           */}
+      {/* 2. MAIN 2-PANE WORKSPACE: CANVAS + EVIDENCE SIDEBAR          */}
       {/* ============================================================ */}
       <div className="flex-1 flex overflow-hidden relative">
         
-        {/* CENTER MAIN CANVAS: Realistic Paper Document / Scrubber */}
+        {/* Canvas Pane (Document Reading or Interactive Step Replay) */}
         <main
-          className={`flex-1 flex-col overflow-hidden relative bg-[#ECEAE5] ${
+          className={`flex-1 flex flex-col bg-[#ECEAE5] overflow-y-auto ${
             mobileTab === 'analytics' ? 'hidden lg:flex' : 'flex'
           }`}
         >
-          {isGroup ? (
-            <GroupFinalDoc content={data.content} sections={sections} />
+          {canvasMode === 'playback' || mobileTab === 'replay' ? (
+            <div className="flex-1 flex flex-col p-2 sm:p-6 max-w-5xl mx-auto w-full">
+              <Playback
+                events={data.events}
+                rawContent={data.content}
+                initialStepIndex={seekStepIndex}
+                onStepChange={() => {}}
+              />
+            </div>
           ) : (
-            <Playback
-              key={`review-view-${id}-${effectivePlaybackMode ? 'replay' : 'final'}`}
-              events={data.events}
-              finalContent={data.content}
-              initialMode={effectivePlaybackMode ? 'playback' : 'final'}
-              externalHighlight={highlightPasted}
-              seekStepIndex={seekStepIndex}
-            />
+            <div className="flex-1 flex flex-col items-center p-3 sm:p-6 overflow-y-auto">
+              {isGroup ? (
+                <GroupFinalDoc
+                  content={data.content}
+                  sections={sections}
+                  pastedStrings={pastedStrings}
+                  highlightPasted={highlightPasted}
+                />
+              ) : (
+                <GroupFinalDoc
+                  content={data.content}
+                  sections={[]}
+                  pastedStrings={pastedStrings}
+                  highlightPasted={highlightPasted}
+                  authorName={student.name || 'Student'}
+                />
+              )}
+            </div>
           )}
         </main>
 
-        {/* EVIDENCE SIDEBAR (Desktop Side Panel / Mobile Full-Screen Tab) */}
+        {/* Evidence & Analytics Sidebar */}
         <aside
-          className={`${
-            mobileTab === 'analytics'
-              ? 'flex-1 w-full lg:flex-none lg:w-84 xl:w-96 flex'
-              : sidebarOpen
-              ? 'hidden lg:flex lg:w-84 xl:w-96'
-              : 'hidden'
-          } border-l border-gray-200 bg-[#F9F8F6] flex-col shrink-0 overflow-y-auto transition-all duration-200 z-10 p-3 sm:p-4 space-y-4`}
+          ref={sidebarRef}
+          onScroll={handleSidebarScroll}
+          className={`w-full lg:w-96 border-l border-gray-200 bg-[#F9F8F6] p-4 flex-col gap-4 shrink-0 overflow-y-auto relative ${
+            sidebarOpen ? 'flex' : 'hidden'
+          } ${mobileTab === 'analytics' ? 'flex w-full' : 'hidden lg:flex'}`}
         >
-          {/* Universal 4-Tab Evidence Navigation */}
-          <div className="flex items-center bg-white p-1 rounded-xl border border-gray-200 shadow-2xs text-xs font-mono shrink-0 overflow-x-auto">
+          {/* Sidebar Segmented Tabs */}
+          <div className="flex items-center bg-white border border-gray-200 p-1 rounded-xl text-xs font-semibold shrink-0 shadow-2xs gap-0.5 sticky top-0 z-20">
             <button
               type="button"
               onClick={() => setSidebarTab('overview')}
@@ -393,7 +482,7 @@ export default function Review() {
 
           {/* TAB 2: WRITING PATTERN & VISUALS */}
           {sidebarTab === 'pattern' && (
-            <div className="space-y-4">
+            <div className="space-y-4 relative">
               <WritingPatternSummary events={data.events} />
               <DocumentGrowthChart events={data.events} finalWordCount={wordCount} />
               <WritingRhythmChart events={data.events} />
@@ -428,6 +517,35 @@ export default function Review() {
             <div className="space-y-4 pt-2 border-t border-gray-200">
               <MemberActivityChart insights={data.insights} members={sections} />
               <CopiedTextViewer insights={data.insights} members={sections} />
+            </div>
+          )}
+
+          {/* ============================================================ */}
+          {/* FLOATING AMBER CONCERN INDICATOR                             */}
+          {/* ============================================================ */}
+          {sidebarTab === 'pattern' && patternConcerns && !sidebarScrolledDown && (
+            <div
+              onClick={scrollToCharts}
+              className="sticky bottom-2 z-30 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-2xl shadow-xl border border-amber-300/40 p-3.5 flex items-center justify-between gap-3 cursor-pointer hover:shadow-2xl transition-all duration-200 active:scale-[0.98] animate-in fade-in slide-in-from-bottom-2"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                  <Zap className="w-4 h-4 text-white" />
+                </div>
+                <div className="min-w-0 leading-tight">
+                  <div className="font-bold text-xs flex items-center gap-1.5">
+                    <span>{patternConcerns.title}</span>
+                  </div>
+                  <div className="text-[11px] text-amber-100 truncate mt-0.5">
+                    {patternConcerns.detail}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 bg-white/20 hover:bg-white/30 px-2.5 py-1.5 rounded-xl text-[11px] font-bold tracking-wide shrink-0 transition-colors">
+                <span>Inspect</span>
+                <ChevronDown className="w-3.5 h-3.5 animate-bounce" />
+              </div>
             </div>
           )}
         </aside>
@@ -485,7 +603,6 @@ export default function Review() {
           <span className="text-[11px] font-sans">Analytics</span>
         </button>
       </nav>
-
     </div>
   );
 }
