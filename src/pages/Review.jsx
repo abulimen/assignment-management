@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useContext } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -8,12 +8,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   AlertTriangle,
-  Layers,
-  Activity,
-  TrendingUp,
-  Clock,
-  Clipboard,
-  Info,
+  BarChart2,
 } from 'lucide-react';
 import { api } from '../api';
 import { AuthContext } from '../context/AuthContext';
@@ -34,8 +29,6 @@ import ContributionXray from '../components/ContributionXray';
 import MemberWorkload from '../components/MemberWorkload';
 import MemberActivityChart from '../components/MemberActivityChart';
 import CopiedTextViewer from '../components/CopiedTextViewer';
-import { annotatePasted, stripPastedMarks } from '../utils/pasted';
-import { wrapFlatContent } from '../utils/sectionDoc';
 
 export default function Review() {
   const { id } = useParams();
@@ -48,10 +41,12 @@ export default function Review() {
 
   // Canvas Mode: 'final' (completed document) | 'playback' (interactive step scrubber)
   const [canvasMode, setCanvasMode] = useState('final');
-  // Sidebar State: 'overview' | 'pattern' | 'timeline' | 'sources'
+  // Mobile View Mode: 'canvas' (document/replay) | 'details' (sidebar analytics)
+  const [mobileView, setMobileView] = useState('canvas');
+  // Sidebar Tab: 'overview' | 'pattern' | 'timeline' | 'sources'
   const [sidebarTab, setSidebarTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [highlightPasted, setHighlightPasted] = useState(false); // DEFAULT OFF
+  const [highlightPasted, setHighlightPasted] = useState(false);
   const [seekStepIndex, setSeekStepIndex] = useState(null);
 
   useEffect(() => {
@@ -65,7 +60,7 @@ export default function Review() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // Extract external pasted strings for document annotation on demand
+  // Extract external pasted strings
   const pastedStrings = useMemo(() => {
     if (!data?.events && !data?.pasted_texts) return [];
     const strings = [];
@@ -94,7 +89,7 @@ export default function Review() {
     return strings;
   }, [data?.events, data?.pasted_texts]);
 
-  // Total word count (derived from doc content to match student view exactly)
+  // Total word count
   const wordCount = useMemo(() => {
     if (data?.content) {
       try {
@@ -125,14 +120,14 @@ export default function Review() {
   if (showSkeleton) {
     return (
       <div role="status" aria-label="Loading review" className="h-screen w-screen flex flex-col bg-[#ECEAE5] overflow-hidden">
-        <div className="h-14 bg-white border-b border-gray-200 px-6 flex items-center justify-between shrink-0">
-          <div className="skeleton h-5 w-48 rounded" />
-          <div className="skeleton h-8 w-64 rounded-xl" />
-          <div className="skeleton h-6 w-24 rounded-full" />
+        <div className="h-14 bg-white border-b border-gray-200 px-4 sm:px-6 flex items-center justify-between shrink-0">
+          <div className="skeleton h-5 w-32 sm:w-48 rounded" />
+          <div className="skeleton h-8 w-40 sm:w-64 rounded-xl" />
+          <div className="skeleton h-6 w-16 sm:w-24 rounded-full" />
         </div>
         <div className="flex-1 flex overflow-hidden">
-          <div className="flex-1 flex items-center justify-center p-8">
-            <div className="w-[800px] h-[90%] bg-white shadow-xl rounded-sm p-12 space-y-6">
+          <div className="flex-1 flex items-center justify-center p-4 sm:p-8">
+            <div className="w-full max-w-[800px] h-[90%] bg-white shadow-xl rounded-sm p-6 sm:p-12 space-y-6">
               <div className="skeleton h-8 w-3/4 rounded" />
               <div className="space-y-3 pt-4">
                 <div className="skeleton h-4 w-full rounded" />
@@ -140,11 +135,6 @@ export default function Review() {
                 <div className="skeleton h-4 w-4/6 rounded" />
               </div>
             </div>
-          </div>
-          <div className="w-84 border-l border-gray-200 bg-white p-6 space-y-6 shrink-0">
-            <div className="skeleton h-20 w-full rounded-2xl" />
-            <div className="skeleton h-32 w-full rounded-2xl" />
-            <div className="skeleton h-40 w-full rounded-2xl" />
           </div>
         </div>
       </div>
@@ -174,8 +164,9 @@ export default function Review() {
   return (
     <div className="h-screen w-screen flex flex-col bg-[#ECEAE5] overflow-hidden select-none">
       {/* Top Header */}
-      <header className="h-14 bg-white border-b border-gray-200 px-4 sm:px-6 flex items-center justify-between shrink-0 z-20 shadow-2xs">
-        <div className="flex items-center gap-3 min-w-0">
+      <header className="h-14 bg-white border-b border-gray-200 px-3 sm:px-6 flex items-center justify-between shrink-0 z-20 shadow-2xs gap-2">
+        {/* Left: Nav & Brand */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
           <Link
             to={`/assignments/${data.assignment_id}`}
             className="p-1.5 rounded-lg text-gray-500 hover:text-[#1A1A1B] hover:bg-gray-100 transition-colors cursor-pointer"
@@ -183,35 +174,36 @@ export default function Review() {
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <div className="h-4 w-px bg-gray-200" />
-          <BrandMark variant="wordmark" className="h-4" />
-          <div className="hidden sm:flex flex-col min-w-0">
-            <span className="text-xs font-bold text-[#1A1A1B] truncate max-w-xs">
+          <div className="h-4 w-px bg-gray-200 hidden sm:block" />
+          <BrandMark variant="wordmark" className="h-4 shrink-0" />
+          <div className="hidden md:flex flex-col min-w-0">
+            <span className="text-xs font-bold text-[#1A1A1B] truncate max-w-[180px] lg:max-w-xs">
               {data.assignment_title || 'Submission Review'}
             </span>
             <span className="text-[10px] text-gray-600 font-mono truncate">
-              {data.student_name || (isGroup ? 'Group Submission' : 'Student')} · Submission Review
+              {data.student_name || (isGroup ? 'Group Submission' : 'Student')} · Review
             </span>
           </div>
         </div>
 
-        {/* Center Canvas Mode Toggle: Final Document vs Process Replay */}
-        <div className="flex items-center bg-[#F9F8F6] p-1 rounded-xl border border-gray-200 shadow-2xs">
+        {/* Center: Canvas Mode Switcher */}
+        <div className="flex items-center bg-[#F9F8F6] p-1 rounded-xl border border-gray-200 shadow-2xs shrink-0">
           <button
             type="button"
             aria-label="Document View"
             onClick={() => {
               setCanvasMode('final');
+              setMobileView('canvas');
               setSeekStepIndex(null);
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              canvasMode === 'final'
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              canvasMode === 'final' && mobileView === 'canvas'
                 ? 'bg-white text-[#0047FF] shadow-xs font-bold'
                 : 'text-gray-600 hover:text-[#1A1A1B]'
             }`}
           >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Document</span>
+            <FileText className="w-3.5 h-3.5 shrink-0" />
+            <span className="text-[11px] sm:text-xs">Document</span>
           </button>
 
           <button
@@ -219,45 +211,61 @@ export default function Review() {
             aria-label="Process Record"
             onClick={() => {
               setCanvasMode('playback');
+              setMobileView('canvas');
               setHighlightPasted(true);
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              canvasMode === 'playback'
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              canvasMode === 'playback' && mobileView === 'canvas'
                 ? 'bg-[#0047FF] text-white shadow-xs font-bold'
                 : 'text-gray-600 hover:text-[#1A1A1B]'
             }`}
           >
-            <Film className="w-3.5 h-3.5" />
-            <span>Replay</span>
+            <Film className="w-3.5 h-3.5 shrink-0" />
+            <span className="text-[11px] sm:text-xs">Replay</span>
           </button>
         </div>
 
-        {/* Right Tools & Collapse Toggle */}
-        <div className="flex items-center gap-2">
+        {/* Right: Actions & Responsive View Toggles */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Mobile Analytics Switcher Button (visible only on < lg screens) */}
+          <button
+            type="button"
+            onClick={() => setMobileView(mobileView === 'details' ? 'canvas' : 'details')}
+            className={`lg:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+              mobileView === 'details'
+                ? 'bg-[#0047FF] text-white border-[#0047FF]'
+                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+            }`}
+            title="Toggle Analytics View"
+          >
+            <BarChart2 className="w-3.5 h-3.5" />
+            <span className="text-[11px]">Analytics</span>
+          </button>
+
           {/* Highlight Toggle */}
           {pastedStrings.length > 0 && (
             <button
               type="button"
               onClick={() => setHighlightPasted(!highlightPasted)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
                 highlightPasted
                   ? 'bg-amber-50 text-amber-950 border-amber-300 ring-1 ring-amber-300/40'
                   : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
               }`}
               title={highlightPasted ? 'Hide Pasted Text Highlights' : 'Highlight Pasted Text'}
             >
-              <Highlighter className="w-3.5 h-3.5 text-amber-700" />
-              <span className="hidden md:inline">
+              <Highlighter className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+              <span className="hidden sm:inline text-[11px] sm:text-xs">
                 {highlightPasted ? 'Highlights: ON' : 'Highlights: OFF'}
               </span>
             </button>
           )}
 
-          {/* Sidebar Collapse Toggle */}
+          {/* Desktop Sidebar Toggle */}
           <button
             type="button"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+            className={`hidden lg:flex p-1.5 rounded-lg border transition-colors cursor-pointer ${
               sidebarOpen
                 ? 'bg-[#0047FF]/5 text-[#0047FF] border-[#0047FF]/20'
                 : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
@@ -268,8 +276,8 @@ export default function Review() {
           </button>
 
           {user && (
-            <div className="pl-1 border-l border-gray-200 ml-1">
-              <UserAvatar user={user} size={28} className="ring-1 ring-black/5" />
+            <div className="hidden sm:block pl-1 border-l border-gray-200 ml-0.5">
+              <UserAvatar user={user} size={26} className="ring-1 ring-black/5" />
             </div>
           )}
         </div>
@@ -277,24 +285,28 @@ export default function Review() {
 
       {/* Leader Override Alert Banner (if applicable) */}
       {data.override?.used && (
-        <div className="bg-amber-50 border-b border-amber-300 px-6 py-2.5 shadow-xs flex items-center justify-between gap-4 text-xs text-amber-900 shrink-0 z-20">
+        <div className="bg-amber-50 border-b border-amber-300 px-4 sm:px-6 py-2.5 shadow-xs flex items-center justify-between gap-4 text-xs text-amber-900 shrink-0 z-20">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
             <span>
               <strong>Submitted via leader override by {data.override.by_name}.</strong> Reason: <em>"{data.override.reason}"</em>
             </span>
           </div>
-          <span className="font-mono text-[11px] text-amber-800 shrink-0">
+          <span className="font-mono text-[11px] text-amber-800 shrink-0 hidden sm:inline">
             Non-done: {(data.override.non_done || []).map((n) => n.student_name).join(', ')}
           </span>
         </div>
       )}
 
-      {/* Main Workspace: Centered Paper Document + Unified Evidence Sidebar */}
+      {/* Main Workspace */}
       <div className="flex-1 flex overflow-hidden relative">
         
         {/* CENTER MAIN CANVAS: Realistic Paper Taking Full Available Space */}
-        <main className="flex-1 flex flex-col overflow-hidden relative bg-[#ECEAE5]">
+        <main
+          className={`flex-1 flex-col overflow-hidden relative bg-[#ECEAE5] ${
+            mobileView === 'details' ? 'hidden lg:flex' : 'flex'
+          }`}
+        >
           {isGroup ? (
             <GroupFinalDoc content={data.content} sections={sections} />
           ) : (
@@ -309,18 +321,22 @@ export default function Review() {
           )}
         </main>
 
-        {/* RIGHT COLLAPSIBLE SIDEBAR: Always Accessible Multi-Tab Evidence Center */}
+        {/* EVIDENCE SIDEBAR / MOBILE FULL SHEET */}
         <aside
           className={`${
-            sidebarOpen ? 'w-84 sm:w-96' : 'w-0 hidden'
-          } border-l border-gray-200 bg-[#F9F8F6] flex flex-col shrink-0 overflow-y-auto transition-all duration-200 z-10 p-4 space-y-4`}
+            mobileView === 'details'
+              ? 'flex-1 w-full lg:flex-none lg:w-84 xl:w-96 flex'
+              : sidebarOpen
+              ? 'hidden lg:flex lg:w-84 xl:w-96'
+              : 'hidden'
+          } border-l border-gray-200 bg-[#F9F8F6] flex-col shrink-0 overflow-y-auto transition-all duration-200 z-10 p-3 sm:p-4 space-y-4`}
         >
-          {/* Universal 4-Tab Evidence Navigation */}
-          <div className="flex items-center bg-white p-1 rounded-xl border border-gray-200 shadow-2xs text-xs font-mono shrink-0">
+          {/* Universal 4-Tab Evidence Navigation with Horizontal Scroll on Mobile */}
+          <div className="flex items-center bg-white p-1 rounded-xl border border-gray-200 shadow-2xs text-xs font-mono shrink-0 overflow-x-auto">
             <button
               type="button"
               onClick={() => setSidebarTab('overview')}
-              className={`flex-1 py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
+              className={`flex-1 min-w-[72px] py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
                 sidebarTab === 'overview'
                   ? 'bg-[#0047FF] text-white shadow-xs'
                   : 'text-gray-600 hover:bg-gray-50'
@@ -331,7 +347,7 @@ export default function Review() {
             <button
               type="button"
               onClick={() => setSidebarTab('pattern')}
-              className={`flex-1 py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
+              className={`flex-1 min-w-[72px] py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
                 sidebarTab === 'pattern'
                   ? 'bg-[#0047FF] text-white shadow-xs'
                   : 'text-gray-600 hover:bg-gray-50'
@@ -342,7 +358,7 @@ export default function Review() {
             <button
               type="button"
               onClick={() => setSidebarTab('timeline')}
-              className={`flex-1 py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
+              className={`flex-1 min-w-[72px] py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
                 sidebarTab === 'timeline'
                   ? 'bg-[#0047FF] text-white shadow-xs'
                   : 'text-gray-600 hover:bg-gray-50'
@@ -353,7 +369,7 @@ export default function Review() {
             <button
               type="button"
               onClick={() => setSidebarTab('sources')}
-              className={`flex-1 py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
+              className={`flex-1 min-w-[72px] py-1.5 text-center rounded-lg font-bold transition-all cursor-pointer ${
                 sidebarTab === 'sources'
                   ? 'bg-[#0047FF] text-white shadow-xs'
                   : 'text-gray-600 hover:bg-gray-50'
@@ -375,6 +391,7 @@ export default function Review() {
                   setSidebarTab('timeline');
                   setCanvasMode('playback');
                   setHighlightPasted(true);
+                  setMobileView('canvas');
                 }}
                 isGroup={isGroup}
               />
@@ -415,6 +432,7 @@ export default function Review() {
                 onSeekToEvent={(stepIdx) => {
                   setCanvasMode('playback');
                   setSeekStepIndex(stepIdx);
+                  setMobileView('canvas');
                 }}
               />
             </div>
