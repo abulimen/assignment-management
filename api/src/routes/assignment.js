@@ -43,9 +43,11 @@ export default async function assignment(ctx) {
       const [subs] = await ctx.pool.query(`
         SELECT s.id, s.student_id, u.name AS student_name, u.email AS student_email,
                s.status, s.submitted_at, s.created_at, s.group_id,
+               g.name AS group_name,
                st.keystroke_count, st.paste_count, st.delete_count, st.avg_wpm, st.total_time_ms
         FROM submissions s
         JOIN users u ON u.id = s.student_id
+        LEFT JOIN \`groups\` g ON g.id = s.group_id
         LEFT JOIN submission_stats st ON st.submission_id = s.id
         WHERE s.assignment_id = ?
           AND s.status = 'submitted'

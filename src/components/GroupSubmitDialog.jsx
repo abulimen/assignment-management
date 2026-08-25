@@ -1,13 +1,33 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, AlertTriangle, CheckCircle2, Lock } from 'lucide-react';
-import { STATUS_LABEL } from '../utils/groupStatus';
+import { STATUS_LABEL, statusSummary } from '../utils/groupStatus';
 
 // The submit ceremony. Two modes:
 //  - normal:   everyone is Done — plain confirmation.
 //  - override: someone isn't Done — names each of them, requires a reason.
-export default function GroupSubmitDialog({ summary, isOverride, busy, onClose, onConfirm }) {
+export default function GroupSubmitDialog({
+  summary: propSummary,
+  group,
+  isOverride: propIsOverride,
+  override,
+  busy = false,
+  onClose,
+  onConfirm,
+  onSubmit,
+}) {
   const [reason, setReason] = useState('');
+
+  const summary =
+    propSummary ||
+    (group?.members
+      ? statusSummary(group.members)
+      : { total: 0, doneCount: 0, allDone: false, notDone: [] });
+  const isOverride = propIsOverride ?? override ?? !summary.allDone;
+  const notDoneList = summary?.notDone || [];
+  const totalCount = summary?.total ?? 0;
+  const handleConfirm = onConfirm || onSubmit;
+
   const valid = !isOverride || reason.trim().length > 0;
 
   const modalContent = (
@@ -57,7 +77,7 @@ export default function GroupSubmitDialog({ summary, isOverride, busy, onClose, 
               The following members have <strong className="text-amber-800">not</strong> marked themselves Done. Submitting now will record exactly who was not finished in the permanent institutional record.
             </p>
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1.5">
-              {summary.notDone.map((m) => (
+              {notDoneList.map((m) => (
                 <div key={m.student_id} className="flex items-center justify-between gap-2 text-xs">
                   <span className="font-bold text-amber-900 min-w-0 truncate">{m.student_name}</span>
                   <span className="font-mono text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded shrink-0">
@@ -83,7 +103,7 @@ export default function GroupSubmitDialog({ summary, isOverride, busy, onClose, 
         ) : (
           <div className="space-y-2">
             <p className="text-xs text-gray-600 leading-relaxed font-sans">
-              All <strong className="text-[#1A1A1B]">{summary.total} members</strong> have marked their sections Done.
+              All <strong className="text-[#1A1A1B]">{totalCount} members</strong> have marked their sections Done.
             </p>
             <p className="text-xs text-gray-500 leading-relaxed font-sans">
               Submitting seals the shared document. No further edits will be permitted once sealed.
@@ -100,7 +120,7 @@ export default function GroupSubmitDialog({ summary, isOverride, busy, onClose, 
             Cancel
           </button>
           <button
-            onClick={() => onConfirm(isOverride ? reason.trim() : null)}
+            onClick={() => handleConfirm?.(isOverride ? reason.trim() : null)}
             disabled={!valid || busy}
             className={`px-5 py-2 text-xs font-bold text-white rounded-lg shadow-sm transition-all disabled:opacity-50 cursor-pointer ${
               isOverride

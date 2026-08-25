@@ -20,6 +20,7 @@ const MIME = {
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml',
   '.map': 'application/json',
 };
 
@@ -34,6 +35,13 @@ const SPA_ROOT_FILES = new Set([
   'icon-512.png',
   'icon-maskable-512.png',
   'robots.txt',
+  'sitemap.xml',
+  'llms.txt',
+  'favicon.svg',
+  'favicon.ico',
+  'favicon-32.png',
+  'favicon-16.png',
+  'og-image.png',
 ]);
 
 // Cache-Control policy (headed for the Lighthouse performance/best-practices
@@ -249,7 +257,7 @@ export function createApiServer({ port, config, staticDir = null }) {
             if (fs.existsSync(file) && fs.statSync(file).isFile()) {
               const extraHeaders = {};
               if (base === 'sw.js') extraHeaders['Service-Worker-Allowed'] = '/';
-              const cacheControl = base === 'sw.js' || base === 'manifest.webmanifest' || base === 'robots.txt'
+              const cacheControl = base === 'sw.js' || base === 'manifest.webmanifest' || base === 'robots.txt' || base === 'sitemap.xml' || base === 'llms.txt'
                 ? CACHE_NO_CACHE
                 : CACHE_FONTS;
               return serveStaticFile(req, res, file, { cacheControl, extraHeaders });

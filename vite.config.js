@@ -15,6 +15,25 @@ export default defineConfig(({ mode }) => ({
       '/api': 'http://localhost:8001',
       '/collab': { target: 'ws://localhost:8003', ws: true },
       '/track': { target: 'ws://localhost:8005', ws: true },
+      // Root-level static files live in public/ and are served by the API
+      // static host (publicDir is false so builds don't copy them into
+      // public/assets). Without these proxies the Vite dev server falls back
+      // to the SPA shell for them — fonts/manifest then fail to decode
+      // ("invalid sfntVersion" = the bytes of <!DOCTYPE html…).
+      '/fonts': 'http://localhost:8001',
+      '/manifest.webmanifest': 'http://localhost:8001',
+      '/favicon.ico': 'http://localhost:8001',
+      '/favicon.svg': 'http://localhost:8001',
+      '/favicon-32.png': 'http://localhost:8001',
+      '/favicon-16.png': 'http://localhost:8001',
+      '/icon-192.png': 'http://localhost:8001',
+      '/icon-512.png': 'http://localhost:8001',
+      '/icon-maskable-512.png': 'http://localhost:8001',
+      '/og-image.png': 'http://localhost:8001',
+      '/robots.txt': 'http://localhost:8001',
+      '/sitemap.xml': 'http://localhost:8001',
+      '/llms.txt': 'http://localhost:8001',
+      '/sw.js': 'http://localhost:8001',
     },
   },
   publicDir: false,

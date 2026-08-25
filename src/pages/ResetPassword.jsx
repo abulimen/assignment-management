@@ -5,9 +5,11 @@ import { AlertCircle, CircleCheckBig } from 'lucide-react';
 import {
   AuthShell, AuthSuccess, authCard, authInput, authBtn, authLink, authError,
 } from '../components/AuthShell';
+import { useSeo } from '../utils/seo';
 
 // Password reset. token arrives as ?token=<raw> from the emailed link.
 export default function ResetPassword() {
+  useSeo({ title: 'Reset password — Draftly', description: 'Set a new password for your Draftly account.', canonical: '/reset-password' });
   const [params] = useSearchParams();
   const token = params.get('token');
 

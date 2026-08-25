@@ -34,16 +34,21 @@ export default function SubmissionList({ submissions }) {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-bold text-sm text-[#1A1A1B] group-hover:text-[#0047FF] transition-colors truncate">
-                    {s.student_name || 'Unknown Student'}
+                    {s.group_name || s.student_name || 'Unknown Student'}
                   </p>
-                  {s.student_matric && (
+                  {s.group_name && (
+                    <span className="text-[10px] font-mono font-bold text-[#0047FF] bg-[#0047FF]/5 px-1.5 py-0.5 rounded-md border border-[#0047FF]/20">
+                      GROUP
+                    </span>
+                  )}
+                  {!s.group_name && s.student_matric && (
                     <span className="text-[10px] font-mono font-bold text-gray-600 bg-white px-1.5 py-0.5 rounded-md border border-gray-200">
                       ID: {s.student_matric}
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-gray-500 font-mono truncate mt-0.5">
-                  {s.student_email}
+                  {s.group_name ? `Submitted by ${s.student_name}` : s.student_email}
                 </p>
               </div>
             </div>

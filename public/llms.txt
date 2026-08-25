@@ -1,0 +1,40 @@
+# Draftly
+
+> Draftly is an assignment workspace for higher education — students do the work individually or together in a tracked, Word-styled editor, and lecturers review how the work developed from first draft to final submission. Realtime group editing runs on one shared document per group (Yjs + Hocuspocus) with per-member contribution tracking.
+
+## Overview
+- Product site: [/](/)
+- Source of truth for proof-of-work: `collab_attribution` + sealed server snapshot at submit, surfaced in playback + verdict
+- Stack: React + TipTap/Yjs, Node API (port 8001), Analyzer (8002), Collab/Hocuspocus (8003/8004/8005)
+
+## Public pages
+- [Landing — See the work behind the submission](/) — public homepage
+- [Log in](/login)
+- [Create account](/register)
+- [Forgot password](/forgot-password) · [Reset password](/reset-password) · [Verify email](/verify-email)
+- [Privacy Policy](/privacy) — also at [/privacy-policy](/privacy-policy)
+- [Terms of Service](/terms) — also at [/terms-of-service](/terms-of-service)
+- [Cookie Policy](/cookies) — also at [/cookie-policy](/cookie-policy)
+
+## For students
+- Individual assignments are written in a tracked Word-styled TipTap editor; every keystroke/paste/edit is captured via a realtime WebSocket stream
+- Group assignments: the whole group edits ONE shared sectioned document; members create/name/reorder sections; leader submits when all are Done (or overrides with a reason); submission seals a server-side snapshot
+- Dashboard, course hub, and group work pages are authenticated: [/dashboard](/dashboard), [/courses/:id](/courses/:id), [/assignments/:id](/assignments/:id), [/group/:id](/group/:id)
+
+## For lecturers
+- Assignment CRUD and roster: [/assignments/:id](/assignments/:id) (owner sees groups), [/assignments/:id/groups](/assignments/:id/groups)
+- Review & integrity: [/review/:id](/review/:id) (playback, insights, originality verdict bound to the sealed snapshot)
+- Verdict engine: stateless analyzer at `POST /api/submissions/:id/verdict` (five evidence-weighted factors, continuous curves, no caps)
+
+## API
+- Auth: `POST /api/register`, `POST /api/login` (HS256 JWT, 7-day expiry) — see [AGENTS.md](/AGENTS.md) and `docs/superpowers/plans/api-route-contract.md` when present
+- Docs & contract: see repository `README.md`, `DESIGN.md`, `PRODUCT.md`
+
+## Legal & preferences
+- Privacy choices and cookie preferences are managed in-app; see [Privacy](/privacy) and [Cookie Policy](/cookies)
+- Robots: [/robots.txt](/robots.txt) · Sitemap: [/sitemap.xml](/sitemap.xml) · Manifest: [/manifest.webmanifest](/manifest.webmanifest)
+
+## Notes for AI agents
+- Do not attempt to crawl authenticated routes without a valid `Authorization: Bearer <jwt>` header
+- `POST /api/events` (HTTP fallback) and the tracking WebSocket (`/track?token=<jwt>`) accept event batches for `submission_id`
+- Canonical URLs are relative (e.g. `/login`); resolve against the site origin at request time — no domain is hardcoded in `sitemap.xml` or `llms.txt` by design

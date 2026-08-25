@@ -1,5 +1,6 @@
 import React from 'react';
 import { LegalLayout } from '../components/legal/LegalLayout';
+import { useSeo } from '../utils/seo';
 import { 
   FileText, 
   Sparkles, 
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 
 export default function TermsOfService() {
+  useSeo({ title: 'Terms of Service — Draftly', description: 'Terms governing use of the Draftly assignment workspace, student IP, and group contribution records.', canonical: '/terms' });
   const toc = [
     { id: 'acceptance', title: '1. Acceptance & Eligibility' },
     { id: 'service-description', title: '2. The Draftly Workspace Service' },

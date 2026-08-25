@@ -5,10 +5,12 @@ import { MailCheck, AlertCircle } from 'lucide-react';
 import {
   AuthShell, AuthSuccess, authCard, authInput, authBtn, authLink, authError,
 } from '../components/AuthShell';
+import { useSeo } from '../utils/seo';
 
 // Password reset request. Always returns a generic "if registered" message —
 // the server never reveals whether an account exists.
 export default function ForgotPassword() {
+  useSeo({ title: 'Forgot password — Draftly', description: 'Request a password reset link for your Draftly account.', canonical: '/forgot-password' });
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);

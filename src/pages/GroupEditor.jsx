@@ -15,9 +15,11 @@ import { useMinLoading } from '../hooks/useMinLoading';
 import { useSectionPresence } from '../hooks/useSectionPresence';
 import { api } from '../api';
 import { collabUrl, authToken } from '../collabConfig';
-import { buildAuthorColorMap, AUTHOR_PALETTE } from '../utils/authorship';
+import { buildAuthorColorMap, solidAuthorColor } from '../utils/authorship';
 import { statusSummary, STATUS_LABEL } from '../utils/groupStatus';
 import { listSections } from '../utils/sectionDoc';
+import { decodeId } from '../utils/id';
+import { reviewLink } from '../utils/links';
 import { TextSelection } from '@tiptap/pm/state';
 import {
   ArrowLeft,
@@ -37,6 +39,9 @@ import {
 
 export default function GroupEditor() {
   const { groupId } = useParams();
+  // URLs carry obfuscated ids; the collab server keys documents numerically
+  // ("group:<id>", see collab/src/server.js parseDocName).
+  const numericGroupId = decodeId(groupId);
   const { user } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
@@ -53,7 +58,10 @@ export default function GroupEditor() {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [, setTick] = useState(0);
 
-  const isCollabReady = Boolean(collab && anchorId != null);
+  const isLecturerView = user?.role === 'lecturer';
+  // Lecturers never write, so they have no anchor submission — readiness only
+  // requires the collab session for them.
+  const isCollabReady = Boolean(collab && (isLecturerView || anchorId != null));
   const showSkeleton = useMinLoading(!isCollabReady, 280);
 
   // Who is editing which section right now
@@ -128,11 +136,11 @@ export default function GroupEditor() {
     if (!group || submitBusy) return;
     setSubmitBusy(true);
     try {
-      await api.post(`groups/${group.id}/submit`, overrideReason ? { override_reason: overrideReason } : {});
+      const d = await api.post(`groups/${group.id}/submit`, overrideReason ? { override_reason: overrideReason } : {});
       setSubmitDialog(null);
-      const d = await api.get(`groups/${group.id}`);
-      setGroup(d.group);
       toast.success('Group assignment submitted and sealed successfully!');
+      // The seal returns the merged submission id — go straight to its review.
+      navigate(reviewLink(d.submission_id));
     } catch (err) {
       toast.error(err.message || 'Submission failed');
     } finally {
@@ -151,25 +159,46 @@ export default function GroupEditor() {
         const d = await api.get(`groups/${groupId}`);
         if (unmounted) return;
         setGroup(d.group);
-        setAnchorId(d.anchor_submission_id);
+
+        // Anchor submission: the per-member draft row that realtime event
+        // tracking attaches to (POST /api/submissions is find-or-create, and
+        // playback joins member events via these rows). Lecturers don't
+        // write, so they get none.
+        if (user?.role === 'student') {
+          const s = await api.post('submissions', { assignment_id: d.group.assignment_id });
+          if (!unmounted) setAnchorId(s.submission.id);
+        }
 
         ydoc = new Y.Doc();
         const token = authToken();
+        let authFailed = false;
         provider = new HocuspocusProvider({
           url: collabUrl(),
-          name: `group-${groupId}`,
+          name: `group:${numericGroupId}`,
           document: ydoc,
           token,
           onStatus: ({ status }) => {
-            if (!unmounted) setConnStatus(status);
+            // 'connected' only means the websocket opened — auth may still
+            // fail. Only onSynced proves the document session is live.
+            if (!unmounted && status !== 'connected') setConnStatus(status);
           },
           onSynced: () => {
             if (!unmounted) setConnStatus('connected');
           },
+          onClose: ({ event }) => {
+            // 4401/4403 = the server rejected the token/document (the provider
+            // retries silently forever — surface it once instead).
+            if (unmounted || authFailed) return;
+            if (event?.code === 4403 || event?.code === 4401) {
+              authFailed = true;
+              setConnStatus('auth-failed');
+              toast.error('Realtime collaboration failed to authenticate — reload the page (log in again if it persists).');
+            }
+          },
         });
 
         if (user) {
-          const color = AUTHOR_PALETTE[Math.abs(user.id || 0) % AUTHOR_PALETTE.length];
+          const color = solidAuthorColor(user.id || 0);
           provider.setAwarenessField('user', {
             id: user.id,
             name: user.name,
@@ -204,7 +233,10 @@ export default function GroupEditor() {
 
   const currentMember = (group?.members || []).find((m) => m.student_id === user?.id);
   const isLeader = group && user && group.leader_id === user.id;
-  const frozen = group?.status === 'submitted';
+  // Sealed = groups.frozen_at (set by the two-phase submit). There is no
+  // groups.status column — keying off `status` kept the Submit button visible
+  // forever after a successful submission.
+  const frozen = !!group?.frozen_at;
   const summary = statusSummary(group?.members || []);
 
   const extraExtensions = useMemo(() => {
@@ -465,10 +497,18 @@ export default function GroupEditor() {
             activeMobileTab === 'editor' ? 'flex' : 'hidden md:flex'
           }`}
         >
-          {collab && anchorId && (
+          {collab && (isLecturerView || anchorId) && (
             <Editor
-              ydoc={collab.ydoc}
-              provider={collab.provider}
+              collab={{
+                ydoc: collab.ydoc,
+                provider: collab.provider,
+                user: {
+                  id: user?.id,
+                  name: user?.name,
+                  role: user?.role,
+                  color: solidAuthorColor(user?.id || 0),
+                },
+              }}
               submissionId={anchorId}
               onReady={(ed) => setEditor(ed)}
               editable={!frozen}
@@ -496,7 +536,7 @@ export default function GroupEditor() {
                 </span>
               </div>
               <span className="text-[10px] font-mono text-gray-500 font-bold">
-                {summary.doneCount}/{summary.totalCount} Done
+                {summary.doneCount}/{summary.total} Done
               </span>
             </div>
 
@@ -593,19 +633,19 @@ export default function GroupEditor() {
           }`}
         >
           <Users className="w-5 h-5" />
-          <span className="text-[11px] font-sans">Team ({summary.doneCount}/{summary.totalCount})</span>
+          <span className="text-[11px] font-sans">Team ({summary.doneCount}/{summary.total})</span>
         </button>
       </nav>
 
       {/* Submit Confirmation Dialog */}
       {submitDialog && (
         <GroupSubmitDialog
+          summary={summary}
           group={group}
-          isOpen={true}
-          override={submitDialog.override}
+          isOverride={submitDialog.override}
           busy={submitBusy}
           onClose={() => setSubmitDialog(null)}
-          onSubmit={handleSubmit}
+          onConfirm={handleSubmit}
         />
       )}
 

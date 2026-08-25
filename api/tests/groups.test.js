@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { getHarness, apiCall, registerUser } from './helpers/harness.js';
+import { encodeId } from '@am/core';
 
 let h;
 let lecturer;
@@ -46,6 +47,23 @@ describe('POST /api/groups', () => {
     const { status, json } = await apiCall(h.api, 'groups', { method: 'POST', token: lecturer.token, body: { assignment_id: aid } });
     expect(status).toBe(403);
     expect(json.error).toBe('Only students can create groups');
+  });
+
+  it('accepts an obfuscated (encoded) assignment id — the SPA always sends encoded ids', async () => {
+    const aid = await makeGroupAssignment();
+    const { status, json } = await apiCall(h.api, 'groups', {
+      method: 'POST', token: student.token, body: { assignment_id: encodeId(aid), name: 'Encoded Team' },
+    });
+    expect(status).toBe(201);
+    expect(json.group.name).toBe('Encoded Team');
+  });
+
+  it('404 for a garbage assignment id (not decodable)', async () => {
+    const { status, json } = await apiCall(h.api, 'groups', {
+      method: 'POST', token: student.token, body: { assignment_id: 'not-an-id', name: 'Ghost' },
+    });
+    expect(status).toBe(404);
+    expect(json.error).toBe('Assignment not found');
   });
 
   it('404 for a missing assignment', async () => {

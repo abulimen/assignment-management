@@ -1,5 +1,6 @@
 import React from 'react';
 import { LegalLayout } from '../components/legal/LegalLayout';
+import { useSeo } from '../utils/seo';
 import { 
   Cookie, 
   CheckCircle2, 
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react';
 
 export default function CookiePolicy() {
+  useSeo({ title: 'Cookie Policy — Draftly', description: 'How Draftly uses cookies and local storage — no third-party advertising cookies, only essential session and preference storage.', canonical: '/cookies' });
   const toc = [
     { id: 'overview', title: '1. What Are Cookies & Local Storage' },
     { id: 'why-we-use', title: '2. Why Draftly Uses Storage Technologies' },

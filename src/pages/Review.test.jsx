@@ -14,7 +14,16 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 }
 
 vi.mock('../api', () => ({ api: { get: vi.fn() } }));
-vi.mock('../components/GroupFinalDoc', () => ({ default: () => <div>group-final-doc</div> }));
+
+// Capture GroupFinalDoc props: the sealed group document must actually reach
+// the component (content + sections), or the review canvas renders empty.
+const groupFinalDocProps = vi.fn();
+vi.mock('../components/GroupFinalDoc', () => ({
+  default: (props) => {
+    groupFinalDocProps(props);
+    return <div>group-final-doc</div>;
+  },
+}));
 
 const hourly = Array.from({ length: 24 }, (_, h) => ({ h, n: 0 }));
 const insights = {
@@ -123,5 +132,16 @@ describe('Review (group)', () => {
     // Sidebars display group breakdown
     expect(screen.getByText('Submission Record')).toBeInTheDocument();
     expect(screen.getByText('Member Contributions')).toBeInTheDocument();
+  });
+
+  // Regression: GroupFinalDoc was rendered without content/sections, so the
+  // sealed snapshot never reached the canvas (blank page, 0 words, no authors).
+  it('hands the sealed snapshot content and member sections to GroupFinalDoc', async () => {
+    renderReview();
+    expect(await screen.findByText('group-final-doc')).toBeInTheDocument();
+    expect(groupFinalDocProps).toHaveBeenCalled();
+    const props = groupFinalDocProps.mock.lastCall[0];
+    expect(props.content).toBe(groupPlayback.content);
+    expect(props.sections).toEqual(groupPlayback.sections);
   });
 });

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { sendJson, sendError, guard, missingField } from '../http.js';
+import { decodeId } from '@am/core';
 
 // 6-char uppercase invite code (mirrors groups.php's md5/uniqid truncation:
 // 6 chars of an md5 hex, uppercased).
@@ -15,8 +16,10 @@ export default async function createGroup(ctx) {
   if (user.role !== 'student') return sendError(ctx, 403, 'Only students can create groups');
   const data = ctx.body;
   if (missingField(data, 'assignment_id')) return sendError(ctx, 422, 'Missing required field: assignment_id');
+  const assignmentId = decodeId(data.assignment_id);
+  if (!assignmentId) return sendError(ctx, 404, 'Assignment not found');
 
-  const [aRows] = await ctx.pool.query('SELECT course_id, is_group_work, target_type FROM assignments WHERE id = ?', [data.assignment_id]);
+  const [aRows] = await ctx.pool.query('SELECT course_id, is_group_work, target_type FROM assignments WHERE id = ?', [assignmentId]);
   const a = aRows[0];
   if (!a) return sendError(ctx, 404, 'Assignment not found');
   if (!Number(a.is_group_work)) return sendError(ctx, 422, 'This assignment is not group work');
@@ -31,7 +34,7 @@ export default async function createGroup(ctx) {
   if (a.target_type === 'selected') {
     const [isPart] = await ctx.pool.query(
       'SELECT 1 FROM assignment_participants WHERE assignment_id = ? AND user_id = ?',
-      [data.assignment_id, user.sub],
+      [assignmentId, user.sub],
     );
     if (isPart.length === 0) return sendError(ctx, 403, 'You are not an assigned participant for this coursework');
   }
@@ -40,14 +43,14 @@ export default async function createGroup(ctx) {
     SELECT g.id FROM \`groups\` g
     JOIN group_members gm ON gm.group_id = g.id
     WHERE g.assignment_id = ? AND gm.student_id = ?
-  `, [data.assignment_id, user.sub]);
+  `, [assignmentId, user.sub]);
   if (existing.length) return sendError(ctx, 409, 'You are already in a group for this assignment');
 
   const inviteCode = generateInviteCode();
   const name = data.name ?? `Group ${inviteCode}`;
   const [ir] = await ctx.pool.query(
     'INSERT INTO `groups` (assignment_id, name, leader_id, invite_code) VALUES (?, ?, ?, ?)',
-    [data.assignment_id, name, user.sub, inviteCode],
+    [assignmentId, name, user.sub, inviteCode],
   );
   const groupId = ir.insertId;
   await ctx.pool.query('INSERT INTO group_members (group_id, student_id) VALUES (?, ?)', [groupId, user.sub]);

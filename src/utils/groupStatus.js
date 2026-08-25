@@ -14,6 +14,7 @@ export function statusSummary(members) {
   const notDone = list.filter((m) => m.status !== 'done');
   return {
     total: list.length,
+    totalCount: list.length,
     doneCount: done.length,
     allDone: list.length > 0 && done.length === list.length,
     notDone,

@@ -5,8 +5,10 @@ import { AlertCircle, MailCheck } from 'lucide-react';
 import {
   AuthShell, AuthSuccess, authCard, authInput, authBtn, authLink, authError,
 } from '../components/AuthShell';
+import { useSeo } from '../utils/seo';
 
 export default function Register() {
+  useSeo({ title: 'Create account — Draftly', description: 'Create a Draftly account to start doing coursework in a tracked workspace — solo or with your group.', canonical: '/register' });
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'student', student_id: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);

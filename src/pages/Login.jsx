@@ -4,8 +4,10 @@ import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
 import { AlertCircle } from 'lucide-react';
 import { AuthShell, authCard, authInput, authBtn, authLink, authError } from '../components/AuthShell';
+import { useSeo } from '../utils/seo';
 
 export default function Login() {
+  useSeo({ title: 'Log in — Draftly', description: 'Log in to Draftly to continue your assignment workspace.', canonical: '/login' });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');

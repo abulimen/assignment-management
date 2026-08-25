@@ -365,11 +365,8 @@ export default function Review() {
         >
           {isGroup ? (
             <GroupFinalDoc
-              assignmentId={data.assignment_id}
-              groupId={data.group_id}
-              title={data.assignment_title}
-              highlightPasted={highlightPasted}
-              pastedTexts={pastedStrings}
+              content={data?.content}
+              sections={data?.sections}
             />
           ) : (
             <Playback
@@ -391,8 +388,8 @@ export default function Review() {
           ref={sidebarRef}
           onScroll={handleSidebarScroll}
           className={`w-full lg:w-96 border-l border-gray-200 bg-[#F9F8F6] p-4 flex-col gap-4 shrink-0 overflow-y-auto relative ${
-            sidebarOpen ? 'flex' : 'hidden'
-          } ${mobileTab === 'analytics' ? 'flex w-full' : 'hidden lg:flex'}`}
+            sidebarOpen ? 'lg:flex' : 'lg:hidden'
+          } ${mobileTab === 'analytics' ? 'flex w-full' : 'hidden'}`}
         >
           {/* Sidebar Segmented Tabs */}
           <div className="flex items-center bg-white border border-gray-200 p-1 rounded-xl text-xs font-semibold shrink-0 shadow-2xs gap-0.5 sticky top-0 z-20">

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Draftly logo">
+  <!-- Geometric Balance mark: charcoal field with cobalt base — matches src/components/landing/Logo.tsx -->
+  <rect width="32" height="32" rx="6" fill="#1A1A1B"/>
+  <!-- blue occupies bottom half (h=16), bottom corners rounded to match container -->
+  <path d="M0 16 H32 V26 A6 6 0 0 1 26 32 H6 A6 6 0 0 1 0 26 Z" fill="#0047FF"/>
+</svg>

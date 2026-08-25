@@ -5,11 +5,13 @@ import { MailCheck, AlertCircle, Loader2 } from 'lucide-react';
 import {
   AuthShell, AuthSuccess, authCard, authInput, authBtn, authLink, authError,
 } from '../components/AuthShell';
+import { useSeo } from '../utils/seo';
 
 // Email-verification screen.
 // - With ?token= (clicked in the emailed link): verifies and shows the result.
 // - Without a token: info + resend form + link to sign in.
 export default function VerifyEmail() {
+  useSeo({ title: 'Verify email — Draftly', description: 'Verify your email address to activate your Draftly account.', canonical: '/verify-email' });
   const [params] = useSearchParams();
   const location = useLocation();
   const token = params.get('token');

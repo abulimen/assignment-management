@@ -13,6 +13,13 @@ export const AUTHOR_PALETTE = [
   'rgba(20, 184, 166, 0.30)', // teal
 ];
 
+// The base palette is 30% alpha — right for author-mark highlight fills, far
+// too faint for cursors, name labels and presence dots. Full opacity, same hue.
+export function solidAuthorColor(index) {
+  const i = ((index % AUTHOR_PALETTE.length) + AUTHOR_PALETTE.length) % AUTHOR_PALETTE.length;
+  return AUTHOR_PALETTE[i].replace(/0?\.30\)$/, '1)');
+}
+
 // Extract plain text from a TipTap doc JSON (walks content[].content[].text).
 export function extractDocText(docJson) {
   if (!docJson || !docJson.content) return '';

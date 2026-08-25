@@ -4,6 +4,7 @@ import {
   buildAuthorColorMap,
   addAuthorMarks,
   AUTHOR_PALETTE,
+  solidAuthorColor,
 } from './authorship';
 
 const doc = {
@@ -43,6 +44,18 @@ describe('buildAuthorColorMap', () => {
   it('has 8 distinct colors in palette', () => {
     expect(AUTHOR_PALETTE.length).toBe(8);
     expect(new Set(AUTHOR_PALETTE).size).toBe(8);
+  });
+});
+
+describe('solidAuthorColor', () => {
+  it('keeps the hue but removes the 30% alpha (cursors must be opaque)', () => {
+    expect(solidAuthorColor(0)).toBe('rgba(89, 63, 145, 1)');
+    expect(solidAuthorColor(4)).toBe('rgba(236, 72, 153, 1)');
+  });
+
+  it('wraps around the palette and tolerates negative indices', () => {
+    expect(solidAuthorColor(8)).toBe(solidAuthorColor(0));
+    expect(solidAuthorColor(-1)).toBe(solidAuthorColor(7));
   });
 });
 

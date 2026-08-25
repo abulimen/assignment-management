@@ -9,22 +9,35 @@
       content="Draftly gives students a workspace to complete assignments individually or together, and preserves how the work develops from first draft to final submission. Free for early lecturers during the beta."
     />
     <meta name="theme-color" content="#F9F8F6" />
+    <!-- canonical is injected per-route via src/utils/seo.js (relative, e.g. "/login") so the static shell stays agnostic and Vite doesn't try to bundle "/" as an asset -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Draftly" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content="/" />
     <meta property="og:title" content="Draftly — See the work behind the submission" />
     <meta
       property="og:description"
       content="An assignment workspace where students actually do the coursework, individually or as a group, with a trustworthy record of how the work developed."
     />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Draftly — See the work behind the submission" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Draftly — See the work behind the submission" />
     <meta
       name="twitter:description"
       content="An assignment workspace where students actually do the coursework, individually or as a group, with a trustworthy record of how the work developed."
     />
+    <meta name="twitter:image" content="/og-image.png" />
+    <meta name="twitter:image:alt" content="Draftly — See the work behind the submission" />
     <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-400.woff2" crossorigin />
     <link rel="preload" as="font" type="font/woff2" href="/fonts/jetbrains-mono-400.woff2" crossorigin />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
   </head>

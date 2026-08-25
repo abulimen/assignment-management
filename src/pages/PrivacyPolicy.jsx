@@ -1,5 +1,6 @@
 import React from 'react';
 import { LegalLayout } from '../components/legal/LegalLayout';
+import { useSeo } from '../utils/seo';
 import { 
   ShieldCheck, 
   Lock, 
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react';
 
 export default function PrivacyPolicy() {
+  useSeo({ title: 'Privacy Policy — Draftly', description: 'How Draftly collects, uses and protects student data under the Nigeria Data Protection Act (NDPA).', canonical: '/privacy' });
   const toc = [
     { id: 'statutory-framework', title: '1. Statutory Framework & Scope' },
     { id: 'philosophy', title: '2. Product Philosophy & Privacy Pledge' },

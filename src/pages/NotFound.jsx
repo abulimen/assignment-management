@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import BrandMark from '../components/BrandMark';
+import { useSeo } from '../utils/seo';
 import {
   ArrowLeft,
   RefreshCw,
@@ -25,6 +26,7 @@ function createSeededRandom(seed) {
 }
 
 export default function NotFound() {
+  useSeo({ title: 'Page not found — Draftly', description: 'The page you’re looking for doesn’t exist. Return to your Draftly workspace.', noIndex: true });
   const navigate = useNavigate();
   const canvasRef = useRef(null);
   const animFrameRef = useRef(null);

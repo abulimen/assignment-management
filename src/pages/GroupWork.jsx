@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
 import { STATUS_LABEL } from '../utils/groupStatus';
+import { encodeId } from '../utils/id';
 import { reviewLink } from '../utils/links';
 import {
   ArrowLeft,
@@ -61,19 +62,25 @@ export default function GroupWork() {
     }
   }, [id, code]);
 
+  // Live roster: poll group detail so member status changes (Not Started →
+  // In Progress → Done) show up without a manual refresh — same 5s cadence
+  // as GroupEditor.
   useEffect(() => {
-    if (groups.length > 0) {
+    if (groups.length === 0) return undefined;
+    const load = () =>
       api.get(`groups/${groups[0].id}`)
         .then((d) => setGroup(d.group))
         .catch(() => {});
-    }
+    load();
+    const timer = setInterval(load, 5000);
+    return () => clearInterval(timer);
   }, [groups]);
 
   async function handleCreateGroup() {
     setError('');
     try {
       const d = await api.post('groups', {
-        assignment_id: parseInt(id),
+        assignment_id: id,
         name: groupName.trim() || undefined,
       });
       setGroup(d.group);
@@ -91,7 +98,7 @@ export default function GroupWork() {
       const d = await api.post('groups/join', { invite_code: joinValue });
       setGroup(d.group);
       setJoinCode('');
-      navigate(`/group/${d.group.assignment_id}`, { replace: true });
+      navigate(`/group/${encodeId(d.group.assignment_id)}`, { replace: true });
     } catch (err) {
       setError(err.message);
     }
@@ -294,7 +301,7 @@ export default function GroupWork() {
         </div>
 
         <button
-          onClick={() => navigate(`/group/${group.id}/edit`)}
+          onClick={() => navigate(`/group/${encodeId(group.id)}/edit`)}
           className="inline-flex items-center justify-center gap-2 min-h-11 px-6 py-2.5 bg-[#0047FF] hover:bg-[#0038CC] text-white text-xs sm:text-sm font-bold rounded-lg shadow-md shadow-blue-200 transition-all active:scale-[0.98] cursor-pointer shrink-0"
         >
           {frozen ? <Lock className="w-4 h-4" /> : <FileText className="w-4 h-4" />}

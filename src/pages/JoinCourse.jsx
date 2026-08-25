@@ -3,9 +3,11 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
 import { courseLink } from '../utils/links';
+import { useSeo } from '../utils/seo';
 import { BookOpen, KeyRound, ArrowRight, ShieldAlert, CheckCircle2 } from 'lucide-react';
 
 export default function JoinCourse() {
+  useSeo({ title: 'Join course — Draftly', description: 'Join a course on Draftly with your invite code.', noIndex: true });
   const { code } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();

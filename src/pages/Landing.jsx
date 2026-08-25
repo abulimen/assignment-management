@@ -12,6 +12,7 @@ import { Footer } from '../components/landing/Footer';
 import { EvidenceModal } from '../components/landing/EvidenceModal';
 import { InfoModal } from '../components/landing/InfoModal';
 import { useParallax, useScrollReveal } from '../hooks/useParallax';
+import { useSeo } from '../utils/seo';
 
 /** Scroll-reveal wrapper: fades + slides children into view on intersection. */
 function RevealSection({ children, className = '' }) {
@@ -24,6 +25,11 @@ function RevealSection({ children, className = '' }) {
 }
 
 export default function Landing() {
+  useSeo({
+    title: 'Draftly — See the work behind the submission',
+    description: 'Draftly gives students a workspace to complete assignments individually or together, and preserves how the work develops from first draft to final submission. Free for early lecturers during the beta.',
+    canonical: '/',
+  });
   const navigate = useNavigate();
   const scrollY = useParallax();
   const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
