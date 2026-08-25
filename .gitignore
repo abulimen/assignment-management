@@ -4,6 +4,15 @@ node_modules/
 *.log
 public/assets/
 __pycache__/
-# harness session artifacts
-.zcode/plans/
 gui-test-screenshots/
+
+# internal tooling and process docs — not part of the product
+.agents/
+.zcode/
+docs/
+scripts/
+AGENTS.md
+PRODUCT.md
+PROGRESS.md
+DESIGN.md
+DRAFTLY_MASTER_GUIDE.md
