@@ -220,26 +220,7 @@ The server also records when activity is received, allowing client-reported time
 
 At a high level, Draftly has four main parts:
 
-```text
-                    Draftly Web App
-                          │
-              ┌───────────┴───────────┐
-              │                       │
-          REST API              Collaboration
-              │                    Service
-              │                 Live documents
-              │                 Activity records
-              │                       │
-              └───────────┬───────────┘
-                          │
-                        MySQL
-                          │
-                     Stored work
-                          │
-                      Analyzer
-                          │
-                  Activity analysis
-```
+![Draftly architecture - web app, REST API, collaboration service, analyzer, and one shared MySQL database](diagrams/architecture.drawio.png)
 
 The web application handles the student and lecturer interfaces.
 
