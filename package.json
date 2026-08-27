@@ -8,7 +8,11 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:frontend": "vitest run",
+    "test:api": "npm test --prefix api",
     "test:collab": "npm test --prefix collab",
+    "test:analyzer": "npm test --prefix analyzer-node",
+    "test:setup-db": "bash database/build_test_db.sh",
     "test:all": "vitest run && npm test --prefix collab && npm test --prefix api && npm test --prefix analyzer-node"
   },
   "dependencies": {
