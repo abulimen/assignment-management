@@ -104,6 +104,8 @@ export async function createInternalApi({ port = 8004, pool, hocuspocus, interna
       const stateMatch = /^\/internal\/doc\/(\d+)\/state$/.exec(req.url || '');
       if (req.method === 'GET' && stateMatch) {
         const groupId = Number(stateMatch[1]);
+        const [[group]] = await pool.query('SELECT id FROM `groups` WHERE id = ?', [groupId]);
+        if (!group) return send(404, { error: 'Group not found' });
         const sha256 = await withDocument(docNameFor(groupId), (doc) => docContentSha256(doc));
         return send(200, { groupId, sha256 });
       }

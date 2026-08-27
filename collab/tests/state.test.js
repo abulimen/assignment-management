@@ -53,6 +53,11 @@ describe('GET /internal/doc/:groupId/state', () => {
     expect(wrong.status).toBe(401);
   });
 
+  it('returns 404 for a non-existent group', async () => {
+    const res = await state(999999);
+    expect(res.status).toBe(404);
+  });
+
   it('returns a deterministic sha256 for the same content', async () => {
     const seeded = await seedGroup(pool);
     const a = await state(seeded.groupId);

@@ -61,6 +61,17 @@ describe('POST /internal/doc/:groupId/seal', () => {
     expect(res.status).toBe(401);
   });
 
+  it('rejects sealing with missing submission_id with 400', async () => {
+    const seeded = await seedGroup(pool);
+    const res = await seal(seeded.groupId, null);
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 404 when sealing a non-existent group', async () => {
+    const res = await seal(999999, 1);
+    expect(res.status).toBe(404);
+  });
+
   it('snapshots the doc, freezes the group, and returns the rollup', async () => {
     const seeded = await seedGroup(pool);
     const [m0, m1] = seeded.memberIds;

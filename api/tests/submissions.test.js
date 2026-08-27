@@ -181,4 +181,14 @@ describe('PUT /api/submissions/:id', () => {
     expect(status).toBe(409);
     expect(json.error).toBe('Cannot edit submitted submission');
   });
+
+  it('403 when attempting to update another student draft', async () => {
+    const aid = await makeAssignment();
+    const created = await apiCall(h.api, 'submissions', { method: 'POST', token: student.token, body: { assignment_id: aid } });
+    const sid = created.json.submission.id;
+    const other = await registerUser(h.api, { name: 'Attacker Student' });
+    const { status, json } = await apiCall(h.api, `submissions/${sid}`, { method: 'PUT', token: other.token, body: { content: DOC } });
+    expect(status).toBe(403);
+    expect(json.error).toBe('Forbidden');
+  });
 });
