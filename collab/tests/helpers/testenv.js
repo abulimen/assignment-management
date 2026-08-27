@@ -1,7 +1,12 @@
 // Test harness: test DB access, seeding, and collab server lifecycle.
 import mysql from 'mysql2/promise';
 import net from 'node:net';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { createCollabServer } from '../../src/server.js';
+
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 export const TEST_DB = process.env.COLLAB_TEST_DB || 'assignment_mgmt_test';
 export const TEST_JWT_SECRET = 'test-jwt-secret';
@@ -17,7 +22,30 @@ export function dbConfig() {
   };
 }
 
+let dbBootstrapped = false;
+export async function buildTestDb() {
+  return new Promise((resolve, reject) => {
+    const child = spawn('bash', [path.join(REPO_ROOT, 'database/build_test_db.sh'), TEST_DB], {
+      env: { ...process.env, COLLAB_TEST_DB: TEST_DB },
+    });
+    let err = '';
+    child.stderr.on('data', (c) => { err += c; });
+    child.on('error', reject);
+    child.on('exit', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`build_test_db.sh failed (${code}): ${err}`));
+    });
+  });
+}
+
+export async function ensureTestDb() {
+  if (dbBootstrapped) return;
+  await buildTestDb();
+  dbBootstrapped = true;
+}
+
 export async function getPool() {
+  await ensureTestDb();
   return mysql.createPool({ ...dbConfig(), waitForConnections: true, connectionLimit: 5 });
 }
 
@@ -32,15 +60,12 @@ export function getFreePort() {
   });
 }
 
-// Seed a lecturer, a group assignment, a group with `memberCount` students,
-// and one outsider. Returns ids + JWTs are minted by the caller via Node jwt helper.
+// Seed a lecturer, a group assignment, a group with memberCount students,
+// and one outsider. Returns ids and JWTs are minted by the caller via Node jwt helper.
 export async function seedGroup(pool, { memberCount = 2, frozen = false } = {}) {
+  await ensureTestDb();
   const ts = Date.now() + Math.floor(Math.random() * 100000);
   const email = (n) => `u${ts}_${n}@test.local`;
-
-  const [[lecturer]] = await pool.query(
-    'SELECT id FROM users WHERE email = ? UNION ALL SELECT NULL LIMIT 1', [email('x')],
-  ).catch(() => [null]);
 
   const insUser = async (name, role) => {
     const [r] = await pool.query(
