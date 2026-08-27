@@ -2,323 +2,168 @@
 
 **The workspace for student assignments.**
 
-Draftly is a web-based workspace where students can write, organize, collaborate on, and submit assignments in one place.
+Draftly is a web-based educational workspace where students write, organize, collaborate on, and submit assignments in one place. Instead of treating an assignment as a static file uploaded at the deadline, Draftly preserves the writing process and its development history alongside the final submission.
 
-Instead of the assignment ending when a student uploads a file, Draftly keeps the work and its development history together.
+Students can work individually or collaborate in real time on shared group documents. Lecturers can review submitted work, inspect individual group member contributions measured by surviving text, and access process analytics when evaluating how an assignment developed.
 
-Students can work individually or with a group, while lecturers can review the finished work and access its history when they need more context.
+![The Draftly landing page: The workspace for student assignments](demo/01-landing.png)
 
-![The Draftly landing page — The workspace for student assignments](demo/01-landing.png)
+## 60-Second Overview: Why Draftly Exists
 
----
+Higher education faces two major challenges in modern student coursework:
 
-## What Draftly does
+1. Free-Riding in Group Assignments: In traditional group assignments, several names appear on a single uploaded document, but educators have no reliable way to verify whether all students contributed fairly.
+2. The AI Detection Arms Race: Generative AI tools have made traditional text-based AI detectors unreliable. Detectors produce black-box percentage scores that fail to explain how a document was created, creating false accusations and friction between students and faculty.
 
-Draftly brings the assignment process into one workspace.
+Draftly approaches these problems through process-first architecture:
 
-A student can:
+* For Group Work: Every group member writes in a shared, real-time collaborative document powered by Yjs CRDTs. When the assignment is submitted, the server freezes the document and computes individual contributions based on the surviving text that remains in the final submission.
+* For Writing Process Integrity: As students write in the Microsoft Word-styled rich text editor, Draftly records process telemetry (typing speed, pause distributions, editing cadence, and pasted text blocks). This telemetry provides educators with rich contextual evidence of how work evolved over time, rather than relying on a black-box AI score.
 
-* Write directly in a Word-style editor.
-* Organize longer assignments into sections.
-* Work alone or collaborate with a group in real time.
-* See who is currently working on the document.
-* Continue working without manually saving different versions.
-* Submit the finished assignment as a fixed record of the work.
+![Two students editing the same group document at the same time with live collaborative cursors](demo/04-realtime-collaboration.png)
 
-For group assignments, each member's contribution is tracked throughout the document. The system can later show how much of the final document came from each member.
+## Architecture Overview
 
-Lecturers can review the submitted work normally, while having access to the development history when they need it.
+Draftly is built as an independent multi-service architecture sharing a single MySQL database and unified JWT authentication:
 
-![Two students editing the same group document at the same time, each with a live cursor](demo/04-realtime-collaboration.png)
+![Draftly architecture diagram showing React frontend, Node REST API, Node Collab service, Node Analyzer engine, and MySQL](diagrams/architecture.drawio.png)
 
-*Two students writing in the same group document at the same time — each sees the other's cursor live.*
+* Frontend (Vite, React 18, Tailwind CSS, TipTap 2.6): Word-styled rich text writing environment with live cursor presence, section reordering, and analytics visualization.
+* API Service (Node HTTP, Port 8001): Handles authentication, courses, assignments, group management, submission lifecycle, review aggregation, and static hosting of the production SPA.
+* Collaboration Service (Hocuspocus and Node WebSocket, Ports 8003, 8004, 8005): Manages Yjs CRDT document synchronization (Port 8003), loopback internal state and sealing HTTP API (Port 8004), and realtime event tracking intake (Port 8005).
+* Analyzer Service (Node HTTP, Port 8002): Stateless originality verdict engine calculating continuous mathematical curves across 5 weighted factors with zero veto caps.
+* Database (MySQL 8, InnoDB, utf8mb4): Shared relational store with prepared queries and strict foreign key integrity.
 
----
+## Core Documentation
 
-## Why I built it
+* [Architecture Decisions (DECISIONS.md)](DECISIONS.md): In-depth rationale for 7 key engineering decisions, alternatives considered, trade-offs, and limitations.
+* [Known Limitations (KNOWN_LIMITATIONS.md)](KNOWN_LIMITATIONS.md): Transparent technical boundaries regarding scaling, offline support, and attribution scope.
+* [Security Policy (SECURITY.md)](SECURITY.md): Trust model, internal service authorization, and dependency security audit findings.
+* [Technical Interview Guide (INTERVIEW_GUIDE.md)](INTERVIEW_GUIDE.md): Codebase defense guide with architectural deep-dive questions and a 12-location code defense map.
 
-Generative AI has changed the way students write assignments.
+## Writing Process Telemetry and Scientific Honesty
 
-Today, a lecturer can receive a piece of work and run it through an AI detector, only to get a score saying that the work is probably AI-generated. But a score doesn't explain how the assignment was actually written. At the same time, students can use tools designed to avoid these detectors, while detector companies continue trying to catch up with these tools. It ends up becoming a constant race, and neither side gets a clear answer.
+Draftly deliberately distinguishes between process evidence and automated claims:
 
-So I started thinking about a different approach. **Instead of trying to guess how an assignment was written from the final document, why not keep track of the work as it happens?**
+* Context, Not Automated Verdicts: Process telemetry (typing cadence, pause intervals, document growth, and paste history) gives lecturers observable evidence of how work developed. It does NOT claim to prove human authorship or prove that generative AI was not used.
+* Explainable Scoring: The analyzer engine uses continuous curves without arbitrary veto caps. Pasting text lowers the paste factor score proportionally based on paste volume, but does not trigger an automatic failure.
+* Human Decision-Making: The final evaluation remains in the hands of the educator.
 
-That would give both students and lecturers something much more useful than a single AI-generated score. A student could show how their work developed over time, while a lecturer could look at the actual writing process when something needed closer attention.
+![A reviewed document showing typed text and pasted text highlighted separately](demo/06-paste-highlights.png)
 
-The same idea applies to group assignments. It is easy to submit one document with five names on it, but much harder to know whether all five people actually contributed to the work.
+![Writing analytics showing document growth and rhythm charts](demo/07-writing-analytics.png)
 
-Draftly therefore keeps track of both how the work developed and who contributed to it, giving lecturers more information to work with instead of asking them to rely on a single AI-detection score or simply trust the final document.
+## Quick Start and Local Setup
 
----
+### Prerequisites
 
-## How it works
+* Node.js 18 or higher
+* MySQL 8
+* npm 9 or higher
 
-### 1. An assignment is created
-
-A lecturer creates an assignment and sets the instructions for students.
-
-![Lecturer creating a new course assignment, with group work enabled](demo/02-create-assignment.png)
-
-*A lecturer creating an assignment. Group work can be enabled with one option.*
-
-### 2. Students work inside Draftly
-
-Students open the assignment and begin writing directly in the editor.
-
-They can format their work, create sections, make changes, and continue developing the document. Drafts save automatically as they write.
-
-### 3. Groups can work together
-
-Students can work on the same document at the same time through our live collaborative editor, with changes appearing for everyone in real time.
-
-Each person can see the other members working, while sections can be created and rearranged as the assignment develops.
-
-### 4. Draftly keeps the work history
-
-Changes made while writing are recorded as the assignment develops.
-
-This allows the system to reconstruct how the document changed over time instead of only keeping the final version.
-
-### 5. The assignment is submitted
-
-When the student or group submits the assignment, Draftly creates a fixed version of the document.
-
-The submitted version cannot simply be changed afterwards.
-
-The lecturer can then review the final document and open the work history whenever more context is needed.
-
-![Group submission confirmation — submitting seals the shared document](demo/05-group-submission.png)
-
-*A group leader submitting. Sealing the document means no further edits are permitted.*
-
----
-
-## Built for individual and group work
-
-Draftly supports two main ways of working.
-
-### Individual assignments
-
-A student gets their own workspace where they can write and develop the assignment from beginning to submission.
-
-The system keeps the writing history with the final submission.
-
-### Group assignments
-
-Several students can work on the same document at the same time.
-
-Draftly also keeps track of individual contributions, allowing the final document to show how much of the surviving text came from each member.
-
-This is more useful than simply counting how many characters each person typed, because students delete, rewrite, and edit each other's work.
-
-![A group workspace with the shared document and team roster](demo/03-group-workspace.png)
-
-*A group workspace: one shared document, a team roster with completion status, and an invite link.*
-
----
-
-## Understanding how the work was created
-
-Draftly records more than the final document.
-
-Depending on the type of activity, lecturers can inspect things such as:
-
-* How the document developed over time.
-* Editing activity.
-* Writing speed and changes in writing rhythm.
-* Text that was pasted into the document.
-* Individual group contributions.
-* The timeline of the writing process.
-
-This information gives lecturers more context around a submission.
-
-It does **not** decide whether a student cheated or whether something was written by AI.
-
-The system provides information for the lecturer to review; the final decision remains with a human.
-
-For example, text that was typed is highlighted separately from text that was pasted:
-
-![A reviewed document with typed text and pasted text highlighted differently](demo/06-paste-highlights.png)
-
-*Typed text and pasted text are highlighted separately during review.*
-
-Writing activity is summarized as charts and a chronological timeline:
-
-![Writing analytics — document growth and writing rhythm charts](demo/07-writing-analytics.png)
-
-*Document growth and writing rhythm for the session.*
-
-![The process timeline of a writing session](demo/08-process-timeline.png)
-
-*The process timeline: when writing started, where text was pasted, breaks taken, and when the submission was sealed.*
-
----
-
-## Core Features
-
-Draftly currently includes:
-
-**Writing workspace**
-
-* Word-style rich text editor.
-* Formatting, headings, tables, blockquotes, and other academic writing tools.
-* Automatic saving as the document changes.
-* Structured sections for larger assignments.
-
-**Real-time collaboration**
-
-* Multiple students editing the same document at once.
-* Live cursors and user presence.
-* Group sections can be created and reordered.
-* Member completion status and submission rules (a group leader submits; overriding members who aren't finished requires a recorded reason).
-
-**Work history**
-
-* Changes are recorded while students write.
-* Previous states can be reconstructed and played back.
-* Pasted text can be identified and reviewed.
-* Writing activity can be displayed as a timeline.
-
-**Submission records**
-
-* Submitted documents are frozen on the server and can't be modified after.
-* The final document stays connected to its development history.
-
-**Review tools**
-
-* Group contribution breakdown.
-* Writing activity information.
-* Pasted-text review.
-* Submission history.
-* Activity analysis that helps lecturers decide whether a submission needs closer attention.
-
----
-
-## A few engineering problems I had to solve
-
-Draftly became more than an editor once I started trying to preserve the history of a document while several people could change it at the same time.
-
-### Tracking group contributions
-
-One of the biggest challenges was measuring each member's contribution when several people are editing the same document.
-
-Draftly keeps authorship information attached to the text as it is written, so each piece of text can be traced back to the member who wrote it.
-
-When the assignment is submitted, the system uses the text that remains in the final document to calculate each member's contribution.
-
-### Keeping submissions trustworthy
-
-The client should not have the final say over what was submitted.
-
-When a student or group submits an assignment, Draftly creates the final record on the server and generates a checksum for it. This provides a way to detect if the stored submission is changed later.
-
-The server also records when activity is received, allowing client-reported timestamps to be checked against the server's own time.
-
----
-
-## How the system is structured
-
-At a high level, Draftly has four main parts:
-
-![Draftly architecture - web app, REST API, collaboration service, analyzer, and one shared MySQL database](diagrams/architecture.drawio.png)
-
-The web application handles the student and lecturer interfaces.
-
-The REST API handles accounts, courses, assignments, submissions, and review data. It also serves the built web application.
-
-The collaboration service keeps shared documents synchronized between students, receives the recorded writing activity, and freezes the document when work is submitted.
-
-The analyzer processes the recorded activity and provides the information shown during review.
-
-All four parts share one MySQL database and one login system.
-
----
-
-## Technology
-
-| Technology           | Used for                        |
-| -------------------- | ------------------------------- |
-| React + Vite         | Web application                 |
-| TipTap / ProseMirror | Writing editor                  |
-| Yjs + Hocuspocus     | Real-time collaboration         |
-| Node.js              | Backend services                |
-| MySQL                | Application and assignment data |
-| JWT + bcrypt         | Authentication                  |
-| Tailwind CSS         | Interface styling               |
-| Recharts             | Activity charts                 |
-| Vitest               | Automated testing               |
-
----
-
-## Current limitations
-
-Draftly is still a work in progress.
-
-Some of the current limitations are:
-
-* The activity analysis can highlight unusual writing patterns, but it cannot prove that a student cheated or used AI.
-* Pasted text is recorded, but Draftly does not currently compare it with external sources.
-* Offline writing is not currently supported; the offline version mainly provides the application shell.
-* The current architecture runs on a single server and is designed for development and testing rather than large-scale deployment.
-
-These are areas I intend to address as the project develops.
-
----
-
-## What's next
-
-The next stage is to turn Draftly from a working project into something real schools could use.
-
-My priorities are:
-
-1. Improve the activity analysis and make it harder to manipulate.
-2. Improve playback for group documents.
-3. Improve offline support.
-4. Prepare the system for larger numbers of students and assignments.
-5. Test the product with real students and lecturers.
-
----
-
-## Project status
-
-**Working locally:** Yes
-
-**Individual assignments:** Working
-
-**Real-time group assignments:** Working
-
-**Submission and work history:** Working
-
-**Activity analysis:** Working
-
-Draftly is currently still in its early stages. The goal is to continue developing it toward a system that can eventually be tested with real schools.
-
-To run it locally (Node 18+ and MySQL 8):
+### 1. Clone and Install Dependencies
 
 ```bash
-# apply database/schema.sql and database/migration_*.sql to a MySQL
-# database named assignment_mgmt (settings in .env.example), then:
+git clone https://github.com/abulimen/assignment-management.git
+cd assignment-management
+
+# Clean installation across all services
+npm ci
+npm ci --prefix api
+npm ci --prefix collab
+npm ci --prefix analyzer-node
+npm ci --prefix shared/core
+```
+
+### 2. Configure Environment
+
+Copy the example environment configuration:
+
+```bash
+cp .env.example .env
+```
+
+Ensure your MySQL server is running. For local development on loopback (127.0.0.1), default settings will connect to MySQL root with no password. If your MySQL setup uses a password, set `DB_PASS=your_password` in `.env`.
+
+### 3. Initialize the Database
+
+Create the development database:
+
+```bash
+mysql -h 127.0.0.1 -u root -e "CREATE DATABASE IF NOT EXISTS assignment_mgmt CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+# Apply schema and migrations
+mysql -h 127.0.0.1 -u root assignment_mgmt < database/schema.sql
+for migration in database/migration_*.sql; do
+  mysql -h 127.0.0.1 -u root assignment_mgmt < "$migration"
+done
+```
+
+### 4. Start All Services
+
+Launch all four services (API `:8001`, Analyzer `:8002`, Collab `:8003/:8004/:8005`, Vite `:3000`) with a single command:
+
+```bash
 ./start.sh
 ```
 
----
+Open your browser at `http://localhost:3000`.
 
-## Demo
+## Automated Test Suites
 
-The screenshots throughout this README show Draftly as it is today. This section is still under progress — more polished captures and a fuller walkthrough of the review experience will be added as the interface settles.
+Draftly includes comprehensive test suites across all layers (370+ total automated tests):
 
----
+```bash
+# Run the entire test suite across all services
+npm run test:all
 
-## About
+# Run individual test suites
+npm run test:frontend    # React unit and component tests (130 tests)
+npm run test:collab      # Collab server, Yjs sync, and sealing tests (50 tests)
+npm run test:api         # REST API contract and authorization tests (153 tests)
+npm run test:analyzer    # Originality scoring fairness and engine tests (45 tests)
+```
+
+Integration tests automatically bootstrap and migrate the test database (`assignment_mgmt_test`) if it does not already exist.
+
+## 90-Second Interactive Demonstration
+
+To experience Draftly's flagship collaborative features in under two minutes:
+
+1. Open Two Browser Windows:
+   * Window A (Incognito): Navigate to `http://localhost:3000/register` and register as a Student named Alice.
+   * Window B: Navigate to `http://localhost:3000/register` and register as a Student named Bob.
+2. Join a Group Assignment:
+   * Alice creates or opens a group assignment workspace and copies the Group Invite Code.
+   * Bob clicks Join Group and enters the invite code.
+3. Simultaneous Real-Time Editing:
+   * Both Alice and Bob type in the document at the same time.
+   * Observe live remote cursors, real-time character synchronization, and instant section updates.
+4. Member Completion Vector:
+   * Alice clicks Mark Section Done. Her status in the group roster changes to Done with an immutable document snapshot hash.
+5. Group Leader Submission and Sealing:
+   * When all members are marked Done, the group leader submits the assignment.
+   * The server executes a two-phase seal: freezing the document, computing surviving character counts per author, generating a SHA-256 checksum, and downgrading all live client connections to read-only mode.
+6. Lecturer Review:
+   * Log in as a Lecturer and navigate to the assignment submission review page.
+   * Inspect the Contribution X-Ray breakdown, paste analysis, document growth chart, and typing cadence timeline.
+
+## Technology Stack
+
+| Layer | Technology | Purpose |
+| :--- | :--- | :--- |
+| Frontend | React 18, Vite, Tailwind CSS | High-performance single page application |
+| Editor | TipTap 2.6, ProseMirror | Word-styled rich text editor with custom extensions |
+| Realtime | Yjs CRDTs, Hocuspocus | Real-time collaborative document synchronization |
+| Backend API | Node.js (node:http) | High-throughput REST API and static asset hosting |
+| Collaboration | Node.js, ws | Dedicated WebSocket room and tracking server |
+| Analyzer | Node.js | Stateless continuous originality scoring engine |
+| Database | MySQL 8 (InnoDB, utf8mb4) | Relational store with parameterized prepared queries |
+| Security | JWT (HS256), bcrypt | Role-based and row-level access control |
+| Testing | Vitest | Automated contract, fairness, and integration testing |
+
+## License and Author
 
 Built by **Samuel Jonathan** ([@abulimen](https://github.com/abulimen)).
 
-Draftly is an ongoing project exploring what happens when the assignment itself becomes the workspace — rather than simply the final file submitted at the end.
-
----
-
-## License
-
-**This repository is publicly available for portfolio and evaluation purposes. The source code is not licensed for reuse, redistribution, or commercial use.**
-
-See [LICENSE](LICENSE) for the full terms.
+This repository is publicly available for portfolio and evaluation purposes. See [LICENSE](LICENSE) for terms.

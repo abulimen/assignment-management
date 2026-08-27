@@ -6,7 +6,7 @@ public/assets/
 __pycache__/
 gui-test-screenshots/
 
-# internal tooling and process docs — not part of the product
+# Internal tooling and process docs: not part of the product
 .agents/
 .zcode/
 docs/
